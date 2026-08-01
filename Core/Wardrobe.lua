@@ -3523,14 +3523,80 @@ function Wardrobe.ClearAllSelections()
     end
 end
 
+local function ModelTryOnSucceeded(result)
+    local successValue = Enum and Enum.ItemTryOnReason and Enum.ItemTryOnReason.Success
+    return result == nil or successValue == nil or result == successValue
+end
+
+local function VerifyModelSlotAppearance(model, slotID, expectedAppearanceID)
+    if not model or not slotID or type(model.GetItemTransmogInfo) ~= "function" then
+        return nil -- Verification is unavailable on this client.
+    end
+    local info = SafeCall(model.GetItemTransmogInfo, model, slotID)
+    if not info then
+        return false
+    end
+    return tonumber(info.appearanceID) == tonumber(expectedAppearanceID)
+end
+
+local function ApplyWeaponSourceToModel(model, source, definition)
+    local slotID = SafeCall(GetInventorySlotInfo, definition.slotName)
+    if not slotID then
+        return false
+    end
+
+    -- Slot-based transmog exceptions such as Fury's one-hand appearances over
+    -- equipped two-handers are represented by the inventory slot, not merely by
+    -- trying an appearance on the model. Clear the equipped visual first so a
+    -- silent no-op can never masquerade as a successful linked preview.
+    if type(model.UndressSlot) == "function" then
+        SafeCall(model.UndressSlot, model, slotID)
+    end
+
+    if type(model.SetItemTransmogInfo) == "function" then
+        local info = CreateItemTransmogInfo(source.sourceID)
+        -- Let a main-hand weapon update any child state first. The explicitly
+        -- assigned secondary hand is replayed afterward and must not disturb the
+        -- main hand or inherit a two-handed child relationship.
+        local ignoreChildItems = definition.slotName == "SECONDARYHANDSLOT"
+        local ok, result = pcall(model.SetItemTransmogInfo, model, info, slotID, ignoreChildItems)
+        if ok and ModelTryOnSucceeded(result) then
+            local verified = VerifyModelSlotAppearance(model, slotID, source.sourceID)
+            if verified ~= false then
+                return true
+            end
+        end
+    end
+
+    -- Compatibility fallback for older clients. Verify the slot afterward when
+    -- the model exposes GetItemTransmogInfo; TryOn can otherwise return success
+    -- while leaving the equipped secondary-hand visual unchanged.
+    if type(model.TryOn) == "function" then
+        local ok, result = pcall(model.TryOn, model, source.sourceID, definition.slotName)
+        if ok and ModelTryOnSucceeded(result) then
+            local verified = VerifyModelSlotAppearance(model, slotID, source.sourceID)
+            if verified ~= false then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
 function Wardrobe.ApplyPreview(model)
     if not model then
         return false, "Preview model is unavailable."
     end
 
     SafeCall(model.SetUnit, model, "player")
+    SafeCall(model.SetAutoDress, model, true)
+    SafeCall(model.SetUseTransmogChoices, model, true)
+    SafeCall(model.SetUseTransmogSkin, model, true)
+
     local applied = 0
     local failed = 0
+    local failedSlots = {}
     local state = EnsurePreviewState()
     for _, definition in ipairs(Wardrobe.slotDefinitions) do
         local source = Wardrobe.GetSelectedSource(definition.key)
@@ -3541,26 +3607,30 @@ function Wardrobe.ApplyPreview(model)
             end
         elseif source then
             local valid = Wardrobe.ValidateSource(source, definition.key)
-            if valid and source.sourceID and model.TryOn then
-                -- TryOn accepts an item link or item-modified appearance ID.
-                -- A transmog sourceID is the latter; itemID is a different
-                -- namespace and can silently leave the equipped visual intact.
-                local handSlotName
-                if definition.slotName == "MAINHANDSLOT" or definition.slotName == "SECONDARYHANDSLOT" then
-                    handSlotName = definition.slotName
+            if valid and source.sourceID then
+                local success
+                if definition.weaponRole then
+                    success = ApplyWeaponSourceToModel(model, source, definition)
+                elseif type(model.TryOn) == "function" then
+                    local ok, result = pcall(model.TryOn, model, source.sourceID)
+                    success = ok and ModelTryOnSucceeded(result)
                 end
-                local ok, result = pcall(model.TryOn, model, source.sourceID, handSlotName)
-                local successValue = Enum and Enum.ItemTryOnReason and Enum.ItemTryOnReason.Success
-                if ok and (result == nil or successValue == nil or result == successValue) then
+
+                if success then
                     applied = applied + 1
                 else
                     failed = failed + 1
+                    table.insert(failedSlots, definition.label)
                 end
             end
         end
     end
     if failed > 0 then
-        return false, string.format("Previewed %d selected appearances; %d could not be applied by WoW.", applied, failed)
+        return false, string.format(
+            "Previewed %d selected appearances; WoW could not apply %s.",
+            applied,
+            table.concat(failedSlots, ", ")
+        )
     end
     return true, string.format("Previewed %d selected appearances.", applied)
 end

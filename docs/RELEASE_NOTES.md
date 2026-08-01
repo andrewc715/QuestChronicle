@@ -1,45 +1,33 @@
-# Quest Chronicle v1.6.2: Linked Weapon Hands Fix
+# Quest Chronicle v1.6.3: Linked Weapon Preview Slot Fix
 
-Version 1.6.2 repairs the final coordination step in the Weapon Appearance Rules system.
+Version 1.6.3 repairs the remaining live-client failure in **Link weapon hands** for slot-based weapon transmog exceptions such as Fury Warrior.
 
-## The problem
+## What the screenshots revealed
 
-The v1.6.1 Fury permission fix correctly allowed one-handed appearances over equipped two-handed weapons. However, **Link weapon hands** only preferred the same broad family and exact subtype before falling back to any other legal second-hand type.
+v1.6.2 correctly generated and stored a linked one-handed sword for the secondary hand, but the embedded model continued showing the physically equipped two-handed off-hand weapon. The problem was no longer generation. It was the final model handoff.
 
-That allowed a generated main-hand one-handed sword to be paired with an unrelated two-handed axe even though linking was enabled.
+`DressUpModel:TryOn(sourceID, "SECONDARYHANDSLOT")` can return success while leaving the existing secondary-hand visual untouched when the equipped weapon and selected appearance use Blizzard's special slot-based compatibility rules.
 
-## The corrected link contract
+## Fixed
 
-When two weapon hands are equipped and linking is enabled, Quest Chronicle now follows this strict order:
+- Weapon previews now use `DressUpModel:SetItemTransmogInfo()` with the actual Main Hand or Secondary Hand inventory slot.
+- Main Hand is applied before Secondary Hand.
+- Secondary Hand uses child-item isolation so it cannot inherit or preserve the equipped two-handed relationship.
+- The equipped weapon visual is cleared before an explicit generated weapon is assigned, preventing silent no-op previews from looking successful.
+- The resulting model slot is verified through `GetItemTransmogInfo()` when available.
+- `TryOn()` remains only as a compatibility fallback and is also verified.
+- Preview failures now identify the exact slot WoW refused instead of reporting only a generic count.
 
-1. Use the exact same collapsed transmog visual in both hands when Blizzard permits it.
-2. If the exact visual cannot be used in the second hand, choose another appearance from the same exact weapon subtype.
-3. If neither is possible, retain the equipped second-hand appearance and report the limitation.
+## Link behavior retained
 
-Quest Chronicle will no longer substitute an unrelated family or type while the hands are linked.
-
-## Where the rule applies
-
-The stricter link behavior now governs:
-
-- Generate Outfit;
-- Reroll Unlocked;
-- main-hand Reroll Slot;
-- manual main-hand appearance selection.
-
-Independent weapon generation remains available by clearing **Link weapon hands**.
-
-## Fury example
-
-With dual two-handed weapons physically equipped, Fury may choose One-Handed Sword appearances when Blizzard permits them. If linking is enabled and the main hand receives a collected sword visual, Quest Chronicle attempts that same sword visual in the second hand.
-
-If Blizzard rejects that exact visual for the second hand, Quest Chronicle may choose a different One-Handed Sword, but it will not switch to an axe, mace, staff, or another unrelated type.
+- Exact same visual in both hands when Blizzard permits it.
+- Another appearance from the same exact subtype only when the visual cannot be duplicated.
+- No unrelated weapon family or subtype fallback.
+- The second hand remains unchanged only when no valid linked selection exists before previewing.
 
 ## Compatibility
 
-- Addon version: `1.6.2`
-- SavedVariables schema: `2`
-- Courier format: `1`
-- Wardrobe cache format: `6`
-
-No collection rescan, saved-concept migration, or Custom Set rebuild is required solely for this update.
+- SavedVariables schema remains 2.
+- Courier format remains 1.
+- Wardrobe cache format remains 6.
+- No collection rescan, concept migration, or Custom Set rebuild is required.

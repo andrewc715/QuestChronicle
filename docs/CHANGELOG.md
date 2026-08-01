@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.6.3 - 2026-08-01
+
+### Fixed
+
+- Replaced weapon preview `TryOn()` calls with explicit per-inventory-slot `SetItemTransmogInfo()` assignments.
+- Applies Main Hand before Secondary Hand and isolates secondary-hand child-item behavior.
+- Clears the equipped weapon visual before assigning an explicit generated weapon.
+- Verifies the resulting model-slot appearance when `GetItemTransmogInfo()` is available.
+- Retains verified `TryOn()` only as a compatibility fallback.
+- Reports the exact preview slot WoW refused.
+- Fixes linked Fury previews that stored matching one-handed selections but continued displaying the equipped two-handed off-hand weapon.
+
+### Compatibility
+
+- Preserves SavedVariables schema 2, Courier format 1, and wardrobe cache format 6.
+- No wardrobe rescan or concept migration is required.
+
 ## 1.6.2 - 2026-08-01
 
 ### Fixed

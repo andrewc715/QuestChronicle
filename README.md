@@ -1,4 +1,4 @@
-# Quest Chronicle v1.6.2
+# Quest Chronicle v1.6.3
 
 > **Linked weapon hands fix:** v1.6.2 now matches the same visual in both weapon hands whenever Blizzard permits it, falls back only to the same exact weapon type, and never substitutes an unrelated type while linking is enabled.
 
