@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.2 - 2026-08-01
+
+### Polished
+
+- Current Preview now labels generated weapons as Main Hand and Off Hand.
+- Linked Two-Hand pairs are listed as two selected rows instead of one collapsed family row.
+- One-Hand, Two-Hand, and companion layouts now use consistent hand terminology.
+- Current Look counts both generated weapon hands when both selections exist.
+- Preserved the v1.7.1 route engine and preview behavior unchanged.
+
 ## 1.7.1 - 2026-08-01
 
 ### Fixed

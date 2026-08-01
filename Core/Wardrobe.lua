@@ -3930,10 +3930,26 @@ function Wardrobe.GetPreviewManifest()
         local displayLabel = definition.label
         if definition.weaponRole then
             if selectedWeaponMode then
-                include = definition.key == selectedWeaponMode or (definition.key == "OFF_HAND" and selectedWeaponMode == "ONE_HAND")
+                if definition.key == selectedWeaponMode then
+                    include = true
+                    displayLabel = "Main Hand"
+                elseif definition.key == "OFF_HAND" then
+                    -- A secondary weapon is stored in OFF_HAND regardless of
+                    -- whether the active route is One-Hand or Two-Hand. Preserve
+                    -- the existing One-Hand companion behavior, while also
+                    -- listing generated Fury Two-Hand pairs explicitly.
+                    include = state.selections.OFF_HAND ~= nil or selectedWeaponMode == "ONE_HAND"
+                    displayLabel = "Off Hand"
+                else
+                    include = false
+                end
             else
                 include = definition.key == "ONE_HAND" or definition.key == "OFF_HAND"
-                if definition.key == "ONE_HAND" then displayLabel = "Main Hand" end
+                if definition.key == "ONE_HAND" then
+                    displayLabel = "Main Hand"
+                elseif definition.key == "OFF_HAND" then
+                    displayLabel = "Off Hand"
+                end
             end
         end
 
