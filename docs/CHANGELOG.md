@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.0.0 - 2026-07-31
+
+### Added
+
+- Saves Quest Chronicle concepts into real World of Warcraft transmog outfit slots through the current `C_TransmogOutfitInfo` system.
+- Links each concept to its Blizzard outfit ID so later saves update the same native slot.
+- Adds **Save to WoW** for migrating existing concepts without allocating slots automatically at login.
+- Shows **Quest Chronicle only**, **Saving to WoW**, **WoW Outfit**, missing, and failed states directly in the concept manager.
+- Converts stable collapsed visual IDs, hidden/equipped armor states, and the valid current weapon option into Blizzard's native outfit format.
+
+### Completed
+
+- Complete Chronicle recorder and active quest lifecycle.
+- RP journal and Courier format 1 export snapshot.
+- Zone-aware, era-aware, Chronicle-aware outfit designer.
+- Saved concept lifecycle, stable appearance recovery, and native outfit persistence.
+- Stable migrations, release documentation, and live verification coverage.
+
+### Compatibility
+
+- Preserves wardrobe cache format 5, SavedVariables schema 2, and Courier format 1.
+- Existing concepts remain intact and migrate to native outfit slots only when the player chooses to save them.
+- Native outfit saving does not apply a transmog or spend gold.
+
 ## 0.9.2 - 2026-07-31
 
 ### Fixed
