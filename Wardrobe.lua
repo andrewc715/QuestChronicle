@@ -992,7 +992,12 @@ function Wardrobe.SaveConcept(name)
 
     local now = time()
     if not concept then
-        local identifier = string.format("%s:%d:%d", characterKey, now, #Wardrobe.GetConcepts() + 1)
+        local sequence = #Wardrobe.GetConcepts() + 1
+        local identifier = string.format("%s:%d:%d", characterKey, now, sequence)
+        while store[identifier] do
+            sequence = sequence + 1
+            identifier = string.format("%s:%d:%d", characterKey, now, sequence)
+        end
         concept = { id = identifier, createdAt = now, characterKey = characterKey }
         store[identifier] = concept
     end
@@ -1038,6 +1043,23 @@ function Wardrobe.LoadConcept(conceptID)
         return true, string.format("Loaded %s; %d unavailable appearances were skipped.", concept.name or "concept", missing), concept
     end
     return true, "Loaded outfit concept: " .. tostring(concept.name or "Unnamed"), concept
+end
+
+function Wardrobe.DeleteConcept(conceptID)
+    local store = EnsureConceptStore()
+    local concept = store[conceptID]
+    if not concept then
+        return false, "That outfit concept is no longer available."
+    end
+    store[conceptID] = nil
+    local state = EnsurePreviewState()
+    if state.selectedConceptID == conceptID then
+        state.selectedConceptID = nil
+    end
+    if QC.Notify then
+        QC.Notify("WARDROBE_CONCEPTS_CHANGED")
+    end
+    return true, "Deleted outfit concept: " .. tostring(concept.name or "Unnamed")
 end
 
 function Wardrobe.GetSelectedSource(slotKey)

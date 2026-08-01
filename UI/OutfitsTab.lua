@@ -5,41 +5,7 @@ local Wardrobe = QC.Wardrobe
 local SOURCE_ROWS = 7
 local SOURCE_ROW_HEIGHT = 37
 local SOURCE_ROW_SPACING = 2
-
-local SAVE_CONCEPT_DIALOG = "QUEST_CHRONICLE_SAVE_OUTFIT_CONCEPT"
-if StaticPopupDialogs and not StaticPopupDialogs[SAVE_CONCEPT_DIALOG] then
-    StaticPopupDialogs[SAVE_CONCEPT_DIALOG] = {
-        text = "Name this Quest Chronicle outfit concept:",
-        button1 = SAVE,
-        button2 = CANCEL,
-        hasEditBox = true,
-        maxLetters = 48,
-        OnShow = function(self, pane)
-            local suggested = pane and pane.GetSuggestedConceptName and pane:GetSuggestedConceptName() or "Outfit Concept"
-            self.editBox:SetText(suggested)
-            self.editBox:HighlightText()
-            self.editBox:SetFocus()
-        end,
-        OnAccept = function(self, pane)
-            if pane and pane.SaveConcept then
-                pane:SaveConcept(self.editBox:GetText())
-            end
-        end,
-        EditBoxOnEnterPressed = function(self)
-            local dialog = self:GetParent()
-            if dialog and dialog.button1 then
-                dialog.button1:Click()
-            end
-        end,
-        EditBoxOnEscapePressed = function(self)
-            self:GetParent():Hide()
-        end,
-        timeout = 0,
-        whileDead = true,
-        hideOnEscape = true,
-        preferredIndex = 3,
-    }
-end
+local CONCEPT_ROWS = 4
 
 local function GetState()
     return Wardrobe.GetPreviewState()
@@ -63,28 +29,66 @@ local function SourceLabel(source)
     return string.format("%s%s|r", color, source.name or ("Appearance " .. tostring(source.sourceID or 0)))
 end
 
-local function ShowConceptMenu(button, pane)
-    local concepts = Wardrobe.GetConcepts()
-    if #concepts == 0 then
-        pane:Refresh("No outfit concepts have been saved yet.")
-        return
+local function CountMap(values)
+    local count = 0
+    for _, value in pairs(values or {}) do
+        if value ~= nil and value ~= false then
+            count = count + 1
+        end
     end
+    return count
+end
 
-    if MenuUtil and type(MenuUtil.CreateContextMenu) == "function" then
-        MenuUtil.CreateContextMenu(button, function(_, rootDescription)
-            if rootDescription.CreateTitle then
-                rootDescription:CreateTitle("Load Outfit Concept")
-            end
-            for _, concept in ipairs(concepts) do
-                local label = concept.name or "Unnamed Concept"
-                local conceptID = concept.id
-                rootDescription:CreateButton(label, function()
-                    pane:LoadConcept(conceptID)
-                end)
-            end
-        end)
-    else
-        pane:LoadConcept(concepts[1].id)
+local function ConceptDetail(concept)
+    local updated = concept.updatedAt and UI.FormatShortTimestamp(concept.updatedAt) or "Unknown time"
+    return string.format(
+        "%d appearances • %d locked • %d hidden • %s",
+        CountMap(concept.selections),
+        CountMap(concept.locks),
+        CountMap(concept.hidden),
+        updated
+    )
+end
+
+local function CreateLockedSlotVisual(button)
+    local icon = button:CreateTexture(nil, "OVERLAY")
+    icon:SetSize(15, 15)
+    icon:SetPoint("RIGHT", button, "RIGHT", -4, 0)
+    icon:SetTexture("Interface\\Buttons\\LockButton-Locked-Up")
+    icon:SetVertexColor(1, 0.82, 0.12)
+    icon:Hide()
+    button.lockIcon = icon
+
+    local edges = {}
+    local function Edge(point1, point2, width, height)
+        local edge = button:CreateTexture(nil, "OVERLAY")
+        edge:SetColorTexture(1, 0.72, 0.08, 0.95)
+        edge:SetPoint(point1, button, point1, 0, 0)
+        edge:SetPoint(point2, button, point2, 0, 0)
+        if width then edge:SetWidth(width) end
+        if height then edge:SetHeight(height) end
+        edge:Hide()
+        table.insert(edges, edge)
+    end
+    Edge("TOPLEFT", "TOPRIGHT", nil, 2)
+    Edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 2)
+    Edge("TOPLEFT", "BOTTOMLEFT", 2, nil)
+    Edge("TOPRIGHT", "BOTTOMRIGHT", 2, nil)
+    button.lockEdges = edges
+
+    local label = button:GetFontString()
+    if label then
+        label:ClearAllPoints()
+        label:SetPoint("LEFT", button, "LEFT", 4, 0)
+        label:SetPoint("RIGHT", button, "RIGHT", -20, 0)
+        label:SetJustifyH("CENTER")
+    end
+end
+
+local function SetLockedSlotVisual(button, locked)
+    button.lockIcon:SetShown(locked)
+    for _, edge in ipairs(button.lockEdges or {}) do
+        edge:SetShown(locked)
     end
 end
 
@@ -189,6 +193,7 @@ function UI.CreateOutfitsTab(parent)
     local previous
     for _, definition in ipairs(Wardrobe.slotDefinitions) do
         local button = UI.CreateButton(slotPanel, definition.label, 108, 22)
+        CreateLockedSlotVisual(button)
         if previous then
             button:SetPoint("TOP", previous, "BOTTOM", 0, -3)
         else
@@ -199,6 +204,11 @@ function UI.CreateOutfitsTab(parent)
             GetState().selectedSlot = self.slotKey
             pane:Refresh()
         end)
+        UI.SetTooltip(
+            button,
+            definition.label .. " Slot",
+            "Select this equipment slot. A gold border and padlock mean Generate Outfit and Reroll Unlocked will preserve its current appearance."
+        )
         pane.slotButtons[definition.key] = button
         previous = button
     end
@@ -246,8 +256,8 @@ function UI.CreateOutfitsTab(parent)
 
     UI.SetTooltip(generateButton, "Generate Outfit", "Build a random outfit from cached appearances. Weapon choices are limited by your currently equipped main- and off-hand items plus Blizzard's current category and usability rules. Locked and hidden choices are preserved.")
     UI.SetTooltip(rerollUnlocked, "Reroll Unlocked", "Replace every unlocked armor choice and only weapon appearances Blizzard allows on the currently equipped items.")
-    UI.SetTooltip(saveConcept, "Save Concept", "Save the current selections, locks, hidden slots, and weapon configuration for this character.")
-    UI.SetTooltip(loadConcept, "Load Concept", "Choose one of this character's saved outfit concepts.")
+    UI.SetTooltip(saveConcept, "Save Concept", "Open the Outfit Concepts manager to name and save the current selections, locks, hidden slots, and weapon configuration.")
+    UI.SetTooltip(loadConcept, "Outfit Concepts", "Open the Outfit Concepts manager to inspect, load, overwrite, or delete this character's saved concepts.")
     UI.SetTooltip(clearAll, "Reset Outfit", "Clear selections, locks, and hidden-slot choices, returning the preview to currently equipped gear.")
 
     generateButton:SetScript("OnClick", function()
@@ -260,18 +270,263 @@ function UI.CreateOutfitsTab(parent)
         if ok then Wardrobe.ApplyPreview(model) end
         pane:Refresh(message)
     end)
-    saveConcept:SetScript("OnClick", function()
-        if StaticPopup_Show then
-            StaticPopup_Show(SAVE_CONCEPT_DIALOG, nil, nil, pane)
-        end
-    end)
-    loadConcept:SetScript("OnClick", function(self)
-        ShowConceptMenu(self, pane)
-    end)
     clearAll:SetScript("OnClick", function()
         Wardrobe.ClearAllSelections()
         Wardrobe.ApplyPreview(model)
         pane:Refresh("Outfit preview reset to currently equipped gear.")
+    end)
+
+    -- A self-contained manager replaces the fragile popup/context-menu pair.
+    -- It stays inside Quest Chronicle's frame strata and exposes the complete
+    -- concept lifecycle: save, overwrite by name, select, load, and delete.
+    local conceptBlocker = CreateFrame("Button", nil, pane)
+    conceptBlocker:SetAllPoints(pane)
+    conceptBlocker:SetFrameLevel(pane:GetFrameLevel() + 40)
+    local blockerShade = conceptBlocker:CreateTexture(nil, "BACKGROUND")
+    blockerShade:SetAllPoints(conceptBlocker)
+    blockerShade:SetColorTexture(0, 0, 0, 0.58)
+    conceptBlocker:Hide()
+
+    local conceptManager = UI.CreateInsetPanel(pane)
+    conceptManager:SetSize(450, 350)
+    conceptManager:SetPoint("CENTER", pane, "CENTER", 0, -4)
+    conceptManager:SetFrameLevel(pane:GetFrameLevel() + 41)
+    conceptManager:EnableMouse(true)
+    conceptManager:Hide()
+    pane.conceptManager = conceptManager
+
+    local managerTitle = conceptManager:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    managerTitle:SetPoint("TOPLEFT", conceptManager, "TOPLEFT", 14, -13)
+    managerTitle:SetText("Outfit Concepts")
+
+    local managerClose = UI.CreateButton(conceptManager, "X", 26, 24)
+    managerClose:SetPoint("TOPRIGHT", conceptManager, "TOPRIGHT", -9, -8)
+
+    local nameLabel = conceptManager:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    nameLabel:SetPoint("TOPLEFT", conceptManager, "TOPLEFT", 15, -47)
+    nameLabel:SetText("Concept Name")
+
+    local conceptName = CreateFrame("EditBox", nil, conceptManager, "InputBoxTemplate")
+    conceptName:SetSize(278, 26)
+    conceptName:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 2, -3)
+    conceptName:SetAutoFocus(false)
+    conceptName:SetMaxLetters(48)
+    pane.conceptName = conceptName
+
+    local saveCurrent = UI.CreateButton(conceptManager, "Save / Update", 122, 25)
+    saveCurrent:SetPoint("LEFT", conceptName, "RIGHT", 11, 0)
+    UI.SetTooltip(saveCurrent, "Save Current Preview", "Saving an existing concept name overwrites it. Entering a new name creates another concept for this character.")
+
+    local managerStatus = conceptManager:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    managerStatus:SetPoint("TOPLEFT", conceptManager, "TOPLEFT", 15, -89)
+    managerStatus:SetPoint("RIGHT", conceptManager, "RIGHT", -15, 0)
+    managerStatus:SetHeight(20)
+    managerStatus:SetJustifyH("LEFT")
+    managerStatus:SetWordWrap(false)
+
+    conceptManager.rows = {}
+    for index = 1, CONCEPT_ROWS do
+        local row = CreateFrame("Button", nil, conceptManager)
+        row:SetHeight(43)
+        row:SetPoint("LEFT", conceptManager, "LEFT", 15, 0)
+        row:SetPoint("RIGHT", conceptManager, "RIGHT", -15, 0)
+        if index == 1 then
+            row:SetPoint("TOP", conceptManager, "TOP", 0, -112)
+        else
+            row:SetPoint("TOP", conceptManager.rows[index - 1], "BOTTOM", 0, -4)
+        end
+
+        local background = row:CreateTexture(nil, "BACKGROUND")
+        background:SetAllPoints(row)
+        background:SetColorTexture(0.07, 0.07, 0.07, 0.92)
+        row.background = background
+
+        local name = row:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+        name:SetPoint("TOPLEFT", row, "TOPLEFT", 9, -6)
+        name:SetPoint("RIGHT", row, "RIGHT", -9, 0)
+        name:SetJustifyH("LEFT")
+        name:SetWordWrap(false)
+        row.name = name
+
+        local detail = row:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        detail:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 9, 6)
+        detail:SetPoint("RIGHT", row, "RIGHT", -9, 0)
+        detail:SetJustifyH("LEFT")
+        detail:SetWordWrap(false)
+        row.detail = detail
+
+        row:SetScript("OnClick", function(self)
+            if self.concept then
+                conceptManager.selectedConceptID = self.concept.id
+                conceptManager.pendingDeleteID = nil
+                conceptName:SetText(self.concept.name or "")
+                conceptManager:Refresh()
+            end
+        end)
+        row:SetScript("OnEnter", function(self)
+            if self.concept then
+                self.background:SetColorTexture(0.18, 0.14, 0.06, 0.96)
+            end
+        end)
+        row:SetScript("OnLeave", function(self)
+            local selected = self.concept and self.concept.id == conceptManager.selectedConceptID
+            self.background:SetColorTexture(selected and 0.20 or 0.07, selected and 0.15 or 0.07, selected and 0.05 or 0.07, 0.92)
+        end)
+        conceptManager.rows[index] = row
+    end
+
+    local previousConcepts = UI.CreateButton(conceptManager, "<", 28, 23)
+    previousConcepts:SetPoint("BOTTOMLEFT", conceptManager, "BOTTOMLEFT", 15, 12)
+    local conceptPage = conceptManager:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    conceptPage:SetPoint("LEFT", previousConcepts, "RIGHT", 6, 0)
+    conceptPage:SetWidth(72)
+    conceptPage:SetJustifyH("CENTER")
+    local nextConcepts = UI.CreateButton(conceptManager, ">", 28, 23)
+    nextConcepts:SetPoint("LEFT", conceptPage, "RIGHT", 6, 0)
+
+    local loadSelected = UI.CreateButton(conceptManager, "Load Selected", 110, 23)
+    loadSelected:SetPoint("BOTTOM", conceptManager, "BOTTOM", 36, 12)
+    local deleteSelected = UI.CreateButton(conceptManager, "Delete", 96, 23)
+    deleteSelected:SetPoint("LEFT", loadSelected, "RIGHT", 7, 0)
+    UI.SetTooltip(loadSelected, "Load Selected Concept", "Restore the selected appearances, locks, hidden slots, and weapon configuration to the preview.")
+    UI.SetTooltip(deleteSelected, "Delete Selected Concept", "Requires a second confirmation click. Deleting a concept does not change the current preview.")
+
+    function conceptManager:Refresh(message)
+        local concepts = Wardrobe.GetConcepts()
+        local pageCount = math.max(1, math.ceil(#concepts / CONCEPT_ROWS))
+        self.page = math.max(1, math.min(tonumber(self.page) or 1, pageCount))
+
+        local selectedExists = false
+        for _, concept in ipairs(concepts) do
+            if concept.id == self.selectedConceptID then
+                selectedExists = true
+                break
+            end
+        end
+        if not selectedExists then
+            self.selectedConceptID = nil
+            self.pendingDeleteID = nil
+        end
+
+        local startIndex = ((self.page - 1) * CONCEPT_ROWS) + 1
+        for rowIndex, row in ipairs(self.rows) do
+            local concept = concepts[startIndex + rowIndex - 1]
+            row.concept = concept
+            row:SetShown(concept ~= nil)
+            if concept then
+                local selected = concept.id == self.selectedConceptID
+                row.name:SetText((selected and UI.gold or UI.white) .. tostring(concept.name or "Unnamed Concept") .. UI.reset)
+                row.detail:SetText(ConceptDetail(concept))
+                row.background:SetColorTexture(selected and 0.20 or 0.07, selected and 0.15 or 0.07, selected and 0.05 or 0.07, 0.92)
+            end
+        end
+
+        local canSave = next(GetState().selections) ~= nil or next(GetState().locks) ~= nil or next(GetState().hidden) ~= nil
+        saveCurrent:SetEnabled(canSave)
+        loadSelected:SetEnabled(self.selectedConceptID ~= nil)
+        deleteSelected:SetEnabled(self.selectedConceptID ~= nil)
+        deleteSelected:SetText(self.pendingDeleteID == self.selectedConceptID and "Confirm Delete" or "Delete")
+        previousConcepts:SetEnabled(self.page > 1)
+        nextConcepts:SetEnabled(self.page < pageCount)
+        conceptPage:SetText(string.format("%d / %d", self.page, pageCount))
+        managerStatus:SetText(message or (#concepts > 0 and string.format("%d saved concept%s for this character.", #concepts, #concepts == 1 and "" or "s") or "No concepts saved yet. Name the current preview and save it."))
+    end
+
+    function conceptManager:Open(forSaving)
+        local concepts = Wardrobe.GetConcepts()
+        local current = Wardrobe.GetCurrentConcept()
+        self.selectedConceptID = current and current.id or (not forSaving and concepts[1] and concepts[1].id or nil)
+        self.pendingDeleteID = nil
+        self.page = 1
+        if self.selectedConceptID then
+            for index, concept in ipairs(concepts) do
+                if concept.id == self.selectedConceptID then
+                    self.page = math.ceil(index / CONCEPT_ROWS)
+                    break
+                end
+            end
+        end
+        conceptName:SetText(current and current.name or (forSaving and pane:GetSuggestedConceptName() or (concepts[1] and concepts[1].name or pane:GetSuggestedConceptName())))
+        conceptBlocker:Show()
+        self:Show()
+        self:Refresh()
+        if forSaving then
+            conceptName:SetFocus()
+            conceptName:HighlightText()
+        else
+            conceptName:ClearFocus()
+        end
+    end
+
+    local function CloseConceptManager()
+        conceptName:ClearFocus()
+        conceptManager:Hide()
+        conceptBlocker:Hide()
+    end
+
+    managerClose:SetScript("OnClick", CloseConceptManager)
+    conceptManager:SetScript("OnHide", function()
+        conceptBlocker:Hide()
+    end)
+    conceptName:SetScript("OnEscapePressed", CloseConceptManager)
+    conceptName:SetScript("OnEnterPressed", function()
+        saveCurrent:Click()
+    end)
+    previousConcepts:SetScript("OnClick", function()
+        conceptManager.page = conceptManager.page - 1
+        conceptManager.selectedConceptID = nil
+        conceptManager.pendingDeleteID = nil
+        conceptManager:Refresh()
+    end)
+    nextConcepts:SetScript("OnClick", function()
+        conceptManager.page = conceptManager.page + 1
+        conceptManager.selectedConceptID = nil
+        conceptManager.pendingDeleteID = nil
+        conceptManager:Refresh()
+    end)
+    saveCurrent:SetScript("OnClick", function()
+        local ok, message, concept = pane:SaveConcept(conceptName:GetText())
+        if ok and concept then
+            conceptManager.selectedConceptID = concept.id
+            conceptManager.pendingDeleteID = nil
+            conceptManager.page = 1
+            conceptName:SetText(concept.name or "")
+            conceptName:ClearFocus()
+        end
+        conceptManager:Refresh(message)
+    end)
+    loadSelected:SetScript("OnClick", function()
+        if conceptManager.selectedConceptID then
+            local ok = pane:LoadConcept(conceptManager.selectedConceptID)
+            if ok then
+                CloseConceptManager()
+            end
+        end
+    end)
+    deleteSelected:SetScript("OnClick", function()
+        local conceptID = conceptManager.selectedConceptID
+        if not conceptID then return end
+        if conceptManager.pendingDeleteID ~= conceptID then
+            conceptManager.pendingDeleteID = conceptID
+            conceptManager:Refresh("Click Confirm Delete to permanently remove the selected concept.")
+            return
+        end
+        local ok, message = Wardrobe.DeleteConcept(conceptID)
+        if ok then
+            conceptManager.selectedConceptID = nil
+            conceptManager.pendingDeleteID = nil
+            pane:Refresh(message)
+        elseif UIErrorsFrame then
+            UIErrorsFrame:AddMessage(message or "Unable to delete outfit concept.", 1, 0.25, 0.25)
+        end
+        conceptManager:Refresh(message)
+    end)
+
+    saveConcept:SetScript("OnClick", function()
+        conceptManager:Open(true)
+    end)
+    loadConcept:SetScript("OnClick", function()
+        conceptManager:Open(false)
     end)
 
     local scanButton = UI.CreateButton(sourcePanel, "Scan Collection", 125, 24)
@@ -489,21 +744,23 @@ function UI.CreateOutfitsTab(parent)
     end
 
     function pane:SaveConcept(name)
-        local ok, message = Wardrobe.SaveConcept(name)
+        local ok, message, concept = Wardrobe.SaveConcept(name)
         self:Refresh(message)
         if not ok and UIErrorsFrame then
             UIErrorsFrame:AddMessage(message or "Unable to save outfit concept.", 1, 0.25, 0.25)
         end
+        return ok, message, concept
     end
 
     function pane:LoadConcept(conceptID)
-        local ok, message = Wardrobe.LoadConcept(conceptID)
+        local ok, message, concept = Wardrobe.LoadConcept(conceptID)
         if ok then
             Wardrobe.ApplyPreview(model)
         elseif UIErrorsFrame then
             UIErrorsFrame:AddMessage(message or "Unable to load outfit concept.", 1, 0.25, 0.25)
         end
         self:Refresh(message)
+        return ok, message, concept
     end
 
     function pane:Refresh(message)
@@ -518,10 +775,11 @@ function UI.CreateOutfitsTab(parent)
         for key, button in pairs(self.slotButtons) do
             button:SetEnabled(key ~= slotKey)
             local count = #(Wardrobe.GetSlotSources(key) or {})
+            local lockedSlot = Wardrobe.IsSlotLocked(key)
             local markers = ""
-            if Wardrobe.IsSlotLocked(key) then markers = markers .. " L" end
             if Wardrobe.IsSlotHidden(key) then markers = markers .. " H" end
             button:SetText(string.format("%s (%d)%s", Wardrobe.GetSlotDefinition(key).label, count, markers))
+            SetLockedSlotVisual(button, lockedSlot)
         end
 
         sourceTitle:SetText((definition and definition.label or "Appearance") .. " Appearances")
@@ -547,8 +805,10 @@ function UI.CreateOutfitsTab(parent)
         local canGenerate = not Wardrobe.IsScanning() and cache.totalVisuals > 0
         generateButton:SetEnabled(canGenerate)
         rerollUnlocked:SetEnabled(canGenerate)
-        saveConcept:SetEnabled(next(GetState().selections) ~= nil or next(GetState().hidden) ~= nil)
-        loadConcept:SetEnabled(#Wardrobe.GetConcepts() > 0)
+        local concepts = Wardrobe.GetConcepts()
+        saveConcept:SetEnabled(next(GetState().selections) ~= nil or next(GetState().locks) ~= nil or next(GetState().hidden) ~= nil)
+        loadConcept:SetEnabled(#concepts > 0)
+        loadConcept:SetText(#concepts > 0 and string.format("Concepts (%d)", #concepts) or "Load Concept")
 
         local startIndex = ((page - 1) * SOURCE_ROWS) + 1
         for rowIndex, row in ipairs(self.sourceRows) do

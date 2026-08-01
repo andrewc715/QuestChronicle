@@ -1,33 +1,34 @@
-# Quest Chronicle v0.6.1: Equipped-Weapon Rules and Bottom Tabs
+# Quest Chronicle v0.6.2: Concept Manager and Visible Locks
 
-Version 0.6.1 corrects generated weapon choices and finishes the main-window tab treatment requested during Outfit Workbench testing.
+Version 0.6.2 completes two Outfit Workbench pieces that were functionally present but not ready for live use: saved concepts and locked-slot visibility.
 
-## Equipped-weapon-safe generation
+## Complete Outfit Concepts manager
 
-**Generate Outfit**, **Reroll Unlocked**, and individual weapon rerolls now start with the items currently equipped in `MAINHANDSLOT` and `SECONDARYHANDSLOT`.
+The fragile name popup and load context menu have been replaced by a self-contained **Outfit Concepts** manager inside Quest Chronicle. It provides:
 
-For every generated weapon visual, Quest Chronicle asks WoW to confirm:
+- a visible concept-name field;
+- **Save / Update** for the current preview;
+- case-insensitive overwrite when an existing name is saved again;
+- a paged list showing appearance, lock, and hidden-slot counts plus update time;
+- explicit selection and **Load Selected**;
+- two-step confirmed deletion;
+- a live concept count on the main **Concepts** button.
 
-- the visual's collection category is valid for the equipped item;
-- the collapsed visual is still collected, displayable, and usable;
-- at least one source for the visual is valid for the current character.
+Saved concepts remain character-specific and include selected appearance source IDs, locked slots, hidden helm/cloak/shirt/tabard state, and weapon configuration. Existing concepts written by v0.6.0 or v0.6.1 remain readable. Concept identifiers now avoid collisions even after older concepts are deleted and another is saved during the same second.
 
-The generator no longer chooses randomly between One-Hand, Two-Hand, and Ranged just because those caches contain entries. An equipped two-hand weapon produces only Blizzard-valid two-hand choices, an equipped ranged weapon produces only valid ranged choices, and an empty hand is left unchanged. Shields and held items draw from the Off-Hand cache; dual-wield off-hand weapons reuse the One-Hand cache but are revalidated against `SECONDARYHANDSLOT` and the actual equipped off-hand item.
+## Visible lock state
 
-Locked weapon appearances are revalidated against the current equipment before any unlocked armor changes. If gear changed after a concept was locked, generation stops with an actionable unlock-or-equip message instead of preserving an impossible weapon combination.
+Locked equipment-slot buttons now show both a gold padlock and a persistent two-pixel gold border. The lock remains visible when another slot is selected and when the locked button itself is the disabled active slot. The previous tiny trailing `L` marker has been removed.
 
-The scanner remains intentionally broad so the manual appearance browser still matches Blizzard's collapsed Wardrobe catalog. Strict equipped-item checks apply only to generated and rerolled weapons.
+The active appearance header still says **Locked**, and its action changes to **Unlock Slot**, providing confirmation in both the slot list and detail panel.
 
-## Bottom navigation tabs
+## Preserved behavior
 
-Chronicle, Active Quests, Write Note, Status, and Outfits now use Blizzard's bottom `PanelTabButtonTemplate` treatment. The tabs sit along the lower edge of the window like Journeys, Traveler's Log, Suggested Content, Dungeons, Raids, and Tutorials. Removing the top tab row also returns that vertical space to the active page.
-
-## Compatibility
-
-- Addon version 0.6.1.
-- Wardrobe cache format 5; upgrading from v0.6.0 does not require a collection rescan.
-- Existing manual selections and v0.6.0 saved outfit concepts remain readable.
+- Equipped main- and off-hand weapon validation from v0.6.1.
+- Dual-wield, two-hand, ranged, empty-hand, and incompatible-lock handling.
+- Native bottom navigation tabs.
+- Wardrobe cache format 5; no collection rescan is required.
 - SavedVariables schema 2.
 - Courier format 1 and Courier v1.0.0 compatibility.
-- Quest history, active quests, notes, drafts, settings, and saved concepts remain intact.
+- Quest history, active quests, notes, drafts, settings, wardrobe cache, and existing concepts.
 - Preview only; Quest Chronicle never applies transmog or changes Blizzard outfit slots.

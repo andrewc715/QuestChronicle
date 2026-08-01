@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.2 - 2026-07-31
+
+### Fixed
+
+- Replaces the conditional save popup and load context menu with a dependable in-panel Outfit Concepts manager.
+- Completes concept save, same-name overwrite, selection, loading, paging, and confirmed deletion.
+- Prevents new concept identifiers from colliding after concepts are deleted and recreated within the same timestamp.
+- Returns saved and loaded concept records consistently to the UI.
+
+### Polished
+
+- Shows a gold padlock and persistent gold border on every locked equipment-slot button.
+- Keeps lock state visible on inactive slots and the disabled active-slot button.
+- Removes the ambiguous trailing `L` marker.
+- Displays saved appearance, lock, hidden-slot, and update details in the concept list.
+
+### Preserved
+
+- Existing v0.6.0 and v0.6.1 outfit concepts and per-character storage.
+- Wardrobe cache format 5, SavedVariables schema 2, and Courier format 1.
+- Equipped-weapon-safe generation and native bottom tabs.
+
 ## 0.6.1 - 2026-07-31
 
 ### Fixed
