@@ -595,7 +595,7 @@ local function SetRandomSelection(state, slotKey, reroll, styleMode, styleContex
     local current = reroll and state.selections[slotKey] or nil
     local source = ChooseRandomSource(slotKey, current, styleMode, styleContext)
     if not source then
-        state.selections[slotKey] = nil
+        if not reroll then state.selections[slotKey] = nil end
         return false
     end
     state.selections[slotKey] = source.sourceID
@@ -926,21 +926,24 @@ function Wardrobe.GenerateOutfit(reroll, requestedStyleMode)
     end
     local styleLabel = "Random"
     local profileLabel
+    local restrictionLabel
     if styleEngine then
         local modeInfo = styleEngine.GetModeInfo(styleMode)
         styleLabel = modeInfo and modeInfo.label or styleLabel
         profileLabel = styleContext and styleContext.profileLabel
+        restrictionLabel = styleEngine.GetContextRestrictionLabel and styleEngine.GetContextRestrictionLabel(styleContext)
         if styleMode == styleEngine.MODE_ZONE_NATIVE then
             styleEngine.ConsumeSuggestion()
         end
     end
     local message = string.format(
-        "Generated a %s outfit%s with %d armor slots and %d equipped-weapon-safe appearance%s; locked and hidden choices were preserved.",
+        "Generated a %s outfit%s with %d armor slots and %d equipped-weapon-safe appearance%s%s; locked and hidden choices were preserved.",
         styleLabel,
         profileLabel and (" for " .. profileLabel) or "",
         selected,
         weaponCount or 0,
-        weaponCount == 1 and "" or "s"
+        weaponCount == 1 and "" or "s",
+        restrictionLabel and (" under " .. restrictionLabel) or ""
     )
     if weaponNotice then
         message = message .. " " .. weaponNotice
@@ -1116,6 +1119,71 @@ function Wardrobe.GetSelectedSource(slotKey)
         return nil
     end
     return GetSourceByID(slotKey, sourceID)
+end
+
+local function GetEquippedManifestDetails(definition)
+    local slotID = definition and SafeCall(GetInventorySlotInfo, definition.slotName)
+    if not slotID then return nil end
+    local itemID = SafeCall(GetInventoryItemID, "player", slotID)
+    local itemLink = SafeCall(GetInventoryItemLink, "player", slotID)
+    if not itemID and not itemLink then return nil end
+    local name = itemID and SafeCall(C_Item and C_Item.GetItemNameByID, itemID)
+    if not name and itemID then name = SafeCall(C_Item and C_Item.GetItemInfo, itemID) end
+    if not name and itemLink then name = SafeCall(C_Item and C_Item.GetItemInfo, itemLink) end
+    local icon = SafeCall(GetInventoryItemTexture, "player", slotID) or GetItemIcon(itemID)
+    return {
+        itemID = itemID,
+        itemLink = itemLink,
+        name = name or itemLink or "Equipped gear",
+        icon = icon,
+    }
+end
+
+function Wardrobe.GetPreviewManifest()
+    local state = EnsurePreviewState()
+    local manifest = {}
+    local selectedWeaponMode
+    for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
+        if state.selections[slotKey] then
+            selectedWeaponMode = slotKey
+            break
+        end
+    end
+
+    for _, definition in ipairs(Wardrobe.slotDefinitions) do
+        local include = not definition.weaponRole
+        local displayLabel = definition.label
+        if definition.weaponRole then
+            if selectedWeaponMode then
+                include = definition.key == selectedWeaponMode or (definition.key == "OFF_HAND" and selectedWeaponMode == "ONE_HAND")
+            else
+                include = definition.key == "ONE_HAND" or definition.key == "OFF_HAND"
+                if definition.key == "ONE_HAND" then displayLabel = "Main Hand" end
+            end
+        end
+
+        if include then
+            local source = GetSourceByID(definition.key, state.selections[definition.key])
+            local equipped = not source and GetEquippedManifestDetails(definition) or nil
+            if not definition.weaponRole or source or equipped then
+                local hidden = state.hidden[definition.key] == true
+                local kind = source and "Selected" or (equipped and "Equipped" or "Empty")
+                table.insert(manifest, {
+                    slotKey = definition.key,
+                    label = displayLabel,
+                    name = source and (source.name or ("Appearance " .. tostring(source.sourceID))) or (equipped and equipped.name or "Empty"),
+                    icon = source and source.icon or equipped and equipped.icon,
+                    sourceID = source and source.sourceID,
+                    itemID = source and source.itemID or equipped and equipped.itemID,
+                    itemLink = source and source.styleItemLink or equipped and equipped.itemLink,
+                    kind = kind,
+                    hidden = hidden,
+                    locked = state.locks[definition.key] == true,
+                })
+            end
+        end
+    end
+    return manifest
 end
 
 function Wardrobe.ValidateSource(source, slotKey)

@@ -54,6 +54,19 @@ local function ConceptDetail(concept)
 end
 
 local function CreateLockedSlotVisual(button)
+    local previewBackground = button:CreateTexture(nil, "BORDER")
+    previewBackground:SetSize(19, 19)
+    previewBackground:SetPoint("LEFT", button, "LEFT", 3, 0)
+    previewBackground:SetColorTexture(0.02, 0.02, 0.02, 0.9)
+    previewBackground:Hide()
+    button.previewIconBackground = previewBackground
+
+    local previewIcon = button:CreateTexture(nil, "ARTWORK")
+    previewIcon:SetSize(17, 17)
+    previewIcon:SetPoint("CENTER", previewBackground, "CENTER", 0, 0)
+    previewIcon:Hide()
+    button.previewIcon = previewIcon
+
     local icon = button:CreateTexture(nil, "OVERLAY")
     icon:SetSize(15, 15)
     icon:SetPoint("RIGHT", button, "RIGHT", -4, 0)
@@ -82,7 +95,7 @@ local function CreateLockedSlotVisual(button)
     local label = button:GetFontString()
     if label then
         label:ClearAllPoints()
-        label:SetPoint("LEFT", button, "LEFT", 4, 0)
+        label:SetPoint("LEFT", button, "LEFT", 23, 0)
         label:SetPoint("RIGHT", button, "RIGHT", -20, 0)
         label:SetJustifyH("CENTER")
     end
@@ -187,6 +200,7 @@ function UI.CreateOutfitsTab(parent)
     local sourcePanel = UI.CreateInsetPanel(pane)
     sourcePanel:SetPoint("TOPLEFT", modelPanel, "TOPRIGHT", 8, 0)
     sourcePanel:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -12, 12)
+    local lookPanel
 
     local slotTitle = slotPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     slotTitle:SetPoint("TOP", slotPanel, "TOP", 0, -10)
@@ -207,14 +221,32 @@ function UI.CreateOutfitsTab(parent)
             GetState().selectedSlot = self.slotKey
             pane:Refresh()
         end)
-        UI.SetTooltip(
-            button,
-            definition.label .. " Slot",
-            "Select this equipment slot. A gold border and padlock mean Generate Outfit and Reroll Unlocked will preserve its current appearance."
-        )
+        button:SetScript("OnEnter", function(self)
+            local entry = self.previewEntry
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            local slotDefinition = Wardrobe.GetSlotDefinition(self.slotKey)
+            GameTooltip:SetText((slotDefinition and slotDefinition.label or self.slotKey) .. " Slot", 1, 0.82, 0)
+            if entry then
+                GameTooltip:AddLine(entry.name or "Empty", 1, 1, 1, true)
+                local stateText = entry.kind or "Preview"
+                if entry.locked then stateText = stateText .. " • Locked" end
+                if entry.hidden then stateText = stateText .. " • Hidden" end
+                GameTooltip:AddLine(stateText, entry.hidden and 0.65 or 0.2, entry.hidden and 0.65 or 1, entry.hidden and 0.65 or 0.2)
+            else
+                GameTooltip:AddLine("Not active in the current preview.", 0.65, 0.65, 0.65, true)
+            end
+            GameTooltip:AddLine(string.format("%s cached appearances", UI.FormatNumber(#(Wardrobe.GetSlotSources(self.slotKey) or {}))), 0.65, 0.65, 0.65)
+            GameTooltip:AddLine("Click to browse this slot.", 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+        button:SetScript("OnLeave", function() GameTooltip:Hide() end)
         pane.slotButtons[definition.key] = button
         previous = button
     end
+
+    local currentLookButton = UI.CreateButton(slotPanel, "Current Look", 108, 24)
+    currentLookButton:SetPoint("BOTTOM", slotPanel, "BOTTOM", 0, 10)
+    UI.SetTooltip(currentLookButton, "Current Character Preview", "Show every selected, equipped, hidden, and locked layer currently represented by the embedded model.")
 
     local modelTitle = modelPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     modelTitle:SetPoint("TOP", modelPanel, "TOP", 0, -10)
@@ -242,12 +274,13 @@ function UI.CreateOutfitsTab(parent)
     local styleInfo = modelPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     styleInfo:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -54)
     styleInfo:SetPoint("RIGHT", modelPanel, "RIGHT", -8, 0)
+    styleInfo:SetHeight(28)
     styleInfo:SetJustifyH("CENTER")
-    styleInfo:SetWordWrap(false)
+    styleInfo:SetWordWrap(true)
     pane.styleInfo = styleInfo
 
     local model = CreateFrame("DressUpModel", nil, modelPanel)
-    model:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -72)
+    model:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -84)
     model:SetPoint("BOTTOMRIGHT", modelPanel, "BOTTOMRIGHT", -8, 112)
     model:SetUnit("player")
     if model.SetFacing then model:SetFacing(0) end
@@ -701,6 +734,8 @@ function UI.CreateOutfitsTab(parent)
                 GameTooltip:AddLine(valid and "Compatible" or reason, valid and 0.2 or 1, valid and 1 or 0.25, valid and 0.2 or 0.25, true)
                 if valid and ZoneStyle then
                     local definition = Wardrobe.GetSlotDefinition(GetCurrentSlot())
+                    local eligible, _, eligibilityReason = ZoneStyle.GetEligibilitySummary(self.source, ZoneStyle.GetMode(), ZoneStyle.GetCurrentContext())
+                    GameTooltip:AddLine((eligible and "Generated pool: " or "Excluded from generation: ") .. tostring(eligibilityReason), eligible and 0.2 or 1, eligible and 1 or 0.35, eligible and 0.2 or 0.2, true)
                     GameTooltip:AddLine(ZoneStyle.GetScoreSummary(self.source, definition, ZoneStyle.GetMode(), ZoneStyle.GetCurrentContext()), 1, 0.82, 0, true)
                 end
                 GameTooltip:Show()
@@ -714,6 +749,106 @@ function UI.CreateOutfitsTab(parent)
         end)
         pane.sourceRows[index] = row
     end
+
+    lookPanel = UI.CreateInsetPanel(sourcePanel)
+    lookPanel:SetAllPoints(sourcePanel)
+    lookPanel:SetFrameLevel(sourcePanel:GetFrameLevel() + 30)
+    lookPanel:Hide()
+    pane.lookPanel = lookPanel
+
+    local lookTitle = lookPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    lookTitle:SetPoint("TOPLEFT", lookPanel, "TOPLEFT", 14, -14)
+    lookTitle:SetText("Current Character Preview")
+    local lookSubtitle = lookPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    lookSubtitle:SetPoint("TOPLEFT", lookTitle, "BOTTOMLEFT", 0, -4)
+    lookSubtitle:SetPoint("RIGHT", lookPanel, "RIGHT", -90, 0)
+    lookSubtitle:SetJustifyH("LEFT")
+    lookSubtitle:SetText("Selected appearances override equipped gear. Hidden layers remain listed.")
+    local closeLook = UI.CreateButton(lookPanel, "Close", 66, 22)
+    closeLook:SetPoint("TOPRIGHT", lookPanel, "TOPRIGHT", -10, -10)
+    closeLook:SetScript("OnClick", function() lookPanel:Hide() end)
+
+    pane.lookRows = {}
+    for index = 1, 14 do
+        local row = CreateFrame("Button", nil, lookPanel)
+        row:SetHeight(39)
+        local column = index > 7 and 2 or 1
+        local rowIndex = column == 2 and index - 7 or index
+        if column == 1 then
+            row:SetPoint("TOPLEFT", lookPanel, "TOPLEFT", 12, -64 - ((rowIndex - 1) * 42))
+            row:SetPoint("RIGHT", lookPanel, "CENTER", -4, 0)
+        else
+            row:SetPoint("TOPLEFT", lookPanel, "TOP", 4, -64 - ((rowIndex - 1) * 42))
+            row:SetPoint("RIGHT", lookPanel, "RIGHT", -12, 0)
+        end
+        local background = row:CreateTexture(nil, "BACKGROUND")
+        background:SetAllPoints(row)
+        background:SetColorTexture(0.07, 0.07, 0.07, 0.88)
+        row.background = background
+        local icon = row:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(30, 30)
+        icon:SetPoint("LEFT", row, "LEFT", 5, 0)
+        row.icon = icon
+        local slot = row:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+        slot:SetPoint("TOPLEFT", icon, "TOPRIGHT", 7, -1)
+        slot:SetWidth(76)
+        slot:SetJustifyH("LEFT")
+        row.slot = slot
+        local name = row:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        name:SetPoint("TOPLEFT", slot, "TOPRIGHT", 3, 0)
+        name:SetPoint("RIGHT", row, "RIGHT", -5, 0)
+        name:SetJustifyH("LEFT")
+        name:SetWordWrap(false)
+        row.name = name
+        local detail = row:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        detail:SetPoint("BOTTOMLEFT", icon, "BOTTOMRIGHT", 7, 1)
+        detail:SetPoint("RIGHT", row, "RIGHT", -5, 0)
+        detail:SetJustifyH("LEFT")
+        row.detail = detail
+        row:SetScript("OnEnter", function(self)
+            if not self.entry then return end
+            self.background:SetColorTexture(0.13, 0.13, 0.13, 0.95)
+            GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+            GameTooltip:SetText(self.entry.label .. ": " .. self.entry.name, 1, 0.82, 0)
+            if self.entry.sourceID then GameTooltip:AddLine("Appearance source " .. tostring(self.entry.sourceID), 0.65, 0.65, 0.65) end
+            if self.entry.itemID then GameTooltip:AddLine("Item " .. tostring(self.entry.itemID), 0.65, 0.65, 0.65) end
+            GameTooltip:Show()
+        end)
+        row:SetScript("OnLeave", function(self)
+            self.background:SetColorTexture(0.07, 0.07, 0.07, 0.88)
+            GameTooltip:Hide()
+        end)
+        pane.lookRows[index] = row
+    end
+
+    function pane:RefreshCurrentLook()
+        local manifest = Wardrobe.GetPreviewManifest()
+        for index, row in ipairs(self.lookRows) do
+            local entry = manifest[index]
+            row.entry = entry
+            row:SetShown(entry ~= nil)
+            if entry then
+                row.icon:SetTexture(entry.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+                if row.icon.SetDesaturated then row.icon:SetDesaturated(entry.hidden == true) end
+                row.slot:SetText(entry.label)
+                row.name:SetText(entry.name)
+                local detail = entry.kind
+                if entry.locked then detail = detail .. " • Locked" end
+                if entry.hidden then detail = detail .. " • Hidden" end
+                row.detail:SetText(detail)
+            end
+        end
+        return manifest
+    end
+
+    currentLookButton:SetScript("OnClick", function()
+        if lookPanel:IsShown() then
+            lookPanel:Hide()
+        else
+            pane:RefreshCurrentLook()
+            lookPanel:Show()
+        end
+    end)
 
     local previousPage = UI.CreateButton(sourcePanel, "Previous", 78, 23)
     previousPage:SetPoint("BOTTOMLEFT", sourcePanel, "BOTTOMLEFT", 10, 10)
@@ -808,27 +943,40 @@ function UI.CreateOutfitsTab(parent)
         local styleMode = ZoneStyle.GetMode()
         local styleContext = ZoneStyle.GetCurrentContext()
         local pendingSuggestion = ZoneStyle.GetPendingSuggestion()
+        local restrictionLabel = ZoneStyle.GetContextRestrictionLabel(styleContext)
         for modeKey, button in pairs(self.styleButtons) do
             local mode = ZoneStyle.GetModeInfo(modeKey)
             local marker = modeKey == ZoneStyle.MODE_ZONE_NATIVE and pendingSuggestion and " *" or ""
             button:SetText(mode.shortLabel .. marker)
             button:SetEnabled(modeKey ~= styleMode)
         end
-        local location = styleContext.subzone ~= "" and (styleContext.subzone .. ", " .. styleContext.zone) or styleContext.zone
         styleInfo:SetText(string.format(
-            "%s • %s%s",
+            "%s • %s\n%s%s",
             styleContext.profileLabel or "Azeroth Adventurer",
-            location or "Unknown Zone",
+            styleContext.provenanceLabel or styleContext.zone or "Unknown Zone",
+            restrictionLabel,
             pendingSuggestion and " • Suggestion ready" or ""
         ))
 
+        local manifest = self:RefreshCurrentLook()
+        local manifestBySlot = {}
+        for _, entry in ipairs(manifest) do manifestBySlot[entry.slotKey] = entry end
+        currentLookButton:SetText(string.format("Current Look (%d)", #manifest))
         for key, button in pairs(self.slotButtons) do
             button:SetEnabled(key ~= slotKey)
-            local count = #(Wardrobe.GetSlotSources(key) or {})
             local lockedSlot = Wardrobe.IsSlotLocked(key)
             local markers = ""
             if Wardrobe.IsSlotHidden(key) then markers = markers .. " H" end
-            button:SetText(string.format("%s (%d)%s", Wardrobe.GetSlotDefinition(key).label, count, markers))
+            button:SetText(string.format("%s%s", Wardrobe.GetSlotDefinition(key).label, markers))
+            local previewEntry = manifestBySlot[key]
+            button.previewEntry = previewEntry
+            local hasIcon = previewEntry and previewEntry.icon ~= nil
+            button.previewIconBackground:SetShown(hasIcon)
+            button.previewIcon:SetShown(hasIcon)
+            if hasIcon then
+                button.previewIcon:SetTexture(previewEntry.icon)
+                if button.previewIcon.SetDesaturated then button.previewIcon:SetDesaturated(previewEntry.hidden == true) end
+            end
             SetLockedSlotVisual(button, lockedSlot)
         end
 
@@ -871,7 +1019,9 @@ function UI.CreateOutfitsTab(parent)
                 local valid, reason = Wardrobe.ValidateSource(source, slotKey)
                 local isSelected = selected and selected.sourceID == source.sourceID
                 local marker = isSelected and (UI.green .. "Selected|r") or (valid and "Collected" or (UI.red .. "Unavailable|r"))
-                row.detail:SetText(string.format("%s • Source %d%s", marker, source.sourceID or 0, valid and "" or (" • " .. tostring(reason))))
+                local eligible, eligibilityKind = ZoneStyle.GetEligibilitySummary(source, styleMode, styleContext)
+                local generatedMarker = eligible and "" or (eligibilityKind == "pending" and " • Loading era" or " • Not generated")
+                row.detail:SetText(string.format("%s • Source %d%s%s", marker, source.sourceID or 0, valid and "" or (" • " .. tostring(reason)), generatedMarker))
                 row:SetEnabled(valid)
                 row.background:SetColorTexture(isSelected and 0.12 or 0.08, isSelected and 0.18 or 0.08, isSelected and 0.10 or 0.08, 0.78)
             end

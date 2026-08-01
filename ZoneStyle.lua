@@ -31,6 +31,168 @@ local function Normalize(value)
     return text:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s+", " ")
 end
 
+ZoneStyle.expansions = {
+    [0] = { label = "Classic", shortLabel = "Classic" },
+    [1] = { label = "The Burning Crusade", shortLabel = "TBC" },
+    [2] = { label = "Wrath of the Lich King", shortLabel = "Wrath" },
+    [3] = { label = "Cataclysm", shortLabel = "Cataclysm" },
+    [4] = { label = "Mists of Pandaria", shortLabel = "Mists" },
+    [5] = { label = "Warlords of Draenor", shortLabel = "Warlords" },
+    [6] = { label = "Legion", shortLabel = "Legion" },
+    [7] = { label = "Battle for Azeroth", shortLabel = "BFA" },
+    [8] = { label = "Shadowlands", shortLabel = "Shadowlands" },
+    [9] = { label = "Dragonflight", shortLabel = "Dragonflight" },
+    [10] = { label = "The War Within", shortLabel = "TWW" },
+    [11] = { label = "Midnight", shortLabel = "Midnight" },
+}
+
+local eraRules = {
+    { maxExpansionID = 11, match = { "midnight", "amani highlands", "harandar", "voidstorm" } },
+    { maxExpansionID = 10, match = { "khaz algar", "isle of dorn", "dornogal", "ringing deeps", "hallowfall", "azjkahet", "azj kahet", "undermine", "karesh", "k aresh" } },
+    { maxExpansionID = 9, match = { "dragon isles", "waking shores", "ohnahran", "ohn ahran", "azure span", "thaldraszus", "valdrakken", "zaralek", "emerald dream", "amirdrassil" } },
+    { maxExpansionID = 8, match = { "shadowlands", "oribos", "bastion", "maldraxxus", "ardenweald", "revendreth", "the maw", "korthia", "zereth mortis" } },
+    { maxExpansionID = 7, match = { "kul tiras", "zandalar", "boralus", "tiragarde", "drustvar", "stormsong", "zuldazar", "nazmir", "voldun", "vol dun", "nazjatar", "mechagon" } },
+    { maxExpansionID = 6, match = { "broken isles", "azsuna", "valsharah", "val sharah", "highmountain", "stormheim", "suramar", "broken shore", "argus" } },
+    { maxExpansionID = 5, match = { "draenor", "frostfire ridge", "shadowmoon valley draenor", "gorgrond", "talador", "spires of arak", "nagrand draenor", "tanaan jungle", "ashran" } },
+    { maxExpansionID = 4, match = { "pandaria", "jade forest", "valley of the four winds", "krasarang", "kun lai", "townlong", "dread wastes", "vale of eternal blossoms", "timeless isle", "isle of thunder" } },
+    { maxExpansionID = 3, match = { "mount hyjal", "vashjir", "vashj ir", "deepholm", "uldum", "twilight highlands", "tol barad", "molten front" } },
+    { maxExpansionID = 2, match = { "northrend", "borean tundra", "howling fjord", "dragonblight", "grizzly hills", "zul drak", "sholazar", "storm peaks", "icecrown", "wintergrasp" } },
+    { maxExpansionID = 1, match = { "outland", "hellfire peninsula", "zangarmarsh", "terokkar", "nagrand", "blades edge", "blade s edge", "netherstorm", "shadowmoon valley", "shattrath", "silvermoon", "eversong", "ghostlands", "queldanas", "quel danas", "sunwell", "zulaman", "zul aman" } },
+}
+
+-- Blizzard exposes exact instance provenance for boss-drop appearances. Other
+-- sources do not consistently carry a zone, so their explicit item/source names
+-- are checked against the same curated vocabulary and otherwise remain eligible.
+ZoneStyle.provenanceProfiles = {
+    { key = "sunwell", label = "Isle of Quel'Danas", match = { "queldanas", "quel danas", "sunwell" }, origins = { "sunwell", "magisters terrace", "queldanas", "quel danas", "kiljaeden", "kil jaeden", "muru", "eredar twins", "felmyst", "brutallus" } },
+    { key = "eversong", label = "Eversong and Ghostlands", match = { "silvermoon", "eversong", "ghostlands" }, origins = { "silvermoon", "eversong", "ghostlands", "deatholme" } },
+    { key = "zulaman", label = "Amani Highlands", match = { "zulaman", "zul aman", "amani highlands", "atal aman" }, origins = { "zulaman", "zul aman", "amani", "nalorakk", "akilzon", "janalai", "halazzi", "malacrass" } },
+    { key = "harandar", label = "Harandar", match = { "harandar", "har athir", "har mara", "har kuai", "sporefall" }, origins = { "harandar", "har athir", "har mara", "har kuai", "sporefall", "rootway" } },
+    { key = "voidstorm", label = "Voidstorm", match = { "voidstorm", "voidspire", "sunkiller" }, origins = { "voidstorm", "voidspire", "sunkiller", "shadowguard point" } },
+
+    { key = "hellfire", label = "Hellfire Peninsula", match = { "hellfire peninsula" }, origins = { "hellfire peninsula", "hellfire ramparts", "blood furnace", "shattered halls", "magtheridons lair", "magtheridon" } },
+    { key = "zangarmarsh", label = "Zangarmarsh", match = { "zangarmarsh" }, origins = { "zangarmarsh", "coilfang reservoir", "slave pens", "underbog", "steamvault", "serpentshrine cavern" } },
+    { key = "terokkar", label = "Terokkar Forest", match = { "terokkar", "shattrath" }, origins = { "terokkar", "shattrath", "auchindoun", "mana tombs", "auchenai crypts", "sethekk halls", "shadow labyrinth" } },
+    { key = "nagrand_outland", label = "Nagrand", maxExpansionID = 1, match = { "nagrand" }, origins = { "nagrand", "oshugun", "ring of blood" } },
+    { key = "bladesedge", label = "Blade's Edge Mountains", match = { "blades edge mountains", "blade s edge mountains", "sylvanaar", "thunderlord stronghold", "moknathal village", "mok nathal village" }, origins = { "blades edge", "blade s edge", "gruuls lair", "gruul the dragonkiller", "high king maulgar" } },
+    { key = "netherstorm", label = "Netherstorm", match = { "netherstorm" }, origins = { "netherstorm", "tempest keep", "the mechanar", "the botanica", "the arcatraz", "the eye" } },
+    { key = "shadowmoon_outland", label = "Shadowmoon Valley", maxExpansionID = 1, match = { "shadowmoon valley" }, origins = { "shadowmoon valley", "black temple", "illidan stormrage", "battle for mount hyjal" } },
+
+    { key = "borean", label = "Borean Tundra", match = { "borean tundra" }, origins = { "borean tundra", "the nexus", "the oculus", "eye of eternity" } },
+    { key = "howling", label = "Howling Fjord", match = { "howling fjord" }, origins = { "howling fjord", "utgarde keep", "utgarde pinnacle" } },
+    { key = "dragonblight", label = "Dragonblight", match = { "dragonblight" }, origins = { "dragonblight", "azjol nerub", "ahnkahet", "naxxramas", "obsidian sanctum" } },
+    { key = "grizzly", label = "Grizzly Hills", match = { "grizzly hills" }, origins = { "grizzly hills", "draktharon keep" } },
+    { key = "zuldrak", label = "Zul'Drak", match = { "zul drak" }, origins = { "zul drak", "gundrak" } },
+    { key = "sholazar", label = "Sholazar Basin", match = { "sholazar" }, origins = { "sholazar" } },
+    { key = "stormpeaks", label = "The Storm Peaks", match = { "storm peaks" }, origins = { "storm peaks", "halls of stone", "halls of lightning", "ulduar" } },
+    { key = "icecrown", label = "Icecrown", match = { "icecrown" }, origins = { "icecrown", "icecrown citadel", "trial of the champion", "trial of the crusader", "forge of souls", "pit of saron", "halls of reflection" } },
+
+    { key = "jadeforest", label = "The Jade Forest", match = { "jade forest" }, origins = { "jade forest", "temple of the jade serpent" } },
+    { key = "fourwinds", label = "Valley of the Four Winds", match = { "valley of the four winds" }, origins = { "valley of the four winds", "stormstout brewery" } },
+    { key = "kunlai", label = "Kun-Lai Summit", match = { "kun lai" }, origins = { "kun lai", "shado pan monastery", "mogu shan vaults" } },
+    { key = "vale", label = "Vale of Eternal Blossoms", match = { "vale of eternal blossoms" }, origins = { "vale of eternal blossoms", "mogu shan palace", "siege of orgrimmar" } },
+    { key = "thunderisle", label = "Isle of Thunder", match = { "isle of thunder" }, origins = { "isle of thunder", "throne of thunder" } },
+
+    { key = "frostfire", label = "Frostfire Ridge", match = { "frostfire ridge" }, origins = { "frostfire ridge", "bloodmaul slag mines", "the slag mines" } },
+    { key = "gorgrond", label = "Gorgrond", match = { "gorgrond" }, origins = { "gorgrond", "iron docks", "blackrock foundry", "everbloom" } },
+    { key = "talador", label = "Talador", match = { "talador" }, origins = { "talador", "auchindoun" } },
+    { key = "shadowmoon_draenor", label = "Shadowmoon Valley", minExpansionID = 5, match = { "shadowmoon valley" }, origins = { "shadowmoon valley", "shadowmoon burial grounds" } },
+    { key = "arak", label = "Spires of Arak", match = { "spires of arak" }, origins = { "spires of arak", "skyreach" } },
+    { key = "nagrand_draenor", label = "Nagrand", match = { "nagrand draenor" }, origins = { "nagrand", "highmaul" } },
+    { key = "tanaan", label = "Tanaan Jungle", match = { "tanaan jungle" }, origins = { "tanaan jungle", "hellfire citadel" } },
+
+    { key = "azsuna", label = "Azsuna", match = { "azsuna" }, origins = { "azsuna", "eye of azshara", "vault of the wardens" } },
+    { key = "valsharah", label = "Val'sharah", match = { "valsharah", "val sharah" }, origins = { "valsharah", "val sharah", "darkheart thicket", "emerald nightmare" } },
+    { key = "highmountain", label = "Highmountain", match = { "highmountain" }, origins = { "highmountain", "neltharions lair" } },
+    { key = "stormheim", label = "Stormheim", match = { "stormheim" }, origins = { "stormheim", "halls of valor", "maw of souls", "trial of valor" } },
+    { key = "suramar", label = "Suramar", match = { "suramar" }, origins = { "suramar", "court of stars", "the arcway", "nighthold" } },
+    { key = "brokenshore", label = "Broken Shore", match = { "broken shore" }, origins = { "broken shore", "tomb of sargeras", "cathedral of eternal night" } },
+    { key = "argus", label = "Argus", match = { "argus", "krokuun", "antoran wastes", "macaree" }, origins = { "argus", "krokuun", "antoran wastes", "macaree", "seat of the triumvirate", "antorus" } },
+
+    { key = "tiragarde", label = "Tiragarde Sound", match = { "tiragarde", "boralus" }, origins = { "tiragarde", "boralus", "freehold", "tol dagor", "siege of boralus" } },
+    { key = "drustvar", label = "Drustvar", match = { "drustvar" }, origins = { "drustvar", "waycrest manor" } },
+    { key = "stormsong", label = "Stormsong Valley", match = { "stormsong" }, origins = { "stormsong", "shrine of the storm" } },
+    { key = "zuldazar", label = "Zuldazar", match = { "zuldazar", "dazaralor", "dazar alor" }, origins = { "zuldazar", "atal dazar", "kings rest", "battle of dazaralor" } },
+    { key = "nazmir", label = "Nazmir", match = { "nazmir" }, origins = { "nazmir", "underrot", "uldir" } },
+    { key = "voldun", label = "Vol'dun", match = { "voldun", "vol dun" }, origins = { "voldun", "vol dun", "temple of sethraliss" } },
+
+    { key = "bastion", label = "Bastion", match = { "bastion" }, origins = { "bastion", "spires of ascension", "necrotic wake" } },
+    { key = "maldraxxus", label = "Maldraxxus", match = { "maldraxxus" }, origins = { "maldraxxus", "theater of pain", "plaguefall" } },
+    { key = "ardenweald", label = "Ardenweald", match = { "ardenweald" }, origins = { "ardenweald", "mists of tirna scithe", "de other side" } },
+    { key = "revendreth", label = "Revendreth", match = { "revendreth" }, origins = { "revendreth", "halls of atonement", "sanguine depths", "castle nathria" } },
+    { key = "maw", label = "The Maw", match = { "the maw", "korthia" }, origins = { "the maw", "korthia", "torghast", "sanctum of domination" } },
+    { key = "zerethmortis", label = "Zereth Mortis", match = { "zereth mortis" }, origins = { "zereth mortis", "sepulcher of the first ones" } },
+
+    { key = "wakingshores", label = "The Waking Shores", match = { "waking shores" }, origins = { "waking shores", "ruby life pools", "neltharus", "vault of the incarnates" } },
+    { key = "ohnahran", label = "Ohn'ahran Plains", match = { "ohn ahran" }, origins = { "ohn ahran", "nokhud offensive" } },
+    { key = "azurespan", label = "The Azure Span", match = { "azure span" }, origins = { "azure span", "azure vault", "brackenhide hollow" } },
+    { key = "thaldraszus", label = "Thaldraszus", match = { "thaldraszus", "valdrakken" }, origins = { "thaldraszus", "valdrakken", "algethar academy", "halls of infusion", "dawn of the infinite" } },
+    { key = "zaralek", label = "Zaralek Cavern", match = { "zaralek" }, origins = { "zaralek", "aberrus" } },
+    { key = "dream", label = "Emerald Dream", match = { "emerald dream", "amirdrassil" }, origins = { "emerald dream", "amirdrassil" } },
+
+    { key = "dorn", label = "Isle of Dorn", match = { "isle of dorn", "dornogal" }, origins = { "isle of dorn", "dornogal", "the rookery", "cinderbrew meadery" } },
+    { key = "ringingdeeps", label = "The Ringing Deeps", match = { "ringing deeps" }, origins = { "ringing deeps", "stonevault", "darkflame cleft" } },
+    { key = "hallowfall", label = "Hallowfall", match = { "hallowfall" }, origins = { "hallowfall", "priory of the sacred flame", "dawnbreaker" } },
+    { key = "azjkahet", label = "Azj-Kahet", match = { "azj kahet" }, origins = { "azj kahet", "ara kara", "city of threads", "nerub ar palace" } },
+    { key = "undermine", label = "Undermine", match = { "undermine" }, origins = { "undermine", "liberation of undermine", "operation floodgate" } },
+}
+
+local provenanceByKey = {}
+local provenanceOriginMarkers = {}
+for _, profile in ipairs(ZoneStyle.provenanceProfiles) do
+    provenanceByKey[profile.key] = profile
+    for _, phrase in ipairs(profile.origins or {}) do
+        local normalized = Normalize(phrase)
+        if normalized ~= "" then
+            table.insert(provenanceOriginMarkers, { text = normalized, profile = profile })
+        end
+    end
+end
+
+local function BuildContextText(context)
+    local parts = { context and context.subzone, context and context.zone, context and context.mapName }
+    for _, name in ipairs(context and context.mapTrail or {}) do table.insert(parts, name) end
+    local values = {}
+    for _, value in ipairs(parts) do
+        if value and value ~= "" then table.insert(values, value) end
+    end
+    return " " .. Normalize(table.concat(values, " ")) .. " "
+end
+
+local function TextMatchesAny(text, phrases)
+    local padded = " " .. Normalize(text) .. " "
+    for _, phrase in ipairs(phrases or {}) do
+        local needle = Normalize(phrase)
+        if needle ~= "" and padded:find(" " .. needle .. " ", 1, true) then return true, phrase end
+    end
+    return false
+end
+
+function ZoneStyle.ResolveEra(context)
+    context = context or ZoneStyle.DetectContext()
+    local text = BuildContextText(context)
+    for _, rule in ipairs(eraRules) do
+        local matches = TextMatchesAny(text, rule.match)
+        if matches then
+            local info = ZoneStyle.expansions[rule.maxExpansionID]
+            return rule.maxExpansionID, info.label, info.shortLabel
+        end
+    end
+    return 0, ZoneStyle.expansions[0].label, ZoneStyle.expansions[0].shortLabel
+end
+
+function ZoneStyle.ResolveProvenance(context)
+    context = context or ZoneStyle.DetectContext()
+    local text = BuildContextText(context)
+    local eraMax = ZoneStyle.ResolveEra(context)
+    for _, profile in ipairs(ZoneStyle.provenanceProfiles) do
+        local eraMatches = (profile.minExpansionID == nil or eraMax >= profile.minExpansionID)
+            and (profile.maxExpansionID == nil or eraMax <= profile.maxExpansionID)
+        if eraMatches and TextMatchesAny(text, profile.match) then return profile, profile.key end
+    end
+    return nil
+end
+
 local travelerKeywords = {
     traveler = 10, travelling = 8, wanderer = 9, wayfarer = 10, expedition = 9,
     explorer = 9, scout = 8, ranger = 7, trail = 7, pathfinder = 9, outpost = 5,
@@ -307,6 +469,11 @@ function ZoneStyle.RefreshZone(force, silent)
     context.profileKey = profileKey
     context.profileLabel = profile.label
     context.profileDescription = profile.description
+    context.eraMax, context.eraLabel, context.eraShortLabel = ZoneStyle.ResolveEra(context)
+    local provenance, provenanceKey = ZoneStyle.ResolveProvenance(context)
+    context.provenanceKey = provenanceKey
+    context.provenanceResolved = true
+    context.provenanceLabel = provenance and provenance.label or context.zone
     context.zoneKey = ContextZoneKey(context)
     context.detailKey = ContextDetailKey(context, profileKey)
 
@@ -322,6 +489,10 @@ function ZoneStyle.RefreshZone(force, silent)
             subzone = context.subzone,
             profileKey = profileKey,
             profileLabel = profile.label,
+            eraMax = context.eraMax,
+            eraLabel = context.eraLabel,
+            provenanceKey = context.provenanceKey,
+            provenanceLabel = context.provenanceLabel,
             createdAt = time and time() or 0,
             unread = true,
         }
@@ -339,6 +510,13 @@ function ZoneStyle.GetCurrentContext()
     local state = GetStyleState()
     if not state.currentContext then
         return ZoneStyle.RefreshZone(true, true)
+    end
+    if state.currentContext.eraMax == nil then
+        state.currentContext.eraMax, state.currentContext.eraLabel, state.currentContext.eraShortLabel = ZoneStyle.ResolveEra(state.currentContext)
+        local provenance, provenanceKey = ZoneStyle.ResolveProvenance(state.currentContext)
+        state.currentContext.provenanceKey = provenanceKey
+        state.currentContext.provenanceResolved = true
+        state.currentContext.provenanceLabel = provenance and provenance.label or state.currentContext.zone
     end
     return state.currentContext
 end
@@ -369,8 +547,38 @@ function ZoneStyle.ConsumeSuggestion()
     return suggestion
 end
 
+local function LoadItemMetadata(source)
+    if not source or not source.itemID then return nil end
+    local genericName = not source.name or tostring(source.name):match("^Appearance %d+$")
+    if source.expansionID ~= nil and not genericName then
+        return source.expansionID
+    end
+
+    local getter = C_Item and C_Item.GetItemInfo or GetItemInfo
+    if type(getter) == "function" then
+        local ok, name, link, quality, _, _, itemType, itemSubType, _, equipLocation, _, _, _, _, _, expansionID = pcall(getter, source.itemID)
+        if ok and name then
+            source.styleName = name
+            if genericName then source.name = name end
+            source.styleItemLink = link or source.styleItemLink
+            source.quality = source.quality or quality
+            source.styleItemType = itemType
+            source.styleItemSubType = itemSubType
+            source.styleEquipLocation = equipLocation
+            if expansionID ~= nil then source.expansionID = tonumber(expansionID) end
+            return source.expansionID
+        end
+    end
+
+    if C_Item and C_Item.RequestLoadItemDataByID then
+        SafeCall(C_Item.RequestLoadItemDataByID, source.itemID)
+    end
+    return source.expansionID
+end
+
 local function SourceMetadata(source)
     if not source then return "" end
+    LoadItemMetadata(source)
     local parts = {}
     local function AddPart(value)
         if value ~= nil and tostring(value) ~= "" then
@@ -379,33 +587,112 @@ local function SourceMetadata(source)
     end
 
     AddPart(source.name)
+    AddPart(source.styleName)
     AddPart(source.styleItemLink)
+    AddPart(source.styleItemType)
+    AddPart(source.styleItemSubType)
+    AddPart(source.styleEquipLocation)
+    return Normalize(table.concat(parts, " "))
+end
 
-    local genericName = not source.name or tostring(source.name):match("^Appearance %d+$")
-    if genericName and source.itemID then
-        local itemName = SafeCall(C_Item and C_Item.GetItemNameByID, source.itemID)
-        if not itemName and type(GetItemInfo) == "function" then
-            local ok, name, link, quality, _, _, itemType, itemSubType, _, equipLocation = pcall(GetItemInfo, source.itemID)
-            if ok then
-                itemName = name
-                source.styleItemLink = link or source.styleItemLink
-                source.quality = source.quality or quality
-                AddPart(itemType)
-                AddPart(itemSubType)
-                AddPart(equipLocation)
-            end
-        end
-        if itemName then
-            source.styleName = itemName
-            source.name = itemName
-        elseif C_Item and C_Item.RequestLoadItemDataByID then
-            SafeCall(C_Item.RequestLoadItemDataByID, source.itemID)
+local dropOriginCache = {}
+
+local function GetDropOrigin(source)
+    if not source or not source.sourceID then return "", nil end
+    local cached = dropOriginCache[source.sourceID]
+    if cached then return cached.text, cached.label end
+
+    local parts = {}
+    local label
+    local bossDropType = TRANSMOG_SOURCE_BOSS_DROP
+    if bossDropType ~= nil and source.sourceType == bossDropType and C_TransmogCollection and C_TransmogCollection.GetAppearanceSourceDrops then
+        local drops = SafeCall(C_TransmogCollection.GetAppearanceSourceDrops, source.sourceID)
+        for _, drop in ipairs(type(drops) == "table" and drops or {}) do
+            if not label and drop.instance then label = drop.instance end
+            if drop.instance then table.insert(parts, drop.instance) end
+            if drop.encounter then table.insert(parts, drop.encounter) end
+            if drop.tier then table.insert(parts, drop.tier) end
         end
     end
 
-    AddPart(source.styleName)
-    AddPart(source.styleItemLink)
-    return Normalize(table.concat(parts, " "))
+    cached = { text = Normalize(table.concat(parts, " ")), label = label }
+    dropOriginCache[source.sourceID] = cached
+    return cached.text, cached.label
+end
+
+function ZoneStyle.GetSourceExpansionID(source)
+    return LoadItemMetadata(source)
+end
+
+function ZoneStyle.GetSourceEligibility(source, modeKey, context)
+    context = context or ZoneStyle.GetCurrentContext()
+    if context.eraMax == nil then
+        context.eraMax, context.eraLabel, context.eraShortLabel = ZoneStyle.ResolveEra(context)
+    end
+    local eraMax, eraLabel = context.eraMax, context.eraLabel
+
+    local expansionID = LoadItemMetadata(source)
+    if expansionID == nil then
+        return false, "pending", "Waiting for WoW to load this item's era."
+    end
+    if expansionID > eraMax then
+        local expansion = ZoneStyle.expansions[expansionID]
+        return false, "era", string.format(
+            "%s item; this zone permits Classic through %s.",
+            expansion and expansion.label or ("Expansion " .. tostring(expansionID)),
+            eraLabel
+        )
+    end
+
+    if not context.provenanceResolved then
+        local resolved, resolvedKey = ZoneStyle.ResolveProvenance(context)
+        context.provenanceKey = resolvedKey
+        context.provenanceLabel = resolved and resolved.label or context.zone
+        context.provenanceResolved = true
+    end
+    local provenance = provenanceByKey[context.provenanceKey]
+    if not provenance then
+        return true, "eligible", string.format("Eligible through %s.", eraLabel)
+    end
+    context.provenanceKey = provenance.key
+    context.provenanceLabel = provenance.label
+
+    local dropText, dropLabel = GetDropOrigin(source)
+    if dropText ~= "" then
+        if TextMatchesAny(dropText, provenance.origins) then
+            return true, "eligible", string.format("Eligible for %s through %s.", provenance.label, eraLabel)
+        end
+        return false, "zone", string.format("%s is outside the %s source pool.", dropLabel or "This boss drop", provenance.label)
+    end
+
+    local metadata = SourceMetadata(source)
+    if TextMatchesAny(metadata, provenance.origins) then
+        return true, "eligible", string.format("Eligible for %s through %s.", provenance.label, eraLabel)
+    end
+    local paddedMetadata = " " .. metadata .. " "
+    for _, marker in ipairs(provenanceOriginMarkers) do
+        if marker.profile.key ~= provenance.key and paddedMetadata:find(" " .. marker.text .. " ", 1, true) then
+            return false, "zone", string.format("Associated with %s, not %s.", marker.profile.label, provenance.label)
+        end
+    end
+
+    return true, "eligible", "Era eligible; no conflicting source zone is reported by WoW."
+end
+
+function ZoneStyle.GetContextRestrictionLabel(context)
+    context = context or ZoneStyle.GetCurrentContext()
+    if context.eraMax == nil then
+        context.eraMax, context.eraLabel, context.eraShortLabel = ZoneStyle.ResolveEra(context)
+    end
+    if not context.provenanceResolved then
+        local resolved, resolvedKey = ZoneStyle.ResolveProvenance(context)
+        context.provenanceKey = resolvedKey
+        context.provenanceLabel = resolved and resolved.label or context.zone
+        context.provenanceResolved = true
+    end
+    local eraLabel, eraShortLabel = context.eraLabel, context.eraShortLabel
+    local provenance = provenanceByKey[context.provenanceKey]
+    return string.format("Through %s%s", eraShortLabel, provenance and (" • " .. provenance.label .. " sources") or ""), eraLabel, provenance
 end
 
 local function AddKeywordScore(text, keywords, multiplier, reasons, reasonPrefix)
@@ -479,13 +766,16 @@ function ZoneStyle.ChooseWeightedSource(candidates, definition, modeKey, context
     local total = 0
     local fallback
     for _, source in ipairs(candidates or {}) do
-        local weight, score = ZoneStyle.WeightForSource(source, definition, modeKey, context)
-        local entry = { source = source, weight = weight, score = score }
-        if source.sourceID == excludeSourceID then
-            fallback = entry
-        else
-            total = total + weight
-            table.insert(pool, entry)
+        local eligible = ZoneStyle.GetSourceEligibility(source, modeKey, context)
+        if eligible then
+            local weight, score = ZoneStyle.WeightForSource(source, definition, modeKey, context)
+            local entry = { source = source, weight = weight, score = score }
+            if source.sourceID == excludeSourceID then
+                fallback = entry
+            else
+                total = total + weight
+                table.insert(pool, entry)
+            end
         end
     end
     if #pool == 0 then
@@ -501,6 +791,11 @@ function ZoneStyle.ChooseWeightedSource(candidates, definition, modeKey, context
 end
 
 function ZoneStyle.OrderWeaponCandidates(candidates, modeKey, context)
+    for index = #(candidates or {}), 1, -1 do
+        local candidate = candidates[index]
+        local eligible = ZoneStyle.GetSourceEligibility(candidate.source, modeKey, context)
+        if not eligible then table.remove(candidates, index) end
+    end
     for _, candidate in ipairs(candidates or {}) do
         local definition = QC.Wardrobe and QC.Wardrobe.GetSlotDefinition and QC.Wardrobe.GetSlotDefinition(candidate.slotKey)
         local weight = ZoneStyle.WeightForSource(candidate.source, definition, modeKey, context)
@@ -518,6 +813,11 @@ function ZoneStyle.GetScoreSummary(source, definition, modeKey, context)
     local mode = ZoneStyle.GetModeInfo(modeKey)
     local reasonText = #reasons > 0 and table.concat(reasons, ", ") or "profile affinity"
     return string.format("%s score %.1f • %s", mode.label, score, reasonText)
+end
+
+function ZoneStyle.GetEligibilitySummary(source, modeKey, context)
+    local eligible, kind, reason = ZoneStyle.GetSourceEligibility(source, modeKey, context)
+    return eligible, kind, reason
 end
 
 local eventFrame = CreateFrame("Frame")

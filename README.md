@@ -1,8 +1,8 @@
-# Quest Chronicle v0.7.0
+# Quest Chronicle v0.7.1
 
-> **Zone Style Engine:** v0.7.0 turns outfit generation into a location-aware creative tool with Zone Native, Traveler, and Class Fantasy modes.
+> **Chronological Zone Pools:** v0.7.1 limits generated outfits by both the current zone's expansion era and its curated source family, then makes the exact preview layers visible at a glance.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.7.0 adds curated zone profiles and weighted outfit suggestions without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.7.1 tightens the Zone Style Engine without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -157,6 +157,7 @@ QuestChronicle\
 ├── UI_FOUNDATION_TEST_CHECKLIST.md
 ├── POLISH_TEST_CHECKLIST.md
 ├── ZONE_STYLE_ENGINE_V070_TEST_CHECKLIST.md
+├── ZONE_POOL_CURRENT_LOOK_V071_TEST_CHECKLIST.md
 ├── WARDROBE_SCANNER_RECOVERY_TEST_CHECKLIST.md
 └── COURIER_CONFIG_PATCH.json
 ```
@@ -178,6 +179,23 @@ When the character enters a different zone or profile, Quest Chronicle announces
 Scoring uses cached source and item names when available. If WoW has not loaded an item's name yet, Quest Chronicle requests it and uses a stable profile affinity in the meantime. The result remains intentionally varied rather than forcing an exact matching set.
 
 The engine only ranks candidates. Existing equipped-item weapon checks still decide whether a weapon appearance can be used.
+
+### Chronological and local source pools
+
+Generated outfits and rerolls now pass two eligibility gates before weighted scoring:
+
+- The **era ceiling** admits the current expansion and everything before it. Blade's Edge, for example, admits Classic and The Burning Crusade but rejects Wrath and later items.
+- The **zone provenance gate** admits boss drops whose Blizzard-provided instance or encounter belongs to the current curated zone family. Gruul's Lair is local to Blade's Edge; Sunwell Plateau is not.
+
+Explicit item/source names associated with another curated zone are also rejected. When Blizzard exposes no usable location for a non-boss source, Quest Chronicle admits it only after the era gate and only when its metadata contains no conflicting zone marker.
+
+The full collected appearance browser remains available for deliberate manual previews. Rows outside the generated pool say **Not generated**, and their tooltip explains the era or zone exclusion.
+
+### Current Look
+
+Every equipment-slot button now shows the icon currently represented by the embedded model, whether it comes from a selected appearance or equipped gear. Hidden icons are desaturated, while locked slots retain the gold padlock and border.
+
+The **Current Look** button opens a compact two-column manifest listing every preview layer, its exact appearance or equipped-item name, and its Selected, Equipped, Hidden, and Locked state. Only the active weapon configuration is listed.
 
 
 ## Outfits: Wardrobe Foundation

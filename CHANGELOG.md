@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.7.1 - 2026-07-31
+
+### Fixed
+
+- Adds an expansion-era ceiling to every generated and rerolled armor or weapon candidate.
+- Limits Outland zones to Classic and The Burning Crusade items, Northrend through Wrath, and subsequent regions through their corresponding expansion.
+- Distinguishes Midnight-parented versions of renewed regions from their original-era counterparts when the parent map is available.
+- Uses Blizzard's boss-drop instance and encounter metadata to reject appearances sourced outside the current curated zone family.
+- Rejects non-boss sources whose loaded item metadata explicitly names another curated zone family.
+- Keeps unknown-origin sources only when they pass the era ceiling and contain no conflicting provenance marker.
+- Applies era and provenance filtering before weighted scoring and before Blizzard-safe weapon validation.
+- Marks manually browsable appearances that are excluded from automatic generation and explains the reason in their tooltip.
+
+### Added
+
+- Shows the previewed appearance or equipped-item icon on every active equipment-slot button.
+- Desaturates thumbnails for hidden layers while retaining the visible padlock and gold border for locked layers.
+- Adds a Current Look manifest with exact names and Selected, Equipped, Hidden, and Locked states.
+- Lists only the active main-hand mode and applicable off-hand in the Current Look weapon summary.
+- Displays the current era ceiling and local source pool beneath the generation modes.
+
+### Preserved
+
+- The full collected wardrobe browser and deliberate manual preview selection.
+- Zone Native, Traveler, and Class Fantasy weighted scoring after eligibility filtering.
+- Equipped-item, category, usability, class, display, valid-source, and hand-slot checks for weapons.
+- Wardrobe cache format 5, SavedVariables schema 2, and Courier format 1.
+- Existing concepts, selections, locks, hidden slots, quest history, notes, and Courier data.
+
 ## 0.7.0 - 2026-07-31
 
 ### Added
