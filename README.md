@@ -1,8 +1,8 @@
-# Quest Chronicle v0.7.3
+# Quest Chronicle v0.8.0
 
-> **Starter-Origin Provenance:** v0.7.3 uses WoW's appearance-tracking maps plus curated fallbacks to keep quest rewards in their true starting-zone and expansion pools.
+> **Chronicle Intelligence:** v0.8.0 lets recent quests, factions, and enemies influence generated looks through Chronicle Echo, with generated names and per-zone favorites and exclusions.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.7.3 corrects legacy starter-reward geography without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.8.0 turns that existing history into an explainable outfit signal without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -130,7 +130,7 @@ Bare `/qc` toggles the main window. `/qc help` displays command help.
 ## Compatibility
 
 - Existing v0.1 through v0.4.0 SavedVariables and historical records are retained.
-- Existing v0.6.x wardrobe caches, outfit selections, locks, hidden slots, and saved concepts are retained.
+- Existing v0.6.x and v0.7.x wardrobe caches, outfit selections, locks, hidden slots, style modes, and saved concepts are retained.
 - Addon schema remains version 2 because the recorded data model is unchanged.
 - Courier export `formatVersion` remains 1.
 - Warcraft Quest Chronicle Courier v1.0.0 remains compatible.
@@ -160,6 +160,7 @@ QuestChronicle\
 ├── ZONE_POOL_CURRENT_LOOK_V071_TEST_CHECKLIST.md
 ├── PROMO_COHERENCE_V072_TEST_CHECKLIST.md
 ├── STARTING_ZONE_PROVENANCE_V073_TEST_CHECKLIST.md
+├── CHRONICLE_INTELLIGENCE_V080_TEST_CHECKLIST.md
 ├── WARDROBE_SCANNER_RECOVERY_TEST_CHECKLIST.md
 └── COURIER_CONFIG_PATCH.json
 ```
@@ -168,11 +169,12 @@ The lifecycle recorder remains in `QuestChronicle.lua`. UI modules use the publi
 
 ## Zone Style Engine
 
-The Outfit Workbench offers three weighted generation modes:
+The Outfit Workbench offers four weighted generation modes:
 
 - **Zone Native** favors the culture, climate, magic, materials, and motifs in the current curated zone profile.
 - **Traveler** favors practical, weathered, expedition-ready appearances with a lighter local accent.
 - **Class Fantasy** favors iconic class terms and silhouettes with a smaller accent from the current zone.
+- **Chronicle Echo** favors themes found in the character's recent quests, recognizable factions, and recurring enemies.
 
 Quest Chronicle detects the current map, zone, subzone, and parent-map trail. Profiles cover the Midnight regions—Quel'Thalas, the Amani Highlands, Harandar, and the Voidstorm—plus major cultures and expansion regions across Azeroth. Unknown areas fall back to an Azeroth Adventurer profile.
 
@@ -181,6 +183,21 @@ When the character enters a different zone or profile, Quest Chronicle announces
 Scoring uses cached source and item names when available. If WoW has not loaded an item's name yet, Quest Chronicle requests it and uses a stable profile affinity in the meantime. The result remains varied while favoring pieces from the same native transmog set or a compatible material and magic motif.
 
 The engine only ranks candidates. Existing equipped-item weapon checks still decide whether a weapon appearance can be used.
+
+### Chronicle Intelligence
+
+Chronicle Intelligence reads up to twelve distinct recent quests from the existing event history and active-quest snapshot. Repeated objective updates are folded into their quest, so one busy objective cannot drown out the rest of the character's journey. Quest titles, objectives, and recorded quest locations can establish Alliance or Horde influence and enemy themes including fel and the Burning Legion, undead and the Scourge, void forces, elementals, dragons, beasts, trolls, naga, pirates, and mechanical forces. RP notes are intentionally excluded from style scoring.
+
+Chronicle Echo gives those signals the strongest weight. Zone Native, Traveler, and Class Fantasy use them as a smaller accent. The Workbench's Echo summary names the leading enemy and faction signals, and appearance tooltips show which Echo terms contributed to a score. Era limits, local source pools, promotional exclusion, outfit coherence, and Blizzard weapon validity are always applied before or alongside that weighting.
+
+Generated looks receive stable names derived from their mode, zone, Chronicle theme, and selected visual identities. The name appears above the preview and in Current Look, becomes the suggested Save Concept name, and is restored by newly saved concepts. Existing concepts remain compatible because the name is optional. A deliberate manual selection clears the generated label.
+
+The appearance panel also supports per-character, per-zone preferences:
+
+- **Favor in Zone** strongly weights the collapsed visual whenever it remains eligible.
+- **Exclude in Zone** removes that visual from automatic generation in the current zone while leaving manual browsing and preview available.
+
+Favorites and exclusions are mutually exclusive and follow Blizzard's collapsed visual identity rather than one interchangeable item source. Their counts appear under the mode buttons, and they remain isolated to the zone where they were set.
 
 ### Chronological and local source pools
 

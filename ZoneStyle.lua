@@ -6,11 +6,13 @@ local ZoneStyle = QC.ZoneStyle
 ZoneStyle.MODE_ZONE_NATIVE = "ZONE_NATIVE"
 ZoneStyle.MODE_TRAVELER = "TRAVELER"
 ZoneStyle.MODE_CLASS_FANTASY = "CLASS_FANTASY"
+ZoneStyle.MODE_CHRONICLE_ECHO = "CHRONICLE_ECHO"
 
 ZoneStyle.modes = {
-    { key = ZoneStyle.MODE_ZONE_NATIVE, label = "Zone Native", shortLabel = "Zone Native", description = "Favor the culture, climate, magic, and materials of the current zone profile." },
+    { key = ZoneStyle.MODE_ZONE_NATIVE, label = "Zone Native", shortLabel = "Zone", description = "Favor the culture, climate, magic, and materials of the current zone profile." },
     { key = ZoneStyle.MODE_TRAVELER, label = "Traveler", shortLabel = "Traveler", description = "Favor practical, weathered, expedition-ready appearances with a lighter touch of local style." },
-    { key = ZoneStyle.MODE_CLASS_FANTASY, label = "Class Fantasy", shortLabel = "Class Fantasy", description = "Favor iconic class themes while borrowing a smaller accent from the current zone." },
+    { key = ZoneStyle.MODE_CLASS_FANTASY, label = "Class Fantasy", shortLabel = "Class", description = "Favor iconic class themes while borrowing a smaller accent from the current zone." },
+    { key = ZoneStyle.MODE_CHRONICLE_ECHO, label = "Chronicle Echo", shortLabel = "Echo", description = "Let recent quests, factions, and enemies shape the outfit while retaining the current zone's era and source limits." },
 }
 
 local modeByKey = {}
@@ -353,6 +355,85 @@ local conflictingFamilies = {
     mechanical = { nature = true, rustic = true },
     rustic = { mechanical = true, arcane = true, regal = true },
     regal = { rustic = true },
+}
+
+-- Chronicle Intelligence deliberately uses only the quest record already kept
+-- by schema 2. The evidence vocabulary converts recent quest titles and
+-- objectives into appearance vocabulary; no new event fields or external quest
+-- database are required.
+local chronicleThemes = {
+    {
+        key = "alliance", label = "Alliance", kind = "faction",
+        evidence = { "alliance", "stormwind", "7th legion", "seventh legion", "lion", "gryphon", "wildhammer", "dark iron", "night elf", "sentinel", "draenei", "kul tiran", "gnome" },
+        appearance = { alliance = 11, stormwind = 10, lion = 8, gryphon = 8, sentinel = 6, royal = 4, silver = 4, blue = 3, defender = 4 },
+        adjectives = { "Lionhearted", "Stormwind", "Alliance", "Gryphon" }, nouns = { "Vanguard", "Oath", "March", "Watch" },
+    },
+    {
+        key = "horde", label = "Horde", kind = "faction",
+        evidence = { "horde", "orgrimmar", "warsong", "frostwolf", "darkspear", "forsaken", "blood elf", "sindorei", "sin dorei", "tauren", "zandalari", "vulpera", "orc" },
+        appearance = { horde = 11, orgrimmar = 10, warsong = 9, frostwolf = 9, darkspear = 8, forsaken = 7, clan = 6, wolf = 5, iron = 4 },
+        adjectives = { "Horde", "Warsong", "Frostwolf", "Orgrimmar" }, nouns = { "Vanguard", "Oath", "March", "Standard" },
+    },
+    {
+        key = "fel", label = "Burning Legion", kind = "enemy",
+        evidence = { "burning legion", "legion", "demon", "demons", "eredar", "satyr", "infernal", "felguard", "felhound", "fel" },
+        appearance = { fel = 12, demon = 10, demonic = 10, legion = 9, infernal = 8, chaos = 8, corrupt = 6, abyss = 5, flame = 3 },
+        adjectives = { "Fel-Scarred", "Demonbane", "Legionfall", "Felsworn" }, nouns = { "Reckoning", "Hunt", "Bulwark", "Defiance" },
+    },
+    {
+        key = "undead", label = "Undead", kind = "enemy",
+        evidence = { "undead", "scourge", "necromancer", "ghoul", "skeleton", "abomination", "plague", "lich", "death knight", "cult of the damned" },
+        appearance = { scourge = 11, undead = 10, death = 8, necrotic = 9, plague = 8, bone = 7, skull = 7, grave = 6, crypt = 6, ebon = 5 },
+        adjectives = { "Graveworn", "Scourgebane", "Ebon", "Plagueward" }, nouns = { "Vigil", "Requiem", "Reckoning", "Guard" },
+    },
+    {
+        key = "void", label = "Void and Old Gods", kind = "enemy",
+        evidence = { "void", "old god", "old gods", "twilight cult", "twilights hammer", "cultist", "faceless", "sha", "nraqi", "n raqi" },
+        appearance = { void = 12, twilight = 9, shadow = 8, abyss = 7, dark = 4, cosmic = 4, eye = 5, whisper = 6 },
+        adjectives = { "Void-Touched", "Twilight", "Whisperbane", "Abyssal" }, nouns = { "Vigil", "Defiance", "Secret", "Ward" },
+    },
+    {
+        key = "elemental", label = "Elementals", kind = "enemy",
+        evidence = { "elemental", "elementals", "fire elemental", "water elemental", "earth elemental", "air elemental", "raging fire", "living flame", "wind fury" },
+        appearance = { elemental = 11, flame = 7, fire = 7, storm = 7, thunder = 6, earth = 6, tide = 6, magma = 7, frost = 5 },
+        adjectives = { "Element-Bound", "Stormforged", "Earthshaken", "Flameward" }, nouns = { "Concord", "Fury", "Aegis", "March" },
+    },
+    {
+        key = "dragon", label = "Dragonkin", kind = "enemy",
+        evidence = { "dragon", "dragons", "dragonkin", "drake", "drakes", "wyrm", "whelps", "black dragon", "blue dragon", "red dragon", "infinite dragonflight" },
+        appearance = { dragon = 12, draconic = 11, drake = 9, wyrm = 8, scale = 7, obsidian = 5, ruby = 4, azure = 4, bronze = 4 },
+        adjectives = { "Dragonsworn", "Scale-Bound", "Wyrmward", "Drakeforged" }, nouns = { "Aegis", "Legacy", "Vigil", "Roar" },
+    },
+    {
+        key = "beast", label = "Wild Beasts", kind = "enemy",
+        evidence = { "beast", "beasts", "wildlife", "wolf", "wolves", "bear", "boar", "raptor", "spider", "moth", "basilisk", "ravager" },
+        appearance = { beast = 10, hunt = 7, hunter = 6, wild = 7, wolf = 6, bear = 6, hide = 6, fur = 6, fang = 6, claw = 6 },
+        adjectives = { "Wild", "Beaststalker", "Fang-Bound", "Trailworn" }, nouns = { "Hunt", "Prowl", "Trail", "Instinct" },
+    },
+    {
+        key = "troll", label = "Troll Tribes", kind = "enemy",
+        evidence = { "troll", "trolls", "amani", "gurubashi", "drakkari", "sandfury", "bloodscalp", "skullsplitter", "zandalari" },
+        appearance = { troll = 11, amani = 10, voodoo = 9, hex = 8, loa = 8, tribal = 7, tusk = 6, mask = 5, jungle = 5 },
+        adjectives = { "Hex-Bound", "Amani", "Loa-Touched", "Tribal" }, nouns = { "Hunt", "Vengeance", "Mask", "Oath" },
+    },
+    {
+        key = "naga", label = "Naga", kind = "enemy",
+        evidence = { "naga", "sirens", "myrmidon", "coilfang", "sea witch", "nazjatar", "azshara" },
+        appearance = { naga = 12, coilfang = 10, serpent = 8, scale = 7, tide = 7, sea = 6, coral = 5, shell = 5, azshara = 7 },
+        adjectives = { "Tideworn", "Serpentine", "Coilfang", "Sea-Bound" }, nouns = { "Defiance", "Wake", "Trident", "Vigil" },
+    },
+    {
+        key = "pirate", label = "Pirates", kind = "enemy",
+        evidence = { "pirate", "pirates", "buccaneer", "corsair", "freebooter", "southsea", "bloodsail", "blackwater raiders" },
+        appearance = { pirate = 12, buccaneer = 10, corsair = 9, captain = 7, admiral = 7, sea = 5, tide = 4, plunder = 7, cutlass = 7 },
+        adjectives = { "Corsair", "Bloodsail", "Sea-Worn", "Freebooter" }, nouns = { "Fortune", "Wake", "Raid", "Reprisal" },
+    },
+    {
+        key = "mechanical", label = "Mechanical Forces", kind = "enemy",
+        evidence = { "mechanical", "machine", "robot", "construct", "gnome", "gnomeregan", "mechagon", "venture company", "iron horde", "titan keeper" },
+        appearance = { mechanical = 12, machine = 10, mechanized = 10, gear = 7, cog = 7, clockwork = 9, industrial = 7, iron = 5, titan = 6 },
+        adjectives = { "Gearforged", "Clockwork", "Ironbound", "Machinist's" }, nouns = { "Bulwark", "Device", "March", "Protocol" },
+    },
 }
 
 ZoneStyle.profiles = {
@@ -934,6 +1015,226 @@ function ZoneStyle.GetPromotionReason(source)
     return ZoneStyle.GetSourcePromotionReason(source)
 end
 
+local AddKeywordScore
+local chronicleEventWeights = {
+    QUEST_TURNED_IN = 7,
+    QUEST_ACCEPTED = 5,
+    QUEST_BECAME_ACTIVE = 4,
+    QUEST_OBJECTIVE_UPDATED = 3,
+    QUEST_STATE_CHANGED = 2,
+}
+
+local function AppendQuestText(parts, value)
+    if value ~= nil and tostring(value) ~= "" then
+        table.insert(parts, tostring(value))
+    end
+end
+
+local function BuildQuestEvidenceText(quest)
+    local parts = {}
+    AppendQuestText(parts, quest and quest.questName)
+    AppendQuestText(parts, quest and quest.objectiveText)
+    AppendQuestText(parts, quest and quest.changeReason)
+    AppendQuestText(parts, quest and quest.zone)
+    AppendQuestText(parts, quest and quest.subZone)
+    for _, objective in ipairs(quest and quest.objectives or {}) do
+        AppendQuestText(parts, objective.text or objective.objectiveText)
+    end
+    return Normalize(table.concat(parts, " "))
+end
+
+local function ChronicleCacheKey()
+    local character = QC.GetCurrentCharacter and QC.GetCurrentCharacter() or {}
+    local events = QC.GetEvents and QC.GetEvents() or {}
+    local active = QC.GetActiveQuests and QC.GetActiveQuests() or {}
+    local activeStamp = 0
+    for _, quest in ipairs(active) do
+        activeStamp = activeStamp + (tonumber(quest.updatedAt or quest.lastSeenAt) or 0)
+    end
+    return table.concat({ tostring(character.key or "UNKNOWN"), tostring(character.lastEventAt or 0), tostring(#events), tostring(#active), tostring(activeStamp) }, ":")
+end
+
+local chronicleProfileCache = {}
+
+function ZoneStyle.BuildChronicleProfile(context)
+    local records = {}
+    local seen = {}
+    local events = QC.GetEvents and QC.GetEvents() or {}
+
+    -- Events are append-only, so walk from newest to oldest and merge each
+    -- quest into one record. This prevents objective spam from overpowering
+    -- the actual sequence of adventures while retaining its useful text.
+    local oldestEventIndex = math.max(1, #events - 199)
+    for index = #events, oldestEventIndex, -1 do
+        local event = events[index]
+        local eventWeight = event and chronicleEventWeights[event.eventType]
+        local identity = event and (event.questID or event.questName)
+        local key = identity and tostring(identity)
+        if eventWeight and key then
+            local record = seen[key]
+            if record then
+                record.weight = math.max(record.weight, eventWeight)
+                record.text = Normalize(record.text .. " " .. BuildQuestEvidenceText(event))
+            elseif #records < 12 then
+                record = {
+                    key = key,
+                    weight = eventWeight,
+                    text = BuildQuestEvidenceText(event),
+                    questName = event.questName,
+                    eventType = event.eventType,
+                }
+                seen[key] = record
+                table.insert(records, record)
+            end
+        end
+    end
+
+    local active = QC.GetActiveQuests and QC.GetActiveQuests() or {}
+    table.sort(active, function(left, right)
+        return (tonumber(left.updatedAt or left.lastSeenAt) or 0) > (tonumber(right.updatedAt or right.lastSeenAt) or 0)
+    end)
+    for _, quest in ipairs(active) do
+        if #records >= 12 then break end
+        local identity = quest.questID or quest.questName
+        local key = identity and tostring(identity)
+        if key and not seen[key] then
+            local record = {
+                key = key,
+                weight = 4,
+                text = BuildQuestEvidenceText(quest),
+                questName = quest.questName,
+                eventType = "ACTIVE",
+            }
+            seen[key] = record
+            table.insert(records, record)
+        end
+    end
+
+    local profile = {
+        questCount = #records,
+        records = records,
+        themeScores = {},
+        appearanceKeywords = {},
+        topThemes = {},
+    }
+
+    local character = QC.GetCurrentCharacter and QC.GetCurrentCharacter() or {}
+    local playerFaction = Normalize(character.faction or (type(UnitFactionGroup) == "function" and UnitFactionGroup("player")))
+    if playerFaction == "alliance" or playerFaction == "horde" then
+        profile.themeScores[playerFaction] = 1.5
+    end
+
+    for rank, record in ipairs(records) do
+        local recency = math.max(0.42, 1.12 - ((rank - 1) * 0.065))
+        for _, theme in ipairs(chronicleThemes) do
+            local matches = TextMatchesAny(record.text, theme.evidence)
+            if matches then
+                profile.themeScores[theme.key] = (profile.themeScores[theme.key] or 0) + (record.weight * recency)
+            end
+        end
+    end
+
+    local ranked = {}
+    for _, theme in ipairs(chronicleThemes) do
+        local score = profile.themeScores[theme.key] or 0
+        if score > 0 then
+            local entry = { theme = theme, score = score }
+            table.insert(ranked, entry)
+            if not profile.dominantTheme or score > profile.dominantTheme.score then
+                profile.dominantTheme = entry
+            end
+            if theme.kind == "faction" and (not profile.dominantFaction or score > profile.dominantFaction.score) then
+                profile.dominantFaction = entry
+            elseif theme.kind == "enemy" and (not profile.dominantEnemy or score > profile.dominantEnemy.score) then
+                profile.dominantEnemy = entry
+            end
+            local keywordScale = math.min(1.35, score / 12)
+            for token, value in pairs(theme.appearance or {}) do
+                profile.appearanceKeywords[token] = (profile.appearanceKeywords[token] or 0) + (value * keywordScale)
+            end
+        end
+    end
+    table.sort(ranked, function(left, right)
+        if left.score == right.score then return left.theme.key < right.theme.key end
+        return left.score > right.score
+    end)
+    for index = 1, math.min(3, #ranked) do profile.topThemes[index] = ranked[index] end
+    return profile
+end
+
+function ZoneStyle.GetChronicleProfile(context)
+    local key = ChronicleCacheKey()
+    if not chronicleProfileCache[key] then
+        chronicleProfileCache = { [key] = ZoneStyle.BuildChronicleProfile(context) }
+    end
+    return chronicleProfileCache[key]
+end
+
+function ZoneStyle.GetChronicleSummary(context)
+    local profile = ZoneStyle.GetChronicleProfile(context)
+    if not profile or profile.questCount == 0 then
+        return "Echo: no recent quest signal"
+    end
+    local labels = {}
+    if profile.dominantEnemy then table.insert(labels, profile.dominantEnemy.theme.label) end
+    if profile.dominantFaction and (not profile.dominantEnemy or profile.dominantFaction.theme.key ~= profile.dominantEnemy.theme.key) then
+        table.insert(labels, profile.dominantFaction.theme.label)
+    end
+    if #labels == 0 and profile.dominantTheme then table.insert(labels, profile.dominantTheme.theme.label) end
+    local signal = #labels > 0 and table.concat(labels, " + ") or "adventuring memory"
+    return string.format("Echo: %s • %d recent quest%s", signal, profile.questCount, profile.questCount == 1 and "" or "s")
+end
+
+function ZoneStyle.GetSourcePreference(source, context)
+    if QC.Wardrobe and QC.Wardrobe.GetSourceZonePreference then
+        return QC.Wardrobe.GetSourceZonePreference(source, context)
+    end
+end
+
+local function ChronicleScore(source, context, multiplier, reasons)
+    local chronicle = context and context.chronicleProfile or ZoneStyle.GetChronicleProfile(context)
+    if not chronicle or chronicle.questCount == 0 then return 0 end
+    return AddKeywordScore(SourceMetadata(source), chronicle.appearanceKeywords, multiplier, reasons, "Echo: ")
+end
+
+local modeNameParts = {
+    [ZoneStyle.MODE_ZONE_NATIVE] = { adjectives = { "Native", "Local", "Homeland", "Wayfarer's" }, nouns = { "Regalia", "Vanguard", "Attire", "Guard" } },
+    [ZoneStyle.MODE_TRAVELER] = { adjectives = { "Trailworn", "Wayfarer's", "Far-Roaming", "Expedition" }, nouns = { "Kit", "Road", "Venture", "Attire" } },
+    [ZoneStyle.MODE_CLASS_FANTASY] = { adjectives = { "Heroic", "Classforged", "Champion's", "Battleworn" }, nouns = { "Regalia", "Legacy", "Arsenal", "Oath" } },
+    [ZoneStyle.MODE_CHRONICLE_ECHO] = { adjectives = { "Echoed", "Remembered", "Chronicle", "Quest-Bound" }, nouns = { "Echo", "Memory", "Legacy", "Tale" } },
+}
+
+function ZoneStyle.GenerateOutfitName(modeKey, context, sources)
+    modeKey = ZoneStyle.NormalizeMode(modeKey)
+    context = context or ZoneStyle.GetCurrentContext()
+    local chronicle = context.chronicleProfile or ZoneStyle.GetChronicleProfile(context)
+    local themeEntry = chronicle and (chronicle.dominantEnemy or chronicle.dominantFaction or chronicle.dominantTheme)
+    local parts = themeEntry and themeEntry.theme or modeNameParts[modeKey]
+    local adjectives = parts.adjectives or modeNameParts[modeKey].adjectives
+    local nouns = parts.nouns or modeNameParts[modeKey].nouns
+    local seed = tonumber((ZoneStyle.profiles[context.profileKey] or {}).seed) or 1
+    for _, source in ipairs(sources or {}) do
+        seed = seed + (tonumber(source.visualID or source.sourceID or source.itemID) or 0)
+    end
+    if themeEntry then seed = seed + math.floor(themeEntry.score * 10) end
+    local adjective = adjectives[(seed % #adjectives) + 1]
+    local noun = nouns[((math.floor(seed / 7)) % #nouns) + 1]
+    local zoneLabel = context.provenanceLabel or context.profileLabel or context.zone or "Azeroth"
+    local pattern = seed % 4
+    local name
+    if pattern == 0 then
+        name = adjective .. " " .. noun
+    elseif pattern == 1 then
+        name = zoneLabel .. " " .. noun
+    elseif pattern == 2 then
+        name = noun .. " of " .. zoneLabel
+    else
+        name = (modeKey == ZoneStyle.MODE_CHRONICLE_ECHO and "Echo of " or adjective .. " ") .. (themeEntry and themeEntry.theme.label or zoneLabel)
+    end
+    if #name > 48 then name = string.sub(name, 1, 48) end
+    return name
+end
+
 function ZoneStyle.CreateGenerationContext(baseContext)
     local context = {}
     for key, value in pairs(baseContext or ZoneStyle.GetCurrentContext()) do
@@ -946,6 +1247,7 @@ function ZoneStyle.CreateGenerationContext(baseContext)
         sourceCount = 0,
         themedSources = 0,
     }
+    context.chronicleProfile = ZoneStyle.GetChronicleProfile(context)
     return context
 end
 
@@ -1051,6 +1353,10 @@ end
 
 function ZoneStyle.GetSourceEligibility(source, modeKey, context)
     context = context or ZoneStyle.GetCurrentContext()
+    local preference = ZoneStyle.GetSourcePreference(source, context)
+    if preference == "excluded" then
+        return false, "excluded", "Excluded from generated outfits in this zone. Manual preview remains available."
+    end
     local promotionReason = GetPromotionReason(source) or GetPromotionalSetReason(source)
     if promotionReason then
         return false, "promotional", promotionReason
@@ -1141,7 +1447,7 @@ function ZoneStyle.GetContextRestrictionLabel(context)
     return string.format("Through %s%s", eraShortLabel, provenance and (" • " .. provenance.label .. " sources") or ""), eraLabel, provenance
 end
 
-local function AddKeywordScore(text, keywords, multiplier, reasons, reasonPrefix)
+AddKeywordScore = function(text, keywords, multiplier, reasons, reasonPrefix)
     local score = 0
     local padded = " " .. text .. " "
     for token, value in pairs(keywords or {}) do
@@ -1159,7 +1465,9 @@ end
 
 local function StableAffinity(source, profile, modeKey, classID)
     local identity = tonumber(source.visualID or source.sourceID or source.itemID) or 1
-    local modeSeed = modeKey == ZoneStyle.MODE_TRAVELER and 37 or (modeKey == ZoneStyle.MODE_CLASS_FANTASY and 73 or 11)
+    local modeSeed = modeKey == ZoneStyle.MODE_TRAVELER and 37
+        or (modeKey == ZoneStyle.MODE_CLASS_FANTASY and 73
+        or (modeKey == ZoneStyle.MODE_CHRONICLE_ECHO and 109 or 11))
     local value = (identity * 1103515245 + (profile.seed or 1) * 12345 + (classID or 0) * 7919 + modeSeed) % 2147483647
     return (value / 2147483647) * 3.0
 end
@@ -1183,19 +1491,28 @@ function ZoneStyle.ScoreSource(source, definition, modeKey, context)
         score = score + AddKeywordScore(text, profile.avoid, 1.0, reasons)
         score = score + AddKeywordScore(text, classProfile, 0.18, reasons, "Class: ")
         score = score + AddKeywordScore(text, travelerKeywords, 0.12, reasons, "Travel: ")
+        score = score + ChronicleScore(source, context, 0.22, reasons)
         if definition and (definition.key == "BACK" or definition.key == "TABARD") then score = score + 1.2 end
     elseif modeKey == ZoneStyle.MODE_TRAVELER then
         score = score + AddKeywordScore(text, travelerKeywords, 1.25, reasons, "Travel: ")
         score = score + AddKeywordScore(text, travelerAvoid, 1.0, reasons)
         score = score + AddKeywordScore(text, profile.keywords, 0.28, reasons, "Local: ")
         score = score + AddKeywordScore(text, classProfile, 0.16, reasons, "Class: ")
+        score = score + ChronicleScore(source, context, 0.18, reasons)
         if definition and (definition.key == "BACK" or definition.key == "WAIST" or definition.key == "FEET" or definition.key == "SHIRT") then score = score + 2.0 end
-    else
+    elseif modeKey == ZoneStyle.MODE_CLASS_FANTASY then
         score = score + AddKeywordScore(text, classProfile, 1.35, reasons, "Class: ")
         score = score + AddKeywordScore(text, profile.keywords, 0.24, reasons, "Local: ")
         score = score + AddKeywordScore(text, travelerKeywords, 0.10, reasons, "Travel: ")
+        score = score + ChronicleScore(source, context, 0.15, reasons)
         if definition and (definition.weaponRole or definition.key == "HEAD" or definition.key == "SHOULDER" or definition.key == "CHEST") then score = score + 2.0 end
         score = score + math.min(2.0, tonumber(source.quality or 0) * 0.35)
+    else
+        score = score + ChronicleScore(source, context, 1.35, reasons)
+        score = score + AddKeywordScore(text, profile.keywords, 0.30, reasons, "Local: ")
+        score = score + AddKeywordScore(text, classProfile, 0.18, reasons, "Class: ")
+        score = score + AddKeywordScore(text, travelerKeywords, 0.12, reasons, "Travel: ")
+        if definition and (definition.key == "BACK" or definition.key == "CHEST" or definition.weaponRole) then score = score + 1.2 end
     end
 
     if context.outfitProfile then
@@ -1204,6 +1521,11 @@ function ZoneStyle.ScoreSource(source, definition, modeKey, context)
         if #reasons < 4 and coherenceReason and (coherenceScore > 0 or not coherent) then
             table.insert(reasons, (coherent and "Match: " or "Clash: ") .. coherenceReason)
         end
+    end
+
+    if ZoneStyle.GetSourcePreference(source, context) == "favorite" then
+        score = score + 24
+        if #reasons < 4 then table.insert(reasons, "Zone favorite") end
     end
 
     score = score + StableAffinity(source, profile, modeKey, classID)

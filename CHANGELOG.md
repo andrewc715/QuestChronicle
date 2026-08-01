@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.8.0 - 2026-07-31
+
+### Added
+
+- Adds Chronicle Echo as a fourth weighted outfit-generation mode.
+- Builds a bounded intelligence profile from the twelve most recent distinct quests in schema-2 history and the active-quest snapshot.
+- Merges repeated objective events by quest so event volume cannot distort recent-quest influence.
+- Recognizes Alliance and Horde signals plus Burning Legion, undead, void, elemental, dragon, beast, troll, naga, pirate, and mechanical enemy themes.
+- Applies a lighter recent-quest accent to Zone Native, Traveler, and Class Fantasy scoring.
+- Displays a compact Chronicle Echo summary and Echo scoring reasons in appearance tooltips.
+- Generates stable outfit names from mode, zone, Chronicle theme, and selected collapsed visuals.
+- Shows generated names in Character Preview and Current Look and offers them as the default Save Concept name.
+- Adds per-character, per-zone favorites and exclusions keyed to Blizzard's collapsed visual identity.
+- Adds Favor in Zone / Exclude in Zone controls, browser markers, tooltips, and per-zone counts.
+
+### Compatibility
+
+- Saves generated names as optional concept fields; legacy concepts without them remain loadable.
+- Stores zone preferences additively without changing wardrobe cache format 5.
+- Preserves SavedVariables schema 2 and Courier format 1.
+- Requires no wardrobe rescan and retains existing history, caches, concepts, selections, locks, hidden slots, and style modes.
+
+### Preserved
+
+- Era ceilings, local source provenance, starting-zone corrections, and the full manual appearance browser.
+- Promotional exclusion, native-set affinity, motif coherence, and dramatic-outlier rejection.
+- Blizzard-safe equipped-item and hand-slot weapon validation.
+- Preview-only behavior with no transmog application, gold cost, or Blizzard outfit-slot mutation.
+
 ## 0.7.3 - 2026-07-31
 
 ### Fixed

@@ -121,6 +121,42 @@ local function EnsureConceptStore()
     return cache.conceptsByCharacter[characterKey], characterKey
 end
 
+local function NormalizePreferenceKey(value)
+    local text = string.lower(tostring(value or "unknown-zone"))
+    text = text:gsub("[^%w]+", "-"):gsub("^-+", ""):gsub("-+$", "")
+    return text ~= "" and text or "unknown-zone"
+end
+
+local function GetZonePreferenceKey(context)
+    context = context or (QC.ZoneStyle and QC.ZoneStyle.GetCurrentContext and QC.ZoneStyle.GetCurrentContext()) or {}
+    return NormalizePreferenceKey(context.provenanceKey or context.zoneKey or context.profileKey or context.zone),
+        tostring(context.provenanceLabel or context.zone or context.profileLabel or "Unknown Zone")
+end
+
+local function GetZonePreferenceStore(context, create)
+    local cache = EnsureCache()
+    local character = QC.GetCurrentCharacter and QC.GetCurrentCharacter()
+    local characterKey = character and character.key or "UNKNOWN"
+    local zoneKey, zoneLabel = GetZonePreferenceKey(context)
+    if not cache.zonePreferencesByCharacter then
+        if not create then return nil, zoneKey, zoneLabel end
+        cache.zonePreferencesByCharacter = {}
+    end
+    if not cache.zonePreferencesByCharacter[characterKey] then
+        if not create then return nil, zoneKey, zoneLabel end
+        cache.zonePreferencesByCharacter[characterKey] = {}
+    end
+    local store = cache.zonePreferencesByCharacter[characterKey]
+    if not store[zoneKey] then
+        if not create then return nil, zoneKey, zoneLabel end
+        store[zoneKey] = { favorites = {}, exclusions = {}, label = zoneLabel }
+    end
+    store[zoneKey].favorites = store[zoneKey].favorites or {}
+    store[zoneKey].exclusions = store[zoneKey].exclusions or {}
+    store[zoneKey].label = zoneLabel
+    return store[zoneKey], zoneKey, zoneLabel
+end
+
 local function LoadTransmogSupport()
     if TransmogUtil and type(TransmogUtil.GetTransmogLocation) == "function" then
         return true
@@ -535,6 +571,93 @@ local function GetSourceByID(slotKey, sourceID)
         end
     end
     return nil
+end
+
+local function GetSourcePreferenceIdentity(source)
+    if not source then return nil end
+    if source.visualID then return "visual:" .. tostring(source.visualID) end
+    if source.sourceID then return "source:" .. tostring(source.sourceID) end
+    if source.itemID then return "item:" .. tostring(source.itemID) end
+end
+
+function Wardrobe.GetZonePreferenceKey(context)
+    return GetZonePreferenceKey(context)
+end
+
+function Wardrobe.GetSourceZonePreference(source, context)
+    local identity = GetSourcePreferenceIdentity(source)
+    if not identity then return nil end
+    local preferences = GetZonePreferenceStore(context, false)
+    if not preferences then return nil end
+    if preferences.exclusions[identity] then return "excluded" end
+    if preferences.favorites[identity] then return "favorite" end
+end
+
+function Wardrobe.SetSourceZonePreference(source, preference, context)
+    local identity = GetSourcePreferenceIdentity(source)
+    if not identity then return false, "That appearance has no stable visual identity." end
+    if preference ~= nil and preference ~= "favorite" and preference ~= "excluded" then
+        return false, "Unknown zone preference."
+    end
+
+    local preferences, _, zoneLabel = GetZonePreferenceStore(context, true)
+    preferences.favorites[identity] = preference == "favorite" and true or nil
+    preferences.exclusions[identity] = preference == "excluded" and true or nil
+    preferences.updatedAt = time and time() or 0
+    if QC.Notify then QC.Notify("WARDROBE_ZONE_PREFERENCES_CHANGED", source, preference, zoneLabel) end
+
+    local sourceName = tostring(source.name or source.sourceID or "Appearance")
+    if preference == "favorite" then
+        return true, string.format("Favoring %s when generating outfits in %s.", sourceName, zoneLabel)
+    elseif preference == "excluded" then
+        return true, string.format("Excluding %s from generated outfits in %s. Manual preview is still available.", sourceName, zoneLabel)
+    end
+    return true, string.format("Cleared the %s preference for %s.", zoneLabel, sourceName)
+end
+
+function Wardrobe.ToggleZoneFavorite(slotKey, sourceID, context)
+    local source = GetSourceByID(slotKey, sourceID)
+    if not source then return false, "Select a cached appearance first." end
+    local current = Wardrobe.GetSourceZonePreference(source, context)
+    return Wardrobe.SetSourceZonePreference(source, current == "favorite" and nil or "favorite", context)
+end
+
+function Wardrobe.ToggleZoneExclusion(slotKey, sourceID, context)
+    local source = GetSourceByID(slotKey, sourceID)
+    if not source then return false, "Select a cached appearance first." end
+    local current = Wardrobe.GetSourceZonePreference(source, context)
+    return Wardrobe.SetSourceZonePreference(source, current == "excluded" and nil or "excluded", context)
+end
+
+function Wardrobe.GetZonePreferenceSummary(context)
+    local preferences, _, zoneLabel = GetZonePreferenceStore(context, false)
+    if not preferences then return 0, 0, zoneLabel end
+    local favorites, exclusions = 0, 0
+    for _, value in pairs(preferences.favorites) do if value then favorites = favorites + 1 end end
+    for _, value in pairs(preferences.exclusions) do if value then exclusions = exclusions + 1 end end
+    return favorites, exclusions, zoneLabel
+end
+
+local function GetSelectedSources(state)
+    local sources = {}
+    for _, definition in ipairs(Wardrobe.slotDefinitions) do
+        if state.selections[definition.key] and not state.hidden[definition.key] then
+            local source = GetSourceByID(definition.key, state.selections[definition.key])
+            if source then table.insert(sources, source) end
+        end
+    end
+    return sources
+end
+
+local function RefreshGeneratedOutfitName(state, styleEngine, styleMode, styleContext)
+    if not styleEngine or not styleEngine.GenerateOutfitName then return nil end
+    state.generatedName = styleEngine.GenerateOutfitName(styleMode, styleContext, GetSelectedSources(state))
+    state.generatedAt = time and time() or 0
+    return state.generatedName
+end
+
+function Wardrobe.GetGeneratedOutfitName()
+    return EnsurePreviewState().generatedName
 end
 
 local function ClearWeaponSlot(state, slotKey)
@@ -956,6 +1079,7 @@ function Wardrobe.GenerateOutfit(reroll, requestedStyleMode)
     end
 
     state.selectedConceptID = nil
+    local generatedName = RefreshGeneratedOutfitName(state, styleEngine, styleMode, styleContext)
     if QC.Notify then
         QC.Notify("WARDROBE_WORKBENCH_CHANGED")
     end
@@ -972,7 +1096,8 @@ function Wardrobe.GenerateOutfit(reroll, requestedStyleMode)
         end
     end
     local message = string.format(
-        "Generated a %s outfit%s with %d armor slots and %d equipped-weapon-safe appearance%s%s; locked and hidden choices were preserved.",
+        "Generated %s, a %s outfit%s with %d armor slots and %d equipped-weapon-safe appearance%s%s; locked and hidden choices were preserved.",
+        generatedName or "a new outfit",
         styleLabel,
         profileLabel and (" for " .. profileLabel) or "",
         selected,
@@ -1028,10 +1153,11 @@ function Wardrobe.RerollSlot(slotKey)
         return false, "No compatible appearance is cached for this slot."
     end
     state.selectedConceptID = nil
+    local generatedName = RefreshGeneratedOutfitName(state, styleEngine, styleMode, styleContext)
     if QC.Notify then
         QC.Notify("WARDROBE_WORKBENCH_CHANGED", slotKey)
     end
-    return true, definition.label .. " rerolled."
+    return true, string.format("%s rerolled%s.", definition.label, generatedName and ("; the current look is now " .. generatedName) or "")
 end
 
 function Wardrobe.GetConcepts()
@@ -1095,6 +1221,8 @@ function Wardrobe.SaveConcept(name)
     concept.locks = CopyPrimitiveMap(state.locks)
     concept.hidden = CopyPrimitiveMap(state.hidden)
     concept.styleMode = QC.ZoneStyle and QC.ZoneStyle.NormalizeMode(state.styleMode) or state.styleMode
+    concept.generatedName = state.generatedName
+    concept.generatedAt = state.generatedAt
     state.selectedConceptID = concept.id
     if QC.Notify then
         QC.Notify("WARDROBE_CONCEPTS_CHANGED", concept)
@@ -1124,6 +1252,8 @@ function Wardrobe.LoadConcept(conceptID)
     state.selections = selections
     state.locks = CopyPrimitiveMap(concept.locks)
     state.hidden = CopyPrimitiveMap(concept.hidden)
+    state.generatedName = concept.generatedName
+    state.generatedAt = concept.generatedAt
     if QC.ZoneStyle then
         state.styleMode = QC.ZoneStyle.NormalizeMode(concept.styleMode or state.styleMode)
     elseif concept.styleMode then
@@ -1630,6 +1760,8 @@ function Wardrobe.SelectSource(slotKey, sourceID)
             state.selections[slotKey] = sourceID
             state.hidden[slotKey] = nil
             state.selectedConceptID = nil
+            state.generatedName = nil
+            state.generatedAt = nil
             ApplyWeaponSelectionRules(state, slotKey)
             if slotKey == "OFF_HAND" and not state.selections.ONE_HAND then
                 SetRandomSelection(state, "ONE_HAND", false)
@@ -1649,6 +1781,8 @@ function Wardrobe.ClearSelection(slotKey)
     state.locks[slotKey] = nil
     state.hidden[slotKey] = nil
     state.selectedConceptID = nil
+    state.generatedName = nil
+    state.generatedAt = nil
     if QC.Notify then
         QC.Notify("WARDROBE_SELECTION_CHANGED", slotKey, nil)
     end
@@ -1660,6 +1794,8 @@ function Wardrobe.ClearAllSelections()
     state.locks = {}
     state.hidden = {}
     state.selectedConceptID = nil
+    state.generatedName = nil
+    state.generatedAt = nil
     if QC.Notify then
         QC.Notify("WARDROBE_SELECTIONS_CLEARED")
     end

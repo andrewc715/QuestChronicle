@@ -249,13 +249,16 @@ function UI.CreateOutfitsTab(parent)
     UI.SetTooltip(currentLookButton, "Current Character Preview", "Show every selected, equipped, hidden, and locked layer currently represented by the embedded model.")
 
     local modelTitle = modelPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    modelTitle:SetPoint("TOP", modelPanel, "TOP", 0, -10)
+    modelTitle:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -10)
+    modelTitle:SetPoint("RIGHT", modelPanel, "RIGHT", -8, 0)
+    modelTitle:SetJustifyH("CENTER")
+    modelTitle:SetWordWrap(false)
     modelTitle:SetText("Character Preview")
 
     pane.styleButtons = {}
     local previousStyleButton
     for _, mode in ipairs(ZoneStyle.modes) do
-        local button = UI.CreateButton(modelPanel, mode.shortLabel, 88, 22)
+        local button = UI.CreateButton(modelPanel, mode.shortLabel, 67, 22)
         if previousStyleButton then
             button:SetPoint("LEFT", previousStyleButton, "RIGHT", 3, 0)
         else
@@ -274,13 +277,13 @@ function UI.CreateOutfitsTab(parent)
     local styleInfo = modelPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     styleInfo:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -54)
     styleInfo:SetPoint("RIGHT", modelPanel, "RIGHT", -8, 0)
-    styleInfo:SetHeight(28)
+    styleInfo:SetHeight(40)
     styleInfo:SetJustifyH("CENTER")
     styleInfo:SetWordWrap(true)
     pane.styleInfo = styleInfo
 
     local model = CreateFrame("DressUpModel", nil, modelPanel)
-    model:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -84)
+    model:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -98)
     model:SetPoint("BOTTOMRIGHT", modelPanel, "BOTTOMRIGHT", -8, 112)
     model:SetUnit("player")
     if model.SetFacing then model:SetFacing(0) end
@@ -614,7 +617,7 @@ function UI.CreateOutfitsTab(parent)
     pane.selectedText = selectedText
 
     local statusText = sourcePanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    statusText:SetPoint("TOPLEFT", sourcePanel, "TOPLEFT", 10, -91)
+    statusText:SetPoint("TOPLEFT", sourcePanel, "TOPLEFT", 10, -116)
     statusText:SetPoint("RIGHT", sourcePanel, "RIGHT", -10, 0)
     statusText:SetHeight(28)
     statusText:SetJustifyH("LEFT")
@@ -647,13 +650,21 @@ function UI.CreateOutfitsTab(parent)
     lockSlot:SetPoint("LEFT", rerollSlot, "RIGHT", 5, 0)
     local hideSlot = UI.CreateButton(sourcePanel, "Hide Slot", 82, 22)
     hideSlot:SetPoint("LEFT", lockSlot, "RIGHT", 5, 0)
+    local favoriteSource = UI.CreateButton(sourcePanel, "Favor in Zone", 92, 22)
+    favoriteSource:SetPoint("TOPLEFT", sourcePanel, "TOPLEFT", 10, -88)
+    local excludeSource = UI.CreateButton(sourcePanel, "Exclude in Zone", 100, 22)
+    excludeSource:SetPoint("LEFT", favoriteSource, "RIGHT", 5, 0)
     pane.rerollSlot = rerollSlot
     pane.lockSlot = lockSlot
     pane.hideSlot = hideSlot
+    pane.favoriteSource = favoriteSource
+    pane.excludeSource = excludeSource
 
     UI.SetTooltip(rerollSlot, "Reroll Selected Slot", "Choose another cached appearance. Weapon rerolls must be valid for the currently equipped item.")
     UI.SetTooltip(lockSlot, "Lock Selected Slot", "Locked slots survive Generate Outfit and Reroll Unlocked.")
     UI.SetTooltip(hideSlot, "Toggle Slot Visibility", "Hide or show helm, cloak, shirt, or tabard while preserving its selected appearance.")
+    UI.SetTooltip(favoriteSource, "Favorite for This Zone", "Strongly favor the selected visual when generating outfits in this zone. Favorites still obey era, provenance, promotion, coherence, and weapon rules.")
+    UI.SetTooltip(excludeSource, "Exclude for This Zone", "Never generate the selected visual in this zone. You can still browse and preview it manually.")
 
     rerollSlot:SetScript("OnClick", function()
         local slotKey = GetCurrentSlot()
@@ -671,6 +682,18 @@ function UI.CreateOutfitsTab(parent)
         if ok then Wardrobe.ApplyPreview(model) end
         pane:Refresh(message)
     end)
+    favoriteSource:SetScript("OnClick", function()
+        local selected = Wardrobe.GetSelectedSource(GetCurrentSlot())
+        local ok, message = Wardrobe.ToggleZoneFavorite(GetCurrentSlot(), selected and selected.sourceID, ZoneStyle.GetCurrentContext())
+        if not ok and UIErrorsFrame then UIErrorsFrame:AddMessage(message or "Unable to favorite this appearance.", 1, 0.25, 0.25) end
+        pane:Refresh(message)
+    end)
+    excludeSource:SetScript("OnClick", function()
+        local selected = Wardrobe.GetSelectedSource(GetCurrentSlot())
+        local ok, message = Wardrobe.ToggleZoneExclusion(GetCurrentSlot(), selected and selected.sourceID, ZoneStyle.GetCurrentContext())
+        if not ok and UIErrorsFrame then UIErrorsFrame:AddMessage(message or "Unable to exclude this appearance.", 1, 0.25, 0.25) end
+        pane:Refresh(message)
+    end)
 
     pane.sourceRows = {}
     for index = 1, SOURCE_ROWS do
@@ -679,7 +702,7 @@ function UI.CreateOutfitsTab(parent)
         row:SetPoint("LEFT", sourcePanel, "LEFT", 10, 0)
         row:SetPoint("RIGHT", sourcePanel, "RIGHT", -10, 0)
         if index == 1 then
-            row:SetPoint("TOP", sourcePanel, "TOP", 0, -122)
+            row:SetPoint("TOP", sourcePanel, "TOP", 0, -148)
         else
             row:SetPoint("TOP", pane.sourceRows[index - 1], "BOTTOM", 0, -SOURCE_ROW_SPACING)
         end
@@ -737,6 +760,12 @@ function UI.CreateOutfitsTab(parent)
                     local eligible, _, eligibilityReason = ZoneStyle.GetEligibilitySummary(self.source, ZoneStyle.GetMode(), ZoneStyle.GetCurrentContext())
                     GameTooltip:AddLine((eligible and "Generated pool: " or "Excluded from generation: ") .. tostring(eligibilityReason), eligible and 0.2 or 1, eligible and 1 or 0.35, eligible and 0.2 or 0.2, true)
                     GameTooltip:AddLine(ZoneStyle.GetScoreSummary(self.source, definition, ZoneStyle.GetMode(), ZoneStyle.GetCurrentContext()), 1, 0.82, 0, true)
+                    local preference = Wardrobe.GetSourceZonePreference(self.source, ZoneStyle.GetCurrentContext())
+                    if preference == "favorite" then
+                        GameTooltip:AddLine("Zone favorite: strongly weighted when eligible.", 1, 0.82, 0, true)
+                    elseif preference == "excluded" then
+                        GameTooltip:AddLine("Zone exclusion: never generated here; manual preview remains available.", 1, 0.25, 0.25, true)
+                    end
                 end
                 GameTooltip:Show()
             end
@@ -823,6 +852,8 @@ function UI.CreateOutfitsTab(parent)
 
     function pane:RefreshCurrentLook()
         local manifest = Wardrobe.GetPreviewManifest()
+        local generatedName = Wardrobe.GetGeneratedOutfitName()
+        lookTitle:SetText(generatedName and ("Current Preview: " .. generatedName) or "Current Character Preview")
         for index, row in ipairs(self.lookRows) do
             local entry = manifest[index]
             row.entry = entry
@@ -908,6 +939,8 @@ function UI.CreateOutfitsTab(parent)
         if concept and concept.name then
             return concept.name
         end
+        local generatedName = Wardrobe.GetGeneratedOutfitName()
+        if generatedName and generatedName ~= "" then return generatedName end
         return "Outfit Concept " .. tostring(#Wardrobe.GetConcepts() + 1)
     end
 
@@ -944,6 +977,10 @@ function UI.CreateOutfitsTab(parent)
         local styleContext = ZoneStyle.GetCurrentContext()
         local pendingSuggestion = ZoneStyle.GetPendingSuggestion()
         local restrictionLabel = ZoneStyle.GetContextRestrictionLabel(styleContext)
+        local chronicleSummary = ZoneStyle.GetChronicleSummary(styleContext)
+        local favoriteCount, exclusionCount = Wardrobe.GetZonePreferenceSummary(styleContext)
+        local generatedName = Wardrobe.GetGeneratedOutfitName()
+        modelTitle:SetText(generatedName and ("Character Preview: " .. generatedName) or "Character Preview")
         for modeKey, button in pairs(self.styleButtons) do
             local mode = ZoneStyle.GetModeInfo(modeKey)
             local marker = modeKey == ZoneStyle.MODE_ZONE_NATIVE and pendingSuggestion and " *" or ""
@@ -951,11 +988,14 @@ function UI.CreateOutfitsTab(parent)
             button:SetEnabled(modeKey ~= styleMode)
         end
         styleInfo:SetText(string.format(
-            "%s • %s\n%s%s",
+            "%s • %s\n%s%s\n%s • %d favored • %d excluded",
             styleContext.profileLabel or "Azeroth Adventurer",
             styleContext.provenanceLabel or styleContext.zone or "Unknown Zone",
             restrictionLabel,
-            pendingSuggestion and " • Suggestion ready" or ""
+            pendingSuggestion and " • Suggestion ready" or "",
+            chronicleSummary,
+            favoriteCount,
+            exclusionCount
         ))
 
         local manifest = self:RefreshCurrentLook()
@@ -996,6 +1036,11 @@ function UI.CreateOutfitsTab(parent)
         lockSlot:SetEnabled(true)
         hideSlot:SetShown(Wardrobe.IsSlotHideable(slotKey))
         hideSlot:SetText(hidden and "Show Slot" or "Hide Slot")
+        local sourcePreference = selected and Wardrobe.GetSourceZonePreference(selected, styleContext)
+        favoriteSource:SetEnabled(selected ~= nil)
+        excludeSource:SetEnabled(selected ~= nil)
+        favoriteSource:SetText(sourcePreference == "favorite" and "Unfavor" or "Favor in Zone")
+        excludeSource:SetText(sourcePreference == "excluded" and "Allow in Zone" or "Exclude in Zone")
 
         local diagnostics = Wardrobe.GetSlotDiagnostics(slotKey)
         statusText:SetText(message or CacheSummary(cache, diagnostics, #sources))
@@ -1020,7 +1065,10 @@ function UI.CreateOutfitsTab(parent)
                 local isSelected = selected and selected.sourceID == source.sourceID
                 local marker = isSelected and (UI.green .. "Selected|r") or (valid and "Collected" or (UI.red .. "Unavailable|r"))
                 local eligible, eligibilityKind = ZoneStyle.GetEligibilitySummary(source, styleMode, styleContext)
-                local generatedMarker = eligible and "" or (eligibilityKind == "pending" and " • Loading era" or (eligibilityKind == "promotional" and " • Promo excluded" or " • Not generated"))
+                local sourceZonePreference = Wardrobe.GetSourceZonePreference(source, styleContext)
+                local generatedMarker = sourceZonePreference == "favorite" and (" • " .. UI.gold .. "Zone favorite|r")
+                    or (sourceZonePreference == "excluded" and (" • " .. UI.red .. "Zone excluded|r")
+                    or (eligible and "" or (eligibilityKind == "pending" and " • Loading era" or (eligibilityKind == "promotional" and " • Promo excluded" or " • Not generated"))))
                 row.detail:SetText(string.format("%s • Source %d%s%s", marker, source.sourceID or 0, valid and "" or (" • " .. tostring(reason)), generatedMarker))
                 row:SetEnabled(valid)
                 row.background:SetColorTexture(isSelected and 0.12 or 0.08, isSelected and 0.18 or 0.08, isSelected and 0.10 or 0.08, 0.78)
@@ -1032,8 +1080,9 @@ function UI.CreateOutfitsTab(parent)
         nextPage:SetEnabled(page < pageCount)
         local concept = Wardrobe.GetCurrentConcept()
         local conceptText = concept and (" • Concept: " .. tostring(concept.name or "Unnamed")) or ""
+        local generatedText = generatedName and (" • Look: " .. generatedName) or ""
         local modeInfo = ZoneStyle.GetModeInfo(styleMode)
-        subtitle:SetText(string.format("%s appearances for %s • %s • %s%s. Preview only; no outfit is applied.", UI.FormatNumber(#sources), definition and definition.label or slotKey, modeInfo.label, styleContext.profileLabel or "Azeroth Adventurer", conceptText))
+        subtitle:SetText(string.format("%s appearances for %s • %s • %s%s%s. Preview only; no outfit is applied.", UI.FormatNumber(#sources), definition and definition.label or slotKey, modeInfo.label, styleContext.profileLabel or "Azeroth Adventurer", generatedText, conceptText))
     end
 
     QC.RegisterCallback("WARDROBE_SCAN_PROGRESS", pane, function(index, total, slotKey, count, diagnostics)
@@ -1060,6 +1109,9 @@ function UI.CreateOutfitsTab(parent)
     QC.RegisterCallback("WARDROBE_CONCEPTS_CHANGED", pane, function()
         if pane:IsShown() then pane:Refresh() end
     end)
+    QC.RegisterCallback("WARDROBE_ZONE_PREFERENCES_CHANGED", pane, function()
+        if pane:IsShown() then pane:Refresh() end
+    end)
     QC.RegisterCallback("ZONE_STYLE_MODE_CHANGED", pane, function()
         if pane:IsShown() then pane:Refresh() end
     end)
@@ -1070,6 +1122,12 @@ function UI.CreateOutfitsTab(parent)
         if pane:IsShown() then pane:Refresh() end
     end)
     QC.RegisterCallback("ZONE_STYLE_SUGGESTION_CONSUMED", pane, function()
+        if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("EVENT_RECORDED", pane, function()
+        if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("ACTIVE_QUESTS_UPDATED", pane, function()
         if pane:IsShown() then pane:Refresh() end
     end)
     QC.RegisterCallback("PLAYER_READY", pane, function()
