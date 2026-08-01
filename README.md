@@ -1,8 +1,8 @@
-# Quest Chronicle v0.6.0
+# Quest Chronicle v0.6.1
 
-> **Outfit Workbench:** v0.6.0 generates complete random outfit concepts, rerolls and locks slots, hides optional pieces, enforces weapon combinations, and saves named concepts per character.
+> **Outfit Workbench:** v0.6.1 generates random outfit concepts, constrains weapons to Blizzard-valid choices for the items currently equipped, and places the main navigation on native bottom tabs.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.6.0 turns the corrected native-scale wardrobe index and embedded preview into a practical outfit design workbench.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.6.1 refines the outfit workbench without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

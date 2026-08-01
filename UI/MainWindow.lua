@@ -143,14 +143,14 @@ function QC.InitializeUI()
     frame.characterText = characterText
 
     local tabBar = CreateFrame("Frame", nil, frame)
-    tabBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -58)
-    tabBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -12, -58)
-    tabBar:SetHeight(33)
+    tabBar:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 12, 7)
+    tabBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -28, 7)
+    tabBar:SetHeight(32)
     frame.tabBar = tabBar
 
     local content = UI.CreateInsetPanel(frame)
-    content:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -89)
-    content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, 12)
+    content:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -58)
+    content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, 41)
     frame.content = content
 
     local resizeGrip = CreateFrame("Button", nil, frame)
@@ -176,13 +176,13 @@ function QC.InitializeUI()
     local previousButton
 
     for _, definition in ipairs(TAB_DEFINITIONS) do
-        local button = CreateFrame("Button", nil, tabBar, "PanelTopTabButtonTemplate")
+        local button = CreateFrame("Button", nil, tabBar, "PanelTabButtonTemplate")
         button:SetSize(definition.width or 120, 32)
         button:SetText(definition.label)
         if previousButton then
             button:SetPoint("LEFT", previousButton, "RIGHT", 1, 0)
         else
-            button:SetPoint("BOTTOMLEFT", tabBar, "BOTTOMLEFT", 0, -1)
+            button:SetPoint("BOTTOMLEFT", tabBar, "BOTTOMLEFT", 0, 0)
         end
         button.key = definition.key
         button:SetScript("OnClick", function(self)

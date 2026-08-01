@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.1 - 2026-07-31
+
+### Fixed
+
+- Derives generated weapon categories from the currently equipped main- and off-hand items instead of randomly choosing any populated weapon cache.
+- Uses Blizzard's `IsCategoryValidForItem` result for every generated or rerolled weapon candidate.
+- Requeries the collapsed appearance and requires it to be collected, displayable, and usable for the current character.
+- Revalidates locked weapon choices against changed equipment before modifying unlocked armor slots.
+- Leaves empty hands and equipped items with no compatible cached visual unchanged.
+- Supports dual-wield off-hand weapons by revalidating cached One-Hand visuals against the equipped secondary-hand item and location.
+
+### Polished
+
+- Moves Chronicle, Active Quests, Write Note, Status, and Outfits to native `PanelTabButtonTemplate` tabs along the bottom edge of the window.
+- Reclaims the old top-tab row for page content.
+
+### Preserved
+
+- Wardrobe cache format 5; no rescan is required from v0.6.0.
+- Existing saved outfit concepts, manual selections, locks, and hidden-slot choices.
+- SavedVariables schema 2 and Courier format 1.
+
 ## 0.6.0 - 2026-07-31
 
 ### Added

@@ -503,6 +503,18 @@ function Wardrobe.ToggleSlotHidden(slotKey)
     return Wardrobe.SetSlotHidden(slotKey, not Wardrobe.IsSlotHidden(slotKey))
 end
 
+local function CopySourceForSlot(source, slotKey)
+    if not source or source.slotKey == slotKey then
+        return source
+    end
+    local copy = {}
+    for key, value in pairs(source) do
+        copy[key] = value
+    end
+    copy.slotKey = slotKey
+    return copy
+end
+
 local function GetSourceByID(slotKey, sourceID)
     if not sourceID then
         return nil
@@ -510,6 +522,16 @@ local function GetSourceByID(slotKey, sourceID)
     for _, source in ipairs(Wardrobe.GetSlotSources(slotKey)) do
         if source.sourceID == sourceID then
             return source
+        end
+    end
+    -- Dual-wield off hands use the same one-hand visual categories as the main
+    -- hand. Reuse that cache without duplicating or invalidating format 5, then
+    -- validate it against SECONDARYHANDSLOT before generation or preview.
+    if slotKey == "OFF_HAND" then
+        for _, source in ipairs(Wardrobe.GetSlotSources("ONE_HAND")) do
+            if source.sourceID == sourceID then
+                return CopySourceForSlot(source, "OFF_HAND")
+            end
         end
     end
     return nil
@@ -567,9 +589,181 @@ local function SetRandomSelection(state, slotKey, reroll)
     return true
 end
 
+local MAIN_WEAPON_SLOT_KEYS = { "ONE_HAND", "TWO_HAND", "RANGED" }
+
+local function GetEquippedItemInfo(slotName)
+    local slotID = SafeCall(GetInventorySlotInfo, slotName)
+    if not slotID then
+        return nil
+    end
+    local itemLink = SafeCall(GetInventoryItemLink, "player", slotID)
+    if itemLink then
+        return itemLink
+    end
+    return SafeCall(GetInventoryItemID, "player", slotID)
+end
+
+local function CreateWeaponGenerationContext()
+    SafeCall(C_TransmogCollection and C_TransmogCollection.UpdateUsableAppearances)
+    return {
+        mainItem = GetEquippedItemInfo("MAINHANDSLOT"),
+        offItem = GetEquippedItemInfo("SECONDARYHANDSLOT"),
+        appearancesByCategory = {},
+        locationsBySlot = {},
+        validation = {},
+    }
+end
+
+local function GetGenerationLocation(definition, context)
+    local slotName = definition.slotName
+    if context.locationsBySlot[slotName] == nil then
+        context.locationsBySlot[slotName] = GetTransmogLocation(definition) or false
+    end
+    local location = context.locationsBySlot[slotName]
+    return location ~= false and location or nil
+end
+
+local function GetGenerationAppearance(source, definition, context)
+    local categoryID = source and source.categoryID
+    if not categoryID then
+        return nil
+    end
+    local key = tostring(definition.slotName) .. ":" .. tostring(categoryID)
+    local indexed = context.appearancesByCategory[key]
+    if not indexed then
+        indexed = {}
+        local location = GetGenerationLocation(definition, context)
+        local appearances = GetCategoryAppearancesRobust(categoryID, location)
+        for _, appearance in ipairs(appearances or {}) do
+            if appearance.visualID then
+                indexed[appearance.visualID] = appearance
+            end
+        end
+        context.appearancesByCategory[key] = indexed
+    end
+    return indexed[source.visualID]
+end
+
+local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, context)
+    local definition = slotByKey[slotKey]
+    local cacheKey = table.concat({ tostring(slotKey), tostring(source and source.sourceID), tostring(equippedItem) }, ":")
+    local cached = context.validation[cacheKey]
+    if cached then
+        return cached.valid, cached.reason
+    end
+
+    local function Finish(valid, reason)
+        context.validation[cacheKey] = { valid = valid, reason = reason }
+        return valid, reason
+    end
+
+    local basicValid, basicReason = Wardrobe.ValidateSource(source, slotKey)
+    if not basicValid then
+        return Finish(false, basicReason)
+    end
+    if not equippedItem then
+        return Finish(false, slotKey == "OFF_HAND" and "No off-hand item is equipped." or "No main-hand item is equipped.")
+    end
+    if not source.categoryID then
+        return Finish(false, "This cached weapon appearance has no collection category. Rescan the collection.")
+    end
+    if not C_TransmogCollection or type(C_TransmogCollection.IsCategoryValidForItem) ~= "function" then
+        return Finish(false, "WoW's equipped-item transmog compatibility check is unavailable.")
+    end
+    if SafeCall(C_TransmogCollection.IsCategoryValidForItem, source.categoryID, equippedItem) ~= true then
+        return Finish(false, "That appearance category cannot transmogrify the currently equipped item.")
+    end
+
+    -- Requery the collapsed visual with the equipped hand's transmog location.
+    -- The scanner intentionally keeps a broad preview catalog; generation is
+    -- stricter and requires Blizzard to mark the visual collected, displayable,
+    -- and usable for the character right now.
+    local appearance = GetGenerationAppearance(source, definition, context)
+    if not appearance or appearance.isCollected ~= true then
+        return Finish(false, "WoW no longer reports this weapon visual as collected.")
+    end
+    if appearance.canDisplayOnPlayer ~= true then
+        return Finish(false, "This character cannot display that weapon visual.")
+    end
+    if appearance.isUsable ~= true then
+        return Finish(false, "WoW does not currently mark that weapon visual as usable.")
+    end
+
+    -- Source detail is an additional guard. isAnySourceValidForPlayer avoids
+    -- rejecting an account-unlocked visual merely because the cache's chosen
+    -- preview representative is not the source this character would use.
+    local appearanceInfo = SafeCall(C_TransmogCollection.GetAppearanceInfoBySource, source.sourceID)
+    if appearanceInfo then
+        if appearanceInfo.appearanceIsCollected ~= true or appearanceInfo.appearanceIsUsable ~= true then
+            return Finish(false, "The collected appearance is not currently usable for transmogrification.")
+        end
+        if appearanceInfo.canDisplayOnPlayer ~= true or appearanceInfo.isAnySourceValidForPlayer ~= true then
+            return Finish(false, "No source for this visual is valid for the current character.")
+        end
+    elseif type(C_TransmogCollection.GetValidAppearanceSourcesForClass) == "function" then
+        local classID = GetCurrentClassID()
+        local location = GetGenerationLocation(definition, context)
+        local validSources = classID and SafeCall(
+            C_TransmogCollection.GetValidAppearanceSourcesForClass,
+            source.visualID,
+            classID,
+            source.categoryID,
+            location
+        )
+        if type(validSources) ~= "table" or #validSources == 0 then
+            return Finish(false, "WoW found no valid source for this character and weapon visual.")
+        end
+    end
+
+    return Finish(true, "Compatible with the equipped item")
+end
+
+local function Shuffle(values)
+    for index = #values, 2, -1 do
+        local other = math.random(1, index)
+        values[index], values[other] = values[other], values[index]
+    end
+end
+
+local function ChooseGeneratedWeaponSource(slotKeys, equippedItem, context, excludedBySlot, targetSlotKey)
+    local candidates = {}
+    for _, slotKey in ipairs(slotKeys) do
+        for _, source in ipairs(Wardrobe.GetSlotSources(slotKey)) do
+            local validationSlotKey = targetSlotKey or slotKey
+            local candidateSource = CopySourceForSlot(source, validationSlotKey)
+            local basicValid = Wardrobe.ValidateSource(candidateSource, validationSlotKey)
+            local categoryValid = equippedItem and candidateSource.categoryID and SafeCall(
+                C_TransmogCollection and C_TransmogCollection.IsCategoryValidForItem,
+                candidateSource.categoryID,
+                equippedItem
+            ) == true
+            if basicValid and categoryValid then
+                table.insert(candidates, { source = candidateSource, slotKey = validationSlotKey })
+            end
+        end
+    end
+    Shuffle(candidates)
+
+    local fallback
+    for _, candidate in ipairs(candidates) do
+        local valid = ValidateGeneratedWeaponSource(candidate.source, candidate.slotKey, equippedItem, context)
+        if valid then
+            if excludedBySlot and excludedBySlot[candidate.slotKey] == candidate.source.sourceID then
+                fallback = fallback or candidate
+            else
+                return candidate.source, candidate.slotKey
+            end
+        end
+    end
+    if fallback then
+        return fallback.source, fallback.slotKey
+    end
+    return nil
+end
+
 local function GetLockedWeaponMode(state)
     local lockedMode
-    for _, slotKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+    for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
         if state.locks[slotKey] and state.selections[slotKey] then
             if lockedMode then
                 return nil, "Unlock one of the conflicting main-hand weapon slots first."
@@ -591,42 +785,92 @@ local function GenerateWeapons(state, reroll)
     if errorMessage then
         return false, errorMessage
     end
+    local context = CreateWeaponGenerationContext()
+    local lockedMainSource
 
-    if not mode then
-        local availableModes = {}
-        for _, slotKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
-            if #Wardrobe.GetSlotSources(slotKey) > 0 then
-                table.insert(availableModes, slotKey)
+    if not context.mainItem then
+        for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
+            if state.locks[slotKey] and state.selections[slotKey] then
+                return false, "A main-hand weapon appearance is locked, but no main-hand item is equipped. Equip a weapon or unlock that slot."
             end
+            state.selections[slotKey] = nil
         end
-        if #availableModes == 0 then
-            return true
+        if state.locks.OFF_HAND and state.selections.OFF_HAND then
+            return false, "An off-hand appearance is locked, but no main-hand item is equipped. Equip your weapons or unlock the slot."
         end
-        mode = availableModes[math.random(1, #availableModes)]
+        state.selections.OFF_HAND = nil
+        return true, 0, "No main-hand item is equipped, so Quest Chronicle generated armor only."
     end
 
-    for _, slotKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
-        if slotKey == mode then
-            if not state.locks[slotKey] then
-                SetRandomSelection(state, slotKey, reroll)
+    if mode and state.locks[mode] and state.selections[mode] then
+        lockedMainSource = GetSourceByID(mode, state.selections[mode])
+        local valid, reason = ValidateGeneratedWeaponSource(lockedMainSource, mode, context.mainItem, context)
+        if not valid then
+            return false, string.format("The locked %s appearance is not valid for the equipped main-hand item: %s Unlock it or equip a compatible weapon.", slotByKey[mode].label, reason or "incompatible")
+        end
+    end
+    if state.locks.OFF_HAND and state.selections.OFF_HAND then
+        local lockedOffHand = GetSourceByID("OFF_HAND", state.selections.OFF_HAND)
+        local valid, reason = ValidateGeneratedWeaponSource(lockedOffHand, "OFF_HAND", context.offItem, context)
+        if not valid then
+            return false, string.format("The locked Off-Hand appearance is not valid for the equipped off-hand item: %s Unlock it or equip a compatible item.", reason or "incompatible")
+        end
+    end
+
+    local selectedMain
+    if lockedMainSource then
+        selectedMain = lockedMainSource
+    else
+        local allowedSlots = mode and { mode } or MAIN_WEAPON_SLOT_KEYS
+        local excluded = {}
+        if reroll then
+            for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
+                excluded[slotKey] = state.selections[slotKey]
             end
-        elseif not state.locks[slotKey] then
+        end
+        selectedMain, mode = ChooseGeneratedWeaponSource(allowedSlots, context.mainItem, context, excluded)
+        if selectedMain then
+            state.selections[mode] = selectedMain.sourceID
+        end
+    end
+
+    for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
+        if slotKey ~= mode and not state.locks[slotKey] then
             state.selections[slotKey] = nil
         end
     end
-
-    if mode == "ONE_HAND" then
+    if not selectedMain then
+        for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
+            if not state.locks[slotKey] then
+                state.selections[slotKey] = nil
+            end
+        end
         if not state.locks.OFF_HAND then
-            if #Wardrobe.GetSlotSources("OFF_HAND") > 0 and math.random(1, 100) <= 75 then
-                SetRandomSelection(state, "OFF_HAND", reroll)
+            state.selections.OFF_HAND = nil
+        end
+        return true, 0, "WoW found no cached weapon visual valid for the equipped main-hand item; armor was generated and the equipped weapon was left unchanged."
+    end
+
+    local selectedWeapons = 1
+    local notice
+    if mode == "ONE_HAND" and context.offItem then
+        if state.locks.OFF_HAND and state.selections.OFF_HAND then
+            selectedWeapons = selectedWeapons + 1
+        elseif not state.locks.OFF_HAND then
+            local excluded = reroll and { OFF_HAND = state.selections.OFF_HAND } or nil
+            local offHand = ChooseGeneratedWeaponSource({ "OFF_HAND", "ONE_HAND" }, context.offItem, context, excluded, "OFF_HAND")
+            state.selections.OFF_HAND = offHand and offHand.sourceID or nil
+            if offHand then
+                selectedWeapons = selectedWeapons + 1
             else
-                state.selections.OFF_HAND = nil
+                notice = "No cached Off-Hand visual matched the equipped off-hand item, so its current appearance was left unchanged."
             end
         end
     elseif not state.locks.OFF_HAND then
         state.selections.OFF_HAND = nil
     end
-    return true
+
+    return true, selectedWeapons, notice
 end
 
 function Wardrobe.GenerateOutfit(reroll)
@@ -636,6 +880,11 @@ function Wardrobe.GenerateOutfit(reroll)
     end
 
     local state = EnsurePreviewState()
+    local weaponsOK, weaponCount, weaponNotice = GenerateWeapons(state, reroll == true)
+    if not weaponsOK then
+        return false, weaponCount
+    end
+
     local selected = 0
     for _, definition in ipairs(Wardrobe.slotDefinitions) do
         if not definition.weaponRole and not state.locks[definition.key] then
@@ -645,15 +894,20 @@ function Wardrobe.GenerateOutfit(reroll)
         end
     end
 
-    local weaponsOK, weaponError = GenerateWeapons(state, reroll == true)
-    if not weaponsOK then
-        return false, weaponError
-    end
     state.selectedConceptID = nil
     if QC.Notify then
         QC.Notify("WARDROBE_WORKBENCH_CHANGED")
     end
-    return true, string.format("Generated a valid outfit across %d armor slots; locked and hidden choices were preserved.", selected)
+    local message = string.format(
+        "Generated %d armor slots and %d equipped-weapon-safe appearance%s; locked and hidden choices were preserved.",
+        selected,
+        weaponCount or 0,
+        weaponCount == 1 and "" or "s"
+    )
+    if weaponNotice then
+        message = message .. " " .. weaponNotice
+    end
+    return true, message
 end
 
 function Wardrobe.RerollSlot(slotKey)
@@ -666,14 +920,24 @@ function Wardrobe.RerollSlot(slotKey)
     end
 
     local state = EnsurePreviewState()
-    if not SetRandomSelection(state, slotKey, true) then
-        return false, "No compatible appearance is cached for this slot."
-    end
     if definition.weaponRole then
+        local context = CreateWeaponGenerationContext()
+        local equippedItem = slotKey == "OFF_HAND" and context.offItem or context.mainItem
+        local sourceSlots = slotKey == "OFF_HAND" and { "OFF_HAND", "ONE_HAND" } or { slotKey }
+        local source = ChooseGeneratedWeaponSource(sourceSlots, equippedItem, context, { [slotKey] = state.selections[slotKey] }, slotKey)
+        if not source then
+            return false, "No cached appearance in this weapon category is valid for the currently equipped item."
+        end
+        state.selections[slotKey] = source.sourceID
         ApplyWeaponSelectionRules(state, slotKey)
         if slotKey == "OFF_HAND" and not state.selections.ONE_HAND then
-            SetRandomSelection(state, "ONE_HAND", false)
+            local mainHand = ChooseGeneratedWeaponSource({ "ONE_HAND" }, context.mainItem, context)
+            if mainHand then
+                state.selections.ONE_HAND = mainHand.sourceID
+            end
         end
+    elseif not SetRandomSelection(state, slotKey, true) then
+        return false, "No compatible appearance is cached for this slot."
     end
     state.selectedConceptID = nil
     if QC.Notify then
@@ -782,12 +1046,7 @@ function Wardrobe.GetSelectedSource(slotKey)
     if not sourceID then
         return nil
     end
-    for _, source in ipairs(Wardrobe.GetSlotSources(slotKey)) do
-        if source.sourceID == sourceID then
-            return source
-        end
-    end
-    return nil
+    return GetSourceByID(slotKey, sourceID)
 end
 
 function Wardrobe.ValidateSource(source, slotKey)

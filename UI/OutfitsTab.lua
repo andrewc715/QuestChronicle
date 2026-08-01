@@ -244,8 +244,8 @@ function UI.CreateOutfitsTab(parent)
     local clearAll = UI.CreateButton(modelPanel, "Reset Outfit", 100, 24)
     clearAll:SetPoint("LEFT", loadConcept, "RIGHT", 4, 0)
 
-    UI.SetTooltip(generateButton, "Generate Outfit", "Build a complete random outfit from cached appearances. Locked slots and hidden helm, cloak, shirt, or tabard choices are preserved.")
-    UI.SetTooltip(rerollUnlocked, "Reroll Unlocked", "Replace every unlocked armor and weapon choice while preserving locked slots and visibility choices.")
+    UI.SetTooltip(generateButton, "Generate Outfit", "Build a random outfit from cached appearances. Weapon choices are limited by your currently equipped main- and off-hand items plus Blizzard's current category and usability rules. Locked and hidden choices are preserved.")
+    UI.SetTooltip(rerollUnlocked, "Reroll Unlocked", "Replace every unlocked armor choice and only weapon appearances Blizzard allows on the currently equipped items.")
     UI.SetTooltip(saveConcept, "Save Concept", "Save the current selections, locks, hidden slots, and weapon configuration for this character.")
     UI.SetTooltip(loadConcept, "Load Concept", "Choose one of this character's saved outfit concepts.")
     UI.SetTooltip(clearAll, "Reset Outfit", "Clear selections, locks, and hidden-slot choices, returning the preview to currently equipped gear.")
@@ -334,7 +334,7 @@ function UI.CreateOutfitsTab(parent)
     pane.lockSlot = lockSlot
     pane.hideSlot = hideSlot
 
-    UI.SetTooltip(rerollSlot, "Reroll Selected Slot", "Choose another cached appearance for the active equipment slot.")
+    UI.SetTooltip(rerollSlot, "Reroll Selected Slot", "Choose another cached appearance. Weapon rerolls must be valid for the currently equipped item.")
     UI.SetTooltip(lockSlot, "Lock Selected Slot", "Locked slots survive Generate Outfit and Reroll Unlocked.")
     UI.SetTooltip(hideSlot, "Toggle Slot Visibility", "Hide or show helm, cloak, shirt, or tabard while preserving its selected appearance.")
 
