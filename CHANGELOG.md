@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.4 - 2026-07-31
+
+### Fixed
+
+- Uses each `GetCategoryAppearances` row's `visualID` as the catalog identity, matching Blizzard's already-collapsed Wardrobe list.
+- Stops source-level `appearanceID` and `itemAppearanceID` values from merging unrelated visual rows.
+- Resolves the best collected, character-compatible source independently inside each visual row.
+- Accepts either source-info records or source-ID arrays from compatible client API paths.
+- Uses `C_TransmogCollection.GetSourceItemID` before the legacy transmog fallback.
+- Advances the rebuildable wardrobe cache to format 4 and marks format 3 stale while preserving Chronicle data and manual selection state.
+- Preserves SavedVariables schema 2 and Courier format 1.
+
 ## 0.5.3 - 2026-07-31
 
 ### Polished

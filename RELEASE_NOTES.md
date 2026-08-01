@@ -1,36 +1,29 @@
-# Quest Chronicle v0.5.3: Wardrobe UI Cleanup
+# Quest Chronicle v0.5.4: Native Visual Indexing
 
-Version 0.5.3 keeps the recovered account wardrobe scanner from v0.5.2 and cleans up the Outfits appearance browser around real-world collection sizes.
+Version 0.5.4 fixes the wardrobe catalog regression revealed by the live Legs comparison. Blizzard's native Wardrobe already returns one row per collapsed visual appearance. Quest Chronicle v0.5.3 resolved a source for each row, but then used a source-level appearance identifier as the cache key. That mixed two identifier namespaces and could overwrite hundreds of distinct Blizzard visual rows with one entry.
 
-## What the live test revealed
+## Scanner correction
 
-The scanner successfully found the account collection, but the right-hand browser still used the foundation layout designed around tiny test collections:
+- Treats `GetCategoryAppearances(...).visualID` as the authoritative catalog identity.
+- Keeps one cache record per collected, non-hidden Blizzard visual row.
+- Resolves all sources belonging to that visual and retains the best collected source the current character can display.
+- Never uses a source's `appearanceID` or `itemAppearanceID` to deduplicate the catalog.
+- Handles API paths that return either full source records or numeric source IDs.
+- Uses Blizzard's collection source-to-item lookup before the older transmog fallback.
+- Preserves staged-cache protection: an impossible empty result cannot replace a healthy cache.
 
-- a variable-height diagnostic message pushed into eight fixed appearance rows;
-- the eighth row collided with the footer;
-- Previous, Next, page text, and Clear Slot competed for the same narrow horizontal strip;
-- collected source counts and unique previewable visual counts were presented as though they should match;
-- the healthy difference between those totals triggered an alarming red warning.
+## Cache migration
 
-## Changes
+The rebuildable wardrobe cache advances from format 3 to format 4. On first load, v0.5.4 marks the old cache stale and requires **Scan Collection**. This is intentional because format 3 may already have lost distinct visuals. The migration does not change or delete Chronicle history, quest state, RP notes, drafts, settings, or Courier data. Manual preview selections remain stored and will reconnect when their source is present in the rebuilt cache.
 
-- Reduces the fixed page from eight to seven appearance rows so the minimum window height remains safe.
-- Uses a compact, fixed two-line browser header.
-- Separates the selected appearance from scan-summary text.
-- Moves Clear Slot into the header rather than the pagination footer.
-- Anchors Previous and Next to opposite sides with centered page text.
-- Adds mouse-wheel page navigation over the appearance browser.
-- Adds row hover highlighting.
-- Keeps source names and details to single lines so rows cannot unexpectedly grow.
-- Replaces the misleading red count warning with neutral diagnostics.
-- Explains in a hover tooltip that WoW's collected count is a source count, while Quest Chronicle caches unique character-previewable visuals.
-- Preserves detailed returned-appearance, returned-source, compatible-visual, error, and scan-state information in that tooltip.
+## Compatibility
 
-## Preserved
-
-- Wardrobe cache format 3.
+- Addon version 0.5.4.
 - SavedVariables schema 2.
 - Courier format 1.
-- The v0.5.2 account collection scanner and staging-cache recovery behavior.
-- All Chronicle events, active quest state, RP notes, settings, drafts, and manual preview selections.
-- Preview-only behavior. Quest Chronicle does not apply transmog or alter Blizzard outfit slots.
+- Warcraft Quest Chronicle Courier v1.0.0 remains compatible.
+- Preview only: Quest Chronicle does not apply transmog or alter Blizzard outfit slots.
+
+## Expected live result
+
+After a clean scan, **Legs** should contain roughly the same collapsed collected visual catalog shown by Blizzard's native Wardrobe. For the reported collection, that means approximately 15 seven-row pages rather than one cached visual. Small count differences are acceptable only when Blizzard marks a visual hidden, unusable, or undisplayable on the current character.

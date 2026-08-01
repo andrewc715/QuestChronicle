@@ -3,8 +3,8 @@ local QC = QuestChronicle
 QC.Wardrobe = QC.Wardrobe or {}
 local Wardrobe = QC.Wardrobe
 
-Wardrobe.CACHE_VERSION = 3
-Wardrobe.PAGE_SIZE = 8
+Wardrobe.CACHE_VERSION = 4
+Wardrobe.PAGE_SIZE = 7
 
 -- Resolve collection enum values when the scan runs instead of when this file loads.
 -- Some Blizzard enum tables are not ready during early addon loading.
@@ -77,7 +77,10 @@ local function EnsureCache()
     database.wardrobe = database.wardrobe or {}
     local cache = database.wardrobe
     if cache.cacheVersion ~= Wardrobe.CACHE_VERSION then
+        local previousCacheVersion = cache.cacheVersion
         ResetCache(cache, "STALE")
+        cache.migratedFromCacheVersion = previousCacheVersion
+        cache.dirtyReason = "VISUAL_IDENTITY_UPGRADE"
     end
     cache.bySlot = cache.bySlot or {}
     cache.slotDiagnostics = cache.slotDiagnostics or {}
@@ -154,6 +157,12 @@ end
 local function GetSourceItemID(sourceID, source)
     if source and source.itemID then
         return source.itemID
+    end
+    if C_TransmogCollection and C_TransmogCollection.GetSourceItemID then
+        local itemID = SafeCall(C_TransmogCollection.GetSourceItemID, sourceID)
+        if itemID then
+            return itemID
+        end
     end
     if C_Transmog and C_Transmog.GetItemIDForSource then
         return SafeCall(C_Transmog.GetItemIDForSource, sourceID)
@@ -304,23 +313,41 @@ local function GetKnownSources(appearance, categoryID, transmogLocation)
     local locationData = GetLocationData(transmogLocation)
     local sources
 
+    local function ExpandSourceIDs(candidateSources)
+        if type(candidateSources) ~= "table" then
+            return candidateSources
+        end
+        local expanded = {}
+        for _, candidate in ipairs(candidateSources) do
+            if type(candidate) == "number" then
+                local source = GetSourceInfo(candidate)
+                if source then
+                    table.insert(expanded, source)
+                end
+            elseif type(candidate) == "table" then
+                table.insert(expanded, candidate)
+            end
+        end
+        return expanded
+    end
+
     -- The generated API documentation accepts a TransmogLocationMixin while
     -- Blizzard's own wardrobe helper also accepts that object. Try the direct,
     -- least stateful path first, then tolerate clients that prefer GetData().
-    sources = SafeCall(C_TransmogCollection.GetAppearanceSources, visualID, categoryID, transmogLocation)
+    sources = ExpandSourceIDs(SafeCall(C_TransmogCollection.GetAppearanceSources, visualID, categoryID, transmogLocation))
     if (not sources or #sources == 0) and locationData then
-        sources = SafeCall(C_TransmogCollection.GetAppearanceSources, visualID, categoryID, locationData)
+        sources = ExpandSourceIDs(SafeCall(C_TransmogCollection.GetAppearanceSources, visualID, categoryID, locationData))
     end
     if (not sources or #sources == 0) and CollectionWardrobeUtil and type(CollectionWardrobeUtil.GetSortedAppearanceSources) == "function" then
-        sources = SafeCall(CollectionWardrobeUtil.GetSortedAppearanceSources, visualID, categoryID, transmogLocation)
+        sources = ExpandSourceIDs(SafeCall(CollectionWardrobeUtil.GetSortedAppearanceSources, visualID, categoryID, transmogLocation))
     end
 
     if (not sources or #sources == 0) and C_TransmogCollection.GetValidAppearanceSourcesForClass then
         local classID = GetCurrentClassID()
         if classID then
-            sources = SafeCall(C_TransmogCollection.GetValidAppearanceSourcesForClass, visualID, classID, categoryID, transmogLocation)
+            sources = ExpandSourceIDs(SafeCall(C_TransmogCollection.GetValidAppearanceSourcesForClass, visualID, classID, categoryID, transmogLocation))
             if (not sources or #sources == 0) and locationData then
-                sources = SafeCall(C_TransmogCollection.GetValidAppearanceSourcesForClass, visualID, classID, categoryID, locationData)
+                sources = ExpandSourceIDs(SafeCall(C_TransmogCollection.GetValidAppearanceSourcesForClass, visualID, classID, categoryID, locationData))
             end
         end
     end
@@ -465,7 +492,10 @@ local function NormalizeSource(source, appearance, slotKey, categoryID)
     local itemID = GetSourceItemID(sourceID, source)
     local normalized = {
         sourceID = sourceID,
-        visualID = source and (source.visualID or source.appearanceID or source.itemAppearanceID) or nil,
+        -- GetCategoryAppearances is already Blizzard's collapsed visual catalog.
+        -- Its visualID is the identity of this row. Source-level appearance IDs
+        -- are a different namespace and must never be used to key the catalog.
+        visualID = appearance and appearance.visualID or nil,
         itemID = itemID,
         name = source and source.name or nil,
         quality = source and source.quality or nil,
@@ -484,7 +514,7 @@ local function NormalizeSource(source, appearance, slotKey, categoryID)
         icon = GetItemIcon(itemID) or appearance and appearance.icon,
     }
 
-    normalized.visualID = normalized.visualID or (appearance and appearance.visualID) or sourceID
+    normalized.visualID = normalized.visualID or sourceID
     if normalized.canDisplayOnPlayer == nil and appearance then
         normalized.canDisplayOnPlayer = appearance.canDisplayOnPlayer
     end
@@ -566,6 +596,7 @@ local function ScanSlot(definition)
                 diagnostics.collectedAppearances = diagnostics.collectedAppearances + 1
 
                 local acceptedForAppearance = false
+                local bestSource
                 local sources = GetKnownSources(appearance, categoryID, transmogLocation)
                 categoryDiagnostic.returnedSources = categoryDiagnostic.returnedSources + #sources
                 diagnostics.returnedSources = diagnostics.returnedSources + #sources
@@ -576,15 +607,21 @@ local function ScanSlot(definition)
                         local valid = Wardrobe.ValidateSource(normalized, definition.key)
                         if valid then
                             acceptedForAppearance = true
-                            local visualKey = normalized.visualID or normalized.sourceID
-                            if BetterSource(normalized, visuals[visualKey]) then
-                                visuals[visualKey] = normalized
+                            if BetterSource(normalized, bestSource) then
+                                bestSource = normalized
                             end
                         end
                     end
                 end
 
-                if acceptedForAppearance then
+                if acceptedForAppearance and bestSource then
+                    -- One entry per Blizzard appearance row. Resolving a source
+                    -- chooses how to preview that row; it does not define or
+                    -- deduplicate the catalog itself.
+                    local visualKey = appearance.visualID
+                    if visualKey and BetterSource(bestSource, visuals[visualKey]) then
+                        visuals[visualKey] = bestSource
+                    end
                     categoryDiagnostic.compatibleVisuals = categoryDiagnostic.compatibleVisuals + 1
                 else
                     diagnostics.excludedVisuals = diagnostics.excludedVisuals + 1
