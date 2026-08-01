@@ -876,18 +876,32 @@ function Wardrobe.ApplyPreview(model)
 
     SafeCall(model.SetUnit, model, "player")
     local applied = 0
+    local failed = 0
     local state = EnsurePreviewState()
     for _, definition in ipairs(Wardrobe.slotDefinitions) do
         local source = Wardrobe.GetSelectedSource(definition.key)
         if source then
             local valid = Wardrobe.ValidateSource(source, definition.key)
-            if valid and source.itemID and model.TryOn then
-                local ok = pcall(model.TryOn, model, source.itemID)
-                if ok then
+            if valid and source.sourceID and model.TryOn then
+                -- TryOn accepts an item link or item-modified appearance ID.
+                -- A transmog sourceID is the latter; itemID is a different
+                -- namespace and can silently leave the equipped visual intact.
+                local handSlotName
+                if definition.slotName == "MAINHANDSLOT" or definition.slotName == "SECONDARYHANDSLOT" then
+                    handSlotName = definition.slotName
+                end
+                local ok, result = pcall(model.TryOn, model, source.sourceID, handSlotName)
+                local successValue = Enum and Enum.ItemTryOnReason and Enum.ItemTryOnReason.Success
+                if ok and (result == nil or successValue == nil or result == successValue) then
                     applied = applied + 1
+                else
+                    failed = failed + 1
                 end
             end
         end
+    end
+    if failed > 0 then
+        return false, string.format("Previewed %d selected appearances; %d could not be applied by WoW.", applied, failed)
     end
     return true, string.format("Previewed %d selected appearances.", applied)
 end

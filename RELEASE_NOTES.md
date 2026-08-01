@@ -1,31 +1,28 @@
-# Quest Chronicle v0.5.5: Native Appearance Eligibility
+# Quest Chronicle v0.5.6: Embedded Preview Repair
 
-The live SavedVariables diagnostics explain the one-item result: v0.5.3 received hundreds of collected collapsed appearances from WoW, then rejected almost every one while validating individual item sources. Legs returned 302 collected appearance rows and 1,039 source rows, but only one appearance survived the source gate. Other armor slots showed the same pattern.
+The collection scanner is now returning native-scale appearance counts. The remaining preview failure came from passing the wrong identifier type to the embedded `DressUpModel`.
 
-Blizzard's native Wardrobe determines whether a visual belongs in the catalog from the collapsed category appearance row. Individual source records describe the items sharing that visual and help choose a representative item; they are not separate catalog entries and their restrictions must not erase an already-unlocked appearance.
+WoW's `TryOn` method accepts an item link or an item-modified appearance ID. Quest Chronicle stored both the ordinary item ID and the transmog source ID, but v0.5.5 passed the ordinary item ID. For collected appearance records this could fail silently or leave the character's currently equipped appearance unchanged.
 
-## Scanner correction
+## Preview correction
 
-- Uses the category appearance's `visualID` as the catalog identity.
-- Uses the category appearance's `isCollected` flag as the visual's collection state.
-- Uses the category appearance's display flag for preview eligibility.
-- Keeps source-level collection, validity, condition, and use-error fields only for ranking the best preview source.
-- Allows an appearance unlocked through one source to use another item sharing the same visual as its preview representative.
-- Continues to exclude hidden visuals and entries for which WoW provides no previewable item.
-- Handles source-info records and numeric source-ID API results.
+- Passes the cached transmog `sourceID` to `DressUpModel:TryOn`.
+- Routes One-Hand, Two-Hand, and Ranged previews to `MAINHANDSLOT`.
+- Routes Off-Hand previews to `SECONDARYHANDSLOT`.
+- Uses the returned `ItemTryOnReason` to distinguish successful and failed applications.
+- Reapplies every selected slot after resetting the model to the player, preserving multi-piece manual outfit previews.
 
-## Cache migration
+## Cache and data compatibility
 
-The rebuildable wardrobe cache advances to format 5. Older wardrobe caches are marked stale and rebuilt with **Scan Collection**. Chronicle history, quest state, RP notes, drafts, settings, Courier data, and manual selection storage are preserved.
+The corrected format 5 wardrobe cache remains valid. Upgrading from v0.5.5 does not require another collection scan.
 
-## Compatibility
-
-- Addon version 0.5.5.
+- Addon version 0.5.6.
+- Wardrobe cache format 5.
 - SavedVariables schema 2.
 - Courier format 1.
 - Warcraft Quest Chronicle Courier v1.0.0 remains compatible.
-- Preview only; Quest Chronicle does not apply transmog or alter Blizzard outfit slots.
+- Preview only; Quest Chronicle never applies transmog to the character or changes Blizzard outfit slots.
 
-## Expected live result
+## Focused live check
 
-The native screenshot shows 17 Head pages. After rescanning with v0.5.5, Quest Chronicle should expose approximately the same collected Head catalog across its seven-row pages instead of a single Clefthoof Helm. Legs should similarly expand from one result to roughly the full native collection. Small differences remain possible for hidden visuals or rows for which WoW supplies no item that the embedded model can preview.
+After reloading the UI, open Outfits and select visibly different Head, Chest, Legs, and Two-Hand appearances. Each click should immediately update the embedded character model while prior selections in other slots remain applied. No rescan should be necessary.

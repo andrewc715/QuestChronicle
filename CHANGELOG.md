@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.6 - 2026-07-31
+
+### Fixed
+
+- Passes the cached item-modified appearance/source ID to `DressUpModel:TryOn` instead of the ordinary item ID.
+- Supplies `MAINHANDSLOT` or `SECONDARYHANDSLOT` when previewing weapon appearances.
+- Checks WoW's `ItemTryOnReason` result instead of treating every protected call as a successful preview.
+- Preserves wardrobe cache format 5, SavedVariables schema 2, and Courier format 1.
+
 ## 0.5.5 - 2026-07-31
 
 ### Fixed
