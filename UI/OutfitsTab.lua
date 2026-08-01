@@ -152,7 +152,7 @@ local function CacheSummary(cache, diagnostics, sourceCount)
     end
 
     local scanned = cache.scanCompletedAt and UI.FormatShortTimestamp(cache.scanCompletedAt) or "unknown"
-    local maintenance = cache.autoRefreshPending and " • Auto refresh queued" or (cache.dirty and " • Refresh recommended" or "")
+    local maintenance = ""
     local expected = diagnostics and tonumber(diagnostics.expectedCollected) or 0
     if expected > 0 then
         return string.format(
@@ -206,10 +206,13 @@ local function BuildDiagnosticsTooltip(cache, diagnostics, sourceCount, selected
     if cache.scanDurationMS then
         table.insert(lines, string.format("Last scan duration: %.1f seconds", cache.scanDurationMS / 1000))
     end
-    if cache.autoRefreshPending then
-        table.insert(lines, "Automatic refresh: waiting for a quiet moment")
-    elseif cache.lastAutoRefreshAt then
-        table.insert(lines, "Last automatic refresh: " .. UI.FormatShortTimestamp(cache.lastAutoRefreshAt))
+    if cache.loginRefreshPending then
+        table.insert(lines, "Login refresh: waiting for a quiet moment")
+    elseif cache.lastLoginRefreshAt then
+        table.insert(lines, "Last login refresh: " .. UI.FormatShortTimestamp(cache.lastLoginRefreshAt))
+    end
+    if cache.dirty then
+        table.insert(lines, "Collection state: may be stale; use Scan Collection to refresh it")
     end
     if cache.lastRecovery then
         local recovered = (cache.lastRecovery.previewRecovered or 0) + (cache.lastRecovery.conceptRecovered or 0)
@@ -801,9 +804,23 @@ function UI.CreateOutfitsTab(parent)
     pane.scanButton = scanButton
     UI.SetTooltip(scanButton, "Scan Collection", "Refresh the local cache of collected, previewable appearances. Keep Blizzard's Wardrobe and Transmogrify windows closed during the scan.", "ANCHOR_LEFT")
 
+    local staleHitbox = CreateFrame("Button", nil, sourcePanel)
+    staleHitbox:SetPoint("TOPRIGHT", scanButton, "TOPLEFT", -8, 0)
+    staleHitbox:SetSize(132, 24)
+    staleHitbox:Hide()
+    pane.staleHitbox = staleHitbox
+
+    local staleText = staleHitbox:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    staleText:SetAllPoints(staleHitbox)
+    staleText:SetJustifyH("RIGHT")
+    staleText:SetText("Collection may be stale")
+    staleText:SetTextColor(1.0, 0.55, 0.12)
+    pane.staleText = staleText
+    UI.SetTooltip(staleHitbox, "Collection May Be Stale", "WoW reported a transmog collection change after the last scan. Quest Chronicle will not rescan automatically during this session; click Scan Collection when convenient.", "ANCHOR_LEFT")
+
     local sourceTitle = sourcePanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     sourceTitle:SetPoint("TOPLEFT", sourcePanel, "TOPLEFT", 10, -10)
-    sourceTitle:SetPoint("RIGHT", scanButton, "LEFT", -8, 0)
+    sourceTitle:SetPoint("RIGHT", staleHitbox, "LEFT", -8, 0)
     sourceTitle:SetJustifyH("LEFT")
     pane.sourceTitle = sourceTitle
 
@@ -1222,7 +1239,8 @@ function UI.CreateOutfitsTab(parent)
 
         sourceTitle:SetText((definition and definition.label or "Appearance") .. " Appearances")
         scanButton:SetEnabled(not Wardrobe.IsScanning())
-        scanButton:SetText(Wardrobe.IsScanning() and "Scanning..." or (cache.dirty and "Rescan Collection" or "Scan Collection"))
+        scanButton:SetText(Wardrobe.IsScanning() and "Scanning..." or "Scan Collection")
+        staleHitbox:SetShown(cache.dirty == true and not Wardrobe.IsScanning())
 
         local selected = Wardrobe.GetSelectedSource(slotKey)
         local hidden = Wardrobe.IsSlotHidden(slotKey)
@@ -1310,11 +1328,11 @@ function UI.CreateOutfitsTab(parent)
     QC.RegisterCallback("WARDROBE_CACHE_DIRTY", pane, function()
         if pane:IsShown() then pane:Refresh() end
     end)
-    QC.RegisterCallback("WARDROBE_AUTO_REFRESH_SCHEDULED", pane, function()
-        if pane:IsShown() then pane:Refresh("Collection changed • automatic refresh queued.") end
+    QC.RegisterCallback("WARDROBE_LOGIN_REFRESH_SCHEDULED", pane, function()
+        if pane:IsShown() then pane:Refresh("Refreshing the wardrobe once for this login...") end
     end)
-    QC.RegisterCallback("WARDROBE_AUTO_REFRESH_DEFERRED", pane, function()
-        if pane:IsShown() then pane:Refresh("Automatic refresh deferred • use Rescan Collection when ready.") end
+    QC.RegisterCallback("WARDROBE_LOGIN_REFRESH_DEFERRED", pane, function()
+        if pane:IsShown() then pane:Refresh("Login refresh deferred • use Scan Collection when ready.") end
     end)
     QC.RegisterCallback("WARDROBE_APPEARANCES_RECOVERED", pane, function(recovery)
         if pane:IsShown() and recovery then

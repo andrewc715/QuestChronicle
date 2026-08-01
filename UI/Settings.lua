@@ -86,13 +86,6 @@ local SETTINGS = {
         tooltip = "Prevent generated outfits from using appearances introduced after the current zone's expansion. Manual preview remains unrestricted.",
     },
     {
-        variable = "QUEST_CHRONICLE_AUTO_REFRESH_WARDROBE",
-        key = "autoRefreshWardrobe",
-        label = "Refresh the wardrobe after collection changes",
-        default = true,
-        tooltip = "Quietly rescan after appearances are learned or removed. Refresh waits until combat and Blizzard's Wardrobe windows are closed.",
-    },
-    {
         variable = "QUEST_CHRONICLE_RECOVER_APPEARANCES",
         key = "recoverMissingAppearances",
         label = "Recover changed appearance sources",
@@ -104,7 +97,7 @@ local SETTINGS = {
         key = "announceWardrobeUpdates",
         label = "Announce wardrobe maintenance in chat",
         default = true,
-        tooltip = "Print concise messages when an automatic refresh completes, is deferred, or recovers saved appearances.",
+        tooltip = "Print concise messages when the one-time login refresh completes, is deferred, or recovers saved appearances.",
     },
     {
         variable = "QUEST_CHRONICLE_HIGH_CONTRAST_OUTFITS",

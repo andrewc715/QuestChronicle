@@ -110,10 +110,10 @@ function UI.CreateStatusTab(parent)
         local wardrobeCache = QC.Wardrobe and QC.Wardrobe.GetCache and QC.Wardrobe.GetCache()
         local wardrobeState = "Unavailable"
         if wardrobeCache then
-            if wardrobeCache.autoRefreshPending then
-                wardrobeState = "Refresh queued"
+            if wardrobeCache.loginRefreshPending then
+                wardrobeState = "Login refresh pending"
             elseif wardrobeCache.dirty then
-                wardrobeState = "Refresh recommended"
+                wardrobeState = "Collection may be stale"
             elseif wardrobeCache.scanState == "COMPLETE" or wardrobeCache.scanState == "COMPLETE_WITH_WARNINGS" then
                 wardrobeState = "Current"
             elseif wardrobeCache.scanState == "FAILED" then
@@ -185,7 +185,7 @@ function UI.CreateStatusTab(parent)
     QC.RegisterCallback("WARDROBE_SCAN_COMPLETE", pane, function()
         if pane:IsShown() then pane:Refresh() end
     end)
-    QC.RegisterCallback("WARDROBE_AUTO_REFRESH_SCHEDULED", pane, function()
+    QC.RegisterCallback("WARDROBE_LOGIN_REFRESH_SCHEDULED", pane, function()
         if pane:IsShown() then pane:Refresh() end
     end)
     QC.RegisterCallback("PLAYER_READY", pane, function()

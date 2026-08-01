@@ -6,10 +6,11 @@ local Wardrobe = QC.Wardrobe
 Wardrobe.CACHE_VERSION = 6
 Wardrobe.PAGE_SIZE = 7
 
-local AUTO_REFRESH_DELAY = 3.0
-local AUTO_REFRESH_RETRY_DELAY = 2.0
-local AUTO_REFRESH_MAX_ATTEMPTS = 15
-local autoRefreshToken = 0
+local LOGIN_REFRESH_DELAY = 3.0
+local LOGIN_REFRESH_RETRY_DELAY = 2.0
+local LOGIN_REFRESH_MAX_ATTEMPTS = 15
+local loginRefreshToken = 0
+local loginRefreshScheduled = false
 local internalUsabilityUpdateUntil
 local pendingCustomSetSync
 local CUSTOM_SET_SYNC_TIMEOUT = 5.0
@@ -89,7 +90,8 @@ local function ResetCache(cache, state)
     cache.scanWarning = nil
     cache.dirty = true
     cache.dirtyReason = "CACHE_UPGRADE"
-    cache.autoRefreshPending = false
+    cache.loginRefreshPending = false
+    cache.autoRefreshPending = nil
 end
 
 local function EnsureCache()
@@ -108,7 +110,8 @@ local function EnsureCache()
     cache.totalSources = cache.totalSources or 0
     cache.totalVisuals = cache.totalVisuals or 0
     cache.expectedCollectedVisuals = cache.expectedCollectedVisuals or 0
-    cache.autoRefreshPending = cache.autoRefreshPending == true
+    cache.loginRefreshPending = cache.loginRefreshPending == true
+    cache.autoRefreshPending = nil
     return cache
 end
 
@@ -2347,70 +2350,69 @@ function Wardrobe.IsScanning()
     return Wardrobe.scanning == true
 end
 
-local function ScheduleAutomaticRefresh(reason)
+local function ScheduleLoginRefresh()
+    if loginRefreshScheduled then
+        return
+    end
+    loginRefreshScheduled = true
+
     local cache = EnsureCache()
-    local settings = QC.GetSettings and QC.GetSettings() or {}
-    cache.lastCollectionChangeAt = time and time() or 0
-    if settings.autoRefreshWardrobe == false
-        or (cache.scanState ~= "COMPLETE" and cache.scanState ~= "COMPLETE_WITH_WARNINGS")
-        or (cache.totalVisuals or 0) == 0
-        or not C_Timer or type(C_Timer.After) ~= "function"
-    then
-        cache.autoRefreshPending = false
+    if not C_Timer or type(C_Timer.After) ~= "function" then
+        cache.loginRefreshPending = false
+        cache.loginRefreshDeferredReason = "TIMER_UNAVAILABLE"
         return
     end
 
-    autoRefreshToken = autoRefreshToken + 1
-    local token = autoRefreshToken
+    loginRefreshToken = loginRefreshToken + 1
+    local token = loginRefreshToken
     local attempts = 0
-    cache.autoRefreshPending = true
-    cache.autoRefreshReason = reason or "COLLECTION_CHANGED"
-    cache.autoRefreshDeferredReason = nil
-    if QC.Notify then QC.Notify("WARDROBE_AUTO_REFRESH_SCHEDULED", cache.autoRefreshReason) end
+    cache.loginRefreshPending = true
+    cache.loginRefreshDeferredReason = nil
+    if QC.Notify then QC.Notify("WARDROBE_LOGIN_REFRESH_SCHEDULED") end
 
     local function TryRefresh()
-        if token ~= autoRefreshToken then return end
-        if settings.autoRefreshWardrobe == false then
-            cache.autoRefreshPending = false
+        if token ~= loginRefreshToken then
+            cache.loginRefreshPending = false
             return
         end
+
         attempts = attempts + 1
         local blockedByCombat = type(InCombatLockdown) == "function" and InCombatLockdown() == true
         local blockedByWardrobe = IsBlizzardWardrobeVisible()
         if Wardrobe.scanning or blockedByCombat or blockedByWardrobe then
-            if attempts < AUTO_REFRESH_MAX_ATTEMPTS then
-                C_Timer.After(AUTO_REFRESH_RETRY_DELAY, TryRefresh)
+            if attempts < LOGIN_REFRESH_MAX_ATTEMPTS then
+                C_Timer.After(LOGIN_REFRESH_RETRY_DELAY, TryRefresh)
                 return
             end
-            cache.autoRefreshPending = false
-            cache.autoRefreshDeferredReason = blockedByCombat and "COMBAT" or (blockedByWardrobe and "BLIZZARD_WARDROBE_OPEN" or "SCAN_BUSY")
+
+            cache.loginRefreshPending = false
+            cache.loginRefreshDeferredReason = blockedByCombat and "COMBAT" or (blockedByWardrobe and "BLIZZARD_WARDROBE_OPEN" or "SCAN_BUSY")
+            local settings = QC.GetSettings and QC.GetSettings() or {}
             if settings.announceWardrobeUpdates ~= false and QC.Print then
-                QC.Print("Wardrobe refresh deferred. Close Blizzard's Wardrobe and leave combat, then use Rescan Collection.")
+                QC.Print("Login wardrobe refresh deferred. Use Scan Collection when ready.")
             end
-            if QC.Notify then QC.Notify("WARDROBE_AUTO_REFRESH_DEFERRED", cache.autoRefreshDeferredReason) end
+            if QC.Notify then QC.Notify("WARDROBE_LOGIN_REFRESH_DEFERRED", cache.loginRefreshDeferredReason) end
             return
         end
 
-        cache.autoRefreshPending = false
-        local started, message = Wardrobe.Scan(true, "AUTO_COLLECTION_CHANGE")
+        cache.loginRefreshPending = false
+        local started, message = Wardrobe.Scan(true, "AUTO_LOGIN")
         if not started then
-            cache.autoRefreshDeferredReason = message or "SCAN_UNAVAILABLE"
-            if QC.Notify then QC.Notify("WARDROBE_AUTO_REFRESH_DEFERRED", cache.autoRefreshDeferredReason) end
+            cache.loginRefreshDeferredReason = message or "SCAN_UNAVAILABLE"
+            if QC.Notify then QC.Notify("WARDROBE_LOGIN_REFRESH_DEFERRED", cache.loginRefreshDeferredReason) end
         end
     end
 
-    C_Timer.After(AUTO_REFRESH_DELAY, TryRefresh)
+    C_Timer.After(LOGIN_REFRESH_DELAY, TryRefresh)
 end
 
 function Wardrobe.MarkDirty(reason)
     local cache = EnsureCache()
     cache.dirty = true
     cache.dirtyReason = reason or "COLLECTION_CHANGED"
+    cache.lastCollectionChangeAt = time and time() or 0
     if QC.Notify then
         QC.Notify("WARDROBE_CACHE_DIRTY", cache.dirtyReason)
-    end
-    if not Wardrobe.scanning then
-        ScheduleAutomaticRefresh(cache.dirtyReason)
     end
 end
 
@@ -2433,8 +2435,8 @@ function Wardrobe.Scan(force, trigger)
         return false, "The wardrobe cache is current."
     end
 
-    autoRefreshToken = autoRefreshToken + 1
-    cache.autoRefreshPending = false
+    loginRefreshToken = loginRefreshToken + 1
+    cache.loginRefreshPending = false
     CaptureRecoveryIdentities()
     Wardrobe.scanning = true
     Wardrobe.scanCollectionState = CaptureCollectionState()
@@ -2512,14 +2514,12 @@ function Wardrobe.Scan(force, trigger)
         cache.characterKey = QC.GetCurrentCharacter().key
         cache.scanDurationMS = scanStartedPrecise and GetTime and math.floor(((GetTime() - scanStartedPrecise) * 1000) + 0.5) or nil
         RecoverAppearanceReferences(cache)
-        if cache.scanTrigger == "AUTO_COLLECTION_CHANGE" then
-            cache.lastAutoRefreshAt = cache.scanCompletedAt
-            cache.lastAutoRefreshReason = cache.autoRefreshReason
-            cache.autoRefreshReason = nil
-            cache.autoRefreshDeferredReason = nil
+        if cache.scanTrigger == "AUTO_LOGIN" then
+            cache.lastLoginRefreshAt = cache.scanCompletedAt
+            cache.loginRefreshDeferredReason = nil
             local settings = QC.GetSettings and QC.GetSettings() or {}
             if settings.announceWardrobeUpdates ~= false and QC.Print then
-                QC.Print(string.format("Wardrobe refreshed automatically: %d previewable appearances in %.1f seconds.", cache.totalVisuals or 0, (cache.scanDurationMS or 0) / 1000))
+                QC.Print(string.format("Wardrobe refreshed for this login: %d previewable appearances in %.1f seconds.", cache.totalVisuals or 0, (cache.scanDurationMS or 0) / 1000))
             end
         end
 
@@ -2718,17 +2718,16 @@ eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_ENTERING_WORLD" then
         local cache = EnsureCache()
-        cache.autoRefreshPending = false
-        cache.autoRefreshReason = nil
+        if not loginRefreshScheduled then
+            cache.loginRefreshPending = false
+        end
         EnsurePreviewState()
         local character = QC.GetCurrentCharacter and QC.GetCurrentCharacter()
         if character and cache.characterKey and cache.characterKey ~= character.key then
             ResetCache(cache, "STALE")
             cache.dirtyReason = "CHARACTER_CHANGED"
         end
-        if cache.dirty then
-            ScheduleAutomaticRefresh(cache.dirtyReason or "COLLECTION_CHANGED")
-        end
+        ScheduleLoginRefresh()
     elseif event == "TRANSMOG_CUSTOM_SETS_CHANGED" then
         local request = pendingCustomSetSync
         local resolved = TryVerifyPendingCustomSet(false)

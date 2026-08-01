@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.6 - 2026-07-31
+
+### Changed
+
+- Limits automatic wardrobe scanning to exactly one attempt per addon session, after login or `/reload`.
+- Prevents `TRANSMOG_COLLECTION_*` events from scheduling background rescans during play.
+- Marks the wardrobe cache stale when appearances are learned or removed.
+- Adds a visible **Collection may be stale** notice beside **Scan Collection**.
+- Keeps manual Scan Collection as the only additional refresh path during the session.
+- Removes the obsolete automatic-refresh setting while preserving all wardrobe data and concepts.
+- Updates Status and diagnostics to distinguish the one-time login refresh from later stale collection state.
+
 ## 1.0.5 - 2026-07-31
 
 ### Added

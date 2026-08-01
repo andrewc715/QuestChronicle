@@ -1,8 +1,8 @@
-# Quest Chronicle v1.0.5
+# Quest Chronicle v1.0.6
 
-> **Quest Chronicle:** v1.0.2 repairs Blizzard Custom Set export with exact inventory-slot mapping, collected-source rebinding, hidden-slot encoding, and slot-by-slot verification.
+> **Quest Chronicle:** v1.0.6 performs one wardrobe refresh per login or `/reload`; later collection changes display a stale-cache notice until the player chooses **Scan Collection**.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.0.5 preserves the complete quest lifecycle, journal, Courier, and outfit-design systems while adding a draggable standalone minimap button alongside the native Blizzard AddOn Compartment entry.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.0.6 preserves the complete quest lifecycle, journal, Courier, Custom Set, and outfit-design systems while limiting wardrobe automation to one scan per login or `/reload`.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -243,7 +243,7 @@ Selected Current Look layers use the same detailed tooltip as the appearance bro
 
 ## Outfits: Wardrobe Foundation
 
-The Outfits tab can scan the account wardrobe for appearances collected and displayable by the current character. It caches compatible sources by equipment slot and lets the player manually assemble a non-destructive preview on an embedded character model. Collection events are debounced into one automatic refresh, which waits for combat and Blizzard's Wardrobe windows to clear. Each scan records its duration.
+The Outfits tab can scan the account wardrobe for appearances collected and displayable by the current character. It caches compatible sources by equipment slot and lets the player manually assemble a non-destructive preview on an embedded character model. Quest Chronicle performs exactly one automatic wardrobe scan after each login or `/reload`. Collection changes later in the same session only mark the cache as potentially stale; they never trigger another scan. Each scan records its duration.
 
 Selections and concepts retain each collapsed visual ID beside Blizzard's representative source ID. If a later scan chooses a different compatible source for the same visual, Quest Chronicle rebinds the preview and saved concept instead of treating the appearance as missing. Legacy selections and concepts gain this identity additively from the existing cache.
 
@@ -255,4 +255,4 @@ Ordinary **Save / Update** stores only the Quest Chronicle concept. Native expor
 
 Quest Chronicle remains the authoritative backup. Replacing a native Custom Set stores up to five internal backups of the overwritten Custom Set data. No transmog is applied, no gold is spent, and Blizzard Outfit slots are never changed.
 
-Existing pre-v1 concepts remain local until explicitly migrated. Use **Scan Collection** after a fresh installation; automatic collection refresh is enabled by default afterward, while **Rescan Collection** remains available at any time.
+Existing pre-v1 concepts remain local until explicitly migrated. The login scan refreshes the collection once per addon session. If WoW reports a later collection change, **Collection may be stale** appears beside **Scan Collection** until the player chooses a convenient time to refresh manually.
