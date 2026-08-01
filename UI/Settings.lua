@@ -72,6 +72,13 @@ local SETTINGS = {
         tooltip = "Prevent the Quest Chronicle window from being dragged or resized.",
     },
     {
+        variable = "QUEST_CHRONICLE_SHOW_MINIMAP_BUTTON",
+        key = "showMinimapButton",
+        label = "Show minimap button",
+        default = true,
+        tooltip = "Show a draggable Quest Chronicle button on the minimap. Minimap button organizers may collect it into their button bag.",
+    },
+    {
         variable = "QUEST_CHRONICLE_ZONE_ERA_RESTRICTION",
         key = "restrictOutfitsToZoneEra",
         label = "Restrict generated outfits to the zone's expansion",

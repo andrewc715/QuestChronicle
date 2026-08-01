@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.5 - 2026-07-31
+
+### Added
+
+- Added a draggable standalone Quest Chronicle minimap button.
+- Added saved minimap position and a WoW Settings visibility toggle.
+- Added `/qc minimap show|hide|toggle|reset` recovery commands.
+- Preserved the native AddOn Compartment entry as a second launcher.
+- Left Ctrl+Right-click unconsumed for minimap-button organizer reattachment workflows.
+
 ## 1.0.4 - 2026-07-31
 
 ### Fixed

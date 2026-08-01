@@ -1,19 +1,22 @@
-# Quest Chronicle v1.0.4: AddOn Compartment Fix
+# Quest Chronicle v1.0.5: Minimap Button
 
-Version 1.0.4 is a focused access-point repair following the successful v1.0.3 outfit-interface polish.
+Version 1.0.5 adds the standalone minimap button requested after the v1.0.4 AddOn Compartment tooltip repair.
 
-## Fixed
+## Added
 
-- Corrects the `AddonCompartmentFuncOnEnter` callback signature.
-- Blizzard passes `(addonName, menuButtonFrame)` to the hover callback. Quest Chronicle previously treated the addon-name string as the tooltip owner, causing `GameTooltip:SetOwner(region)` usage errors.
-- The tooltip now anchors to Blizzard's actual AddOn Compartment menu button.
-- Left-click still toggles the main Quest Chronicle window.
-- Right-click still opens **Status & Maintenance**.
-- Leaving the tray entry cleanly hides the tooltip.
+- A named `QuestChronicleMinimapButton` parented to Blizzard's Minimap.
+- Left-click toggles the main Quest Chronicle window.
+- Right-click opens **Status & Maintenance**.
+- Dragging moves the button around the minimap and saves its angle.
+- A **Show minimap button** checkbox under WoW's Quest Chronicle AddOns settings.
+- `/qc minimap show|hide|toggle|reset` recovery commands.
+- A dedicated tooltip explaining both click actions and dragging.
 
-## Access behavior
+## Minimap button organizers
 
-Quest Chronicle is already registered in Blizzard's native AddOns tray through TOC metadata. v1.0.4 repairs that existing integration; it does not add a second standalone minimap icon or a new library dependency.
+The button is a conventional named Minimap child rather than a private launcher. Minimap button organizers such as MinimapButtonBag Reborn should therefore be able to collect it into their bag. Quest Chronicle leaves `Ctrl+Right-click` unconsumed so organizer-specific reattachment gestures remain available.
+
+The existing Blizzard AddOn Compartment entry remains available as a second access route.
 
 ## Preserved
 
@@ -21,4 +24,5 @@ Quest Chronicle is already registered in Blizzard's native AddOns tray through T
 - Courier format 1.
 - Wardrobe cache and outfit concepts.
 - Linked and verified WoW Custom Sets.
-- Quest history, active quests, RP notes, settings, and window state.
+- Chronicle history, active quests, RP notes, settings, drafts, and window state.
+- No wardrobe rescan or Custom Set resave is required.

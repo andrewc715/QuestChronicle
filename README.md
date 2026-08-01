@@ -1,8 +1,8 @@
-# Quest Chronicle v1.0.4
+# Quest Chronicle v1.0.5
 
 > **Quest Chronicle:** v1.0.2 repairs Blizzard Custom Set export with exact inventory-slot mapping, collected-source rebinding, hidden-slot encoding, and slot-by-slot verification.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.0.4 preserves the complete quest lifecycle, journal, Courier, and outfit-design systems while repairing the Blizzard AddOn Compartment hover callback used to open Quest Chronicle from the minimap tray.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.0.5 preserves the complete quest lifecycle, journal, Courier, and outfit-design systems while adding a draggable standalone minimap button alongside the native Blizzard AddOn Compartment entry.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -13,10 +13,12 @@ It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 /qc show
 ```
 
-The AddOn Compartment beside the minimap also opens it:
+Quest Chronicle provides both a standalone minimap button and a native AddOn Compartment entry:
 
 - Left-click: toggle the main window.
 - Right-click: open Status & Maintenance.
+- Drag the standalone button around the minimap edge.
+- Use `/qc minimap show|hide|toggle|reset` if it is hidden or misplaced.
 
 The window remembers both its position and size. Drag the lower-right resize grip to enlarge it, lock it through WoW's AddOns settings, or use **Reset Window** on the Status tab.
 
@@ -101,6 +103,7 @@ Settings include:
 - Recover changed appearance sources
 - Announce wardrobe maintenance in chat
 - High-contrast outfit states
+- Show minimap button
 
 ## Slash commands
 
@@ -117,6 +120,7 @@ Settings include:
 /qc lifecycle on|off
 /qc objectives on|off
 /qc removals on|off
+/qc minimap show|hide|toggle|reset
 ```
 
 Bare `/qc` toggles the main window. `/qc help` displays command help.

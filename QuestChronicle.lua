@@ -16,7 +16,7 @@ local questSyncToken = 0
 
 local SCHEMA_VERSION = 2
 local COURIER_FORMAT_VERSION = 1
-local ADDON_VERSION = "1.0.4"
+local ADDON_VERSION = "1.0.5"
 local PREFIX = "|cffd9b36cQuest Chronicle:|r "
 local OBJECTIVE_SYNC_DELAY = 0.35
 local REMOVAL_CLASSIFY_DELAY = 0.45
@@ -343,6 +343,7 @@ local function EnsureDatabase()
     QuestChronicleDB.settings.recoverMissingAppearances = QuestChronicleDB.settings.recoverMissingAppearances ~= false
     QuestChronicleDB.settings.announceWardrobeUpdates = QuestChronicleDB.settings.announceWardrobeUpdates ~= false
     QuestChronicleDB.settings.highContrastOutfitStates = QuestChronicleDB.settings.highContrastOutfitStates == true
+    QuestChronicleDB.settings.showMinimapButton = QuestChronicleDB.settings.showMinimapButton ~= false
     QuestChronicleDB.characters = QuestChronicleDB.characters or {}
     QuestChronicleDB.ui = QuestChronicleDB.ui or {}
     QuestChronicleDB.ui.lastTab = QuestChronicleDB.ui.lastTab or "chronicle"
@@ -1225,6 +1226,7 @@ local function PrintHelp()
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc lifecycle on|off|r - toggle acceptance and state events")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc objectives on|off|r - toggle objective progress events")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc removals on|off|r - toggle abandonment and removal events")
+    DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc minimap show|hide|toggle|reset|r - manage the minimap button")
 end
 
 local function HandleSlashCommand(message)
@@ -1279,6 +1281,23 @@ local function HandleSlashCommand(message)
         SetTrackingSetting("objectiveTracking", string.lower(rest), "Objectives")
     elseif command == "removals" then
         SetTrackingSetting("removalTracking", string.lower(rest), "Removals")
+    elseif command == "minimap" then
+        local value = string.lower(rest or "")
+        if value == "show" or value == "on" then
+            if QC.SetMinimapButtonVisible then QC.SetMinimapButtonVisible(true) end
+            Print("Minimap button shown.")
+        elseif value == "hide" or value == "off" then
+            if QC.SetMinimapButtonVisible then QC.SetMinimapButtonVisible(false) end
+            Print("Minimap button hidden. Use /qc minimap show to restore it.")
+        elseif value == "reset" then
+            if QC.ResetMinimapButtonPosition then QC.ResetMinimapButtonPosition() end
+        elseif value == "toggle" or value == "" then
+            local visible = QuestChronicleDB.settings.showMinimapButton ~= false
+            if QC.SetMinimapButtonVisible then QC.SetMinimapButtonVisible(not visible) end
+            Print("Minimap button " .. (visible and "hidden." or "shown."))
+        else
+            Print("Usage: /qc minimap show|hide|toggle|reset")
+        end
     else
         PrintHelp()
     end
@@ -1444,6 +1463,9 @@ frame:SetScript("OnEvent", function(_, event, ...)
         if QC.RegisterSettings then
             QC.RegisterSettings()
         end
+        if QC.InitializeMinimapButton then
+            QC.InitializeMinimapButton()
+        end
 
     elseif event == "PLAYER_LOGIN" then
         EnsureCharacter()
@@ -1452,6 +1474,9 @@ frame:SetScript("OnEvent", function(_, event, ...)
         RefreshCourierExport()
         if QC.InitializeUI then
             QC.InitializeUI()
+        end
+        if QC.InitializeMinimapButton then
+            QC.InitializeMinimapButton()
         end
         if QC.Notify then
             QC.Notify("PLAYER_READY")
