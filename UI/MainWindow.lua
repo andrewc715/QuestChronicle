@@ -315,7 +315,7 @@ function QC.ToggleWindow(tabKey)
     end
 end
 
-function QuestChronicle_OnAddonCompartmentClick(_, buttonName)
+function QuestChronicle_OnAddonCompartmentClick(addonName, buttonName, menuButtonFrame)
     if buttonName == "RightButton" then
         QC.ShowWindow("status")
     else
@@ -323,14 +323,21 @@ function QuestChronicle_OnAddonCompartmentClick(_, buttonName)
     end
 end
 
-function QuestChronicle_OnAddonCompartmentEnter(frame)
-    GameTooltip:SetOwner(frame, "ANCHOR_LEFT")
+function QuestChronicle_OnAddonCompartmentEnter(addonName, menuButtonFrame)
+    -- Blizzard supplies the addon folder name first and the actual menu button
+    -- region second. Using the first argument as the tooltip owner causes
+    -- GameTooltip:SetOwner to receive a string and throw a usage error.
+    if not menuButtonFrame then
+        return
+    end
+
+    GameTooltip:SetOwner(menuButtonFrame, "ANCHOR_LEFT")
     GameTooltip:SetText("Quest Chronicle " .. tostring(QC.version or ""))
     GameTooltip:AddLine("Left-click to open the Chronicle.", 1, 1, 1)
     GameTooltip:AddLine("Right-click to open Status & Maintenance.", 1, 1, 1)
     GameTooltip:Show()
 end
 
-function QuestChronicle_OnAddonCompartmentLeave()
+function QuestChronicle_OnAddonCompartmentLeave(addonName, menuButtonFrame)
     GameTooltip:Hide()
 end

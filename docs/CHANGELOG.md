@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.4 - 2026-07-31
+
+### Fixed
+
+- Corrected AddOn Compartment hover callback arguments.
+- Anchored the Quest Chronicle tray tooltip to Blizzard's supplied menu button instead of the addon-name string.
+- Preserved left-click window toggling and right-click Status access.
+
 ## 1.0.3 - 2026-07-31
 
 ### Polished
