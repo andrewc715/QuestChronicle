@@ -1,8 +1,8 @@
-# Quest Chronicle v1.0.2
+# Quest Chronicle v1.0.3
 
 > **Quest Chronicle:** v1.0.2 repairs Blizzard Custom Set export with exact inventory-slot mapping, collected-source rebinding, hidden-slot encoding, and slot-by-slot verification.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.0.2 combines the complete quest lifecycle, journal, Courier, and outfit-design systems with a fail-safe Custom Set handoff that reproduces the Quest Chronicle preview instead of creating partial native recipes.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.0.3 combines the complete quest lifecycle, journal, Courier, and outfit-design systems with a fail-safe Custom Set handoff that reproduces the Quest Chronicle preview instead of creating partial native recipes.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

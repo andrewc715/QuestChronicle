@@ -412,7 +412,7 @@ function UI.CreateOutfitsTab(parent)
     conceptBlocker:Hide()
 
     local conceptManager = UI.CreateInsetPanel(pane)
-    conceptManager:SetSize(690, 390)
+    conceptManager:SetSize(690, 420)
     conceptManager:SetPoint("CENTER", pane, "CENTER", 0, -4)
     conceptManager:SetFrameLevel(pane:GetFrameLevel() + 41)
     conceptManager:EnableMouse(true)
@@ -499,6 +499,18 @@ function UI.CreateOutfitsTab(parent)
         conceptManager.rows[index] = row
     end
 
+    -- Native Custom Set actions occupy their own row. Keeping them separate
+    -- from paging and local concept actions prevents the footer from exceeding
+    -- the manager width at the minimum Quest Chronicle window size.
+    local syncSelected = UI.CreateButton(conceptManager, "Save to Custom Sets", 150, 23)
+    syncSelected:SetPoint("BOTTOMLEFT", conceptManager, "BOTTOMLEFT", 151, 43)
+    local saveAsNew = UI.CreateButton(conceptManager, "Save as New", 108, 23)
+    saveAsNew:SetPoint("LEFT", syncSelected, "RIGHT", 8, 0)
+    local replaceExisting = UI.CreateButton(conceptManager, "Replace Existing", 124, 23)
+    replaceExisting:SetPoint("LEFT", saveAsNew, "RIGHT", 8, 0)
+
+    -- Paging remains on the lower-left; local load/delete actions remain on the
+    -- lower-right. These groups no longer compete for the same horizontal run.
     local previousConcepts = UI.CreateButton(conceptManager, "<", 28, 23)
     previousConcepts:SetPoint("BOTTOMLEFT", conceptManager, "BOTTOMLEFT", 15, 12)
     local conceptPage = conceptManager:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -508,16 +520,10 @@ function UI.CreateOutfitsTab(parent)
     local nextConcepts = UI.CreateButton(conceptManager, ">", 28, 23)
     nextConcepts:SetPoint("LEFT", conceptPage, "RIGHT", 6, 0)
 
-    local syncSelected = UI.CreateButton(conceptManager, "Save to Custom Sets", 130, 23)
-    syncSelected:SetPoint("BOTTOMLEFT", conceptManager, "BOTTOMLEFT", 145, 12)
-    local saveAsNew = UI.CreateButton(conceptManager, "Save as New", 94, 23)
-    saveAsNew:SetPoint("LEFT", syncSelected, "RIGHT", 6, 0)
-    local replaceExisting = UI.CreateButton(conceptManager, "Replace Existing", 112, 23)
-    replaceExisting:SetPoint("LEFT", saveAsNew, "RIGHT", 6, 0)
-    local loadSelected = UI.CreateButton(conceptManager, "Load Selected", 105, 23)
-    loadSelected:SetPoint("LEFT", replaceExisting, "RIGHT", 6, 0)
-    local deleteSelected = UI.CreateButton(conceptManager, "Delete", 76, 23)
-    deleteSelected:SetPoint("LEFT", loadSelected, "RIGHT", 6, 0)
+    local deleteSelected = UI.CreateButton(conceptManager, "Delete", 92, 23)
+    deleteSelected:SetPoint("BOTTOMRIGHT", conceptManager, "BOTTOMRIGHT", -15, 12)
+    local loadSelected = UI.CreateButton(conceptManager, "Load Selected", 118, 23)
+    loadSelected:SetPoint("RIGHT", deleteSelected, "LEFT", -8, 0)
     UI.SetTooltip(syncSelected, "Save to Custom Sets", "Create a new WoW Custom Set for this concept, or update its linked Custom Set. Quest Chronicle remains the authoritative backup and nothing is applied to your character.")
     UI.SetTooltip(saveAsNew, "Save as New Custom Set", "Create another WoW Custom Set from the selected Quest Chronicle concept without replacing its currently linked set.")
     UI.SetTooltip(replaceExisting, "Replace Existing Custom Set", "Choose an existing WoW Custom Set and replace its appearance recipe. Quest Chronicle keeps the original concept as the authoritative backup.")
@@ -1169,7 +1175,17 @@ function UI.CreateOutfitsTab(parent)
             local mode = ZoneStyle.GetModeInfo(modeKey)
             local marker = modeKey == ZoneStyle.MODE_ZONE_NATIVE and pendingSuggestion and " *" or ""
             button:SetText(mode.shortLabel .. marker)
-            button:SetEnabled(modeKey ~= styleMode)
+
+            -- Do not disable the selected mode: disabled buttons do not receive
+            -- mouse-enter events, which made the active mode's tooltip vanish.
+            -- A locked highlight communicates selection while preserving hover
+            -- and allowing the player to click the mode again harmlessly.
+            button:SetEnabled(true)
+            if modeKey == styleMode then
+                if button.LockHighlight then button:LockHighlight() end
+            else
+                if button.UnlockHighlight then button:UnlockHighlight() end
+            end
         end
         styleInfo:SetText(string.format(
             "%s • %s\n%s%s\n%s • %d favored • %d excluded",

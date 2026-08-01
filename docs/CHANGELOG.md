@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.3 - 2026-07-31
+
+### Polished
+
+- Split the Outfit Concepts footer into a native Custom Set row and a separate paging/load/delete row.
+- Increased the concept manager height and widened dynamic Custom Set controls.
+- Kept selected generation-mode buttons enabled so active-mode tooltips remain available.
+- Added selected-mode highlighting without disabling mouse interaction.
+- Preserved the v1.0.2 Custom Set handoff and verification pipeline.
+
 ## 1.0.2 - 2026-07-31
 
 ### Fixed
