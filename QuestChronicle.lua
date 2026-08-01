@@ -16,7 +16,7 @@ local questSyncToken = 0
 
 local SCHEMA_VERSION = 2
 local COURIER_FORMAT_VERSION = 1
-local ADDON_VERSION = "0.4.0"
+local ADDON_VERSION = "0.4.1"
 local PREFIX = "|cffd9b36cQuest Chronicle:|r "
 local OBJECTIVE_SYNC_DELAY = 0.35
 local REMOVAL_CLASSIFY_DELAY = 0.45
@@ -335,12 +335,18 @@ local function EnsureDatabase()
     QuestChronicleDB.settings.removalTracking = QuestChronicleDB.settings.removalTracking ~= false
     QuestChronicleDB.settings.rememberWindowPosition = QuestChronicleDB.settings.rememberWindowPosition ~= false
     QuestChronicleDB.settings.lockWindow = QuestChronicleDB.settings.lockWindow == true
+    QuestChronicleDB.settings.showQuestIDs = QuestChronicleDB.settings.showQuestIDs ~= false
+    QuestChronicleDB.settings.showDateSeparators = QuestChronicleDB.settings.showDateSeparators ~= false
+    QuestChronicleDB.settings.confirmClearDraft = QuestChronicleDB.settings.confirmClearDraft ~= false
     QuestChronicleDB.characters = QuestChronicleDB.characters or {}
     QuestChronicleDB.ui = QuestChronicleDB.ui or {}
     QuestChronicleDB.ui.lastTab = QuestChronicleDB.ui.lastTab or "chronicle"
     QuestChronicleDB.ui.noteDrafts = QuestChronicleDB.ui.noteDrafts or {}
     QuestChronicleDB.ui.chronicleFilter = QuestChronicleDB.ui.chronicleFilter or "ALL"
     QuestChronicleDB.ui.chronicleNewestFirst = QuestChronicleDB.ui.chronicleNewestFirst ~= false
+    QuestChronicleDB.ui.chronicleSearch = QuestChronicleDB.ui.chronicleSearch or ""
+    QuestChronicleDB.ui.activeQuestFilter = QuestChronicleDB.ui.activeQuestFilter or "ALL"
+    QuestChronicleDB.ui.activeQuestSort = QuestChronicleDB.ui.activeQuestSort or "READY"
     QuestChronicleDB.ui.window = QuestChronicleDB.ui.window or {}
 end
 
@@ -1085,6 +1091,29 @@ local function PrintStatus()
     ))
 end
 
+local QUEST_STATE_LABELS = {
+    ACTIVE = "Active",
+    READY_FOR_TURN_IN = "Ready for Turn-In",
+    FAILED = "Failed",
+    COMPLETE = "Complete",
+    TURNED_IN = "Turned In",
+    REMOVED = "Removed",
+}
+
+local function FriendlyQuestState(value)
+    value = SafeText(value)
+    if QUEST_STATE_LABELS[value] then
+        return QUEST_STATE_LABELS[value]
+    end
+    if value == "" then
+        return "Unknown"
+    end
+    value = value:gsub("_", " "):lower()
+    return (value:gsub("(%a)([%w']*)", function(first, rest)
+        return first:upper() .. rest
+    end))
+end
+
 local function EventSummary(event)
     local questName = event.questName and event.questName ~= "" and event.questName
         or (event.questID and ("Quest " .. tostring(event.questID)) or "")
@@ -1100,7 +1129,7 @@ local function EventSummary(event)
     elseif event.eventType == "QUEST_BECAME_ACTIVE" then
         return string.format("ACTIVE %s [%d]", questName, event.questID or 0)
     elseif event.eventType == "QUEST_STATE_CHANGED" then
-        return string.format("STATE %s: %s -> %s", questName, SafeText(event.previousQuestState), SafeText(event.questState))
+        return string.format("STATE %s: %s -> %s", questName, FriendlyQuestState(event.previousQuestState), FriendlyQuestState(event.questState))
     elseif event.eventType == "QUEST_OBJECTIVE_UPDATED" then
         return string.format(
             "OBJECTIVE %s #%d: %s",
@@ -1158,7 +1187,7 @@ local function PrintActive(count)
             "  |cffd9b36c%s|r [%d] - %s - %d objectives",
             quest.questName ~= "" and quest.questName or ("Quest " .. tostring(quest.questID)),
             quest.questID,
-            quest.questState,
+            FriendlyQuestState(quest.questState),
             quest.objectiveCount or 0
         ))
     end
@@ -1250,7 +1279,7 @@ local function HandleSlashCommand(message)
     end
 end
 
--- Public API used by the v0.4.0 UI modules. The recorder remains local so
+-- Public API used by the v0.4.1 UI modules. The recorder remains local so
 -- future UI work cannot accidentally replace its event handlers.
 function QC.GetDatabase()
     EnsureDatabase()
@@ -1333,6 +1362,8 @@ function QC.GetStatus()
         abandonedCount = CountEvents(character, "QUEST_ABANDONED"),
         removedCount = CountEvents(character, "QUEST_REMOVED"),
         noteCount = CountEvents(character, "RP_NOTE"),
+        objectiveUpdateCount = CountEvents(character, "QUEST_OBJECTIVE_UPDATED"),
+        stateChangeCount = CountEvents(character, "QUEST_STATE_CHANGED"),
         lastEventAt = character.lastEventAt,
         lastEventAtText = character.lastEventAtText,
         lastQuestSyncAt = character.lastQuestSyncAt,

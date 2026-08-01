@@ -37,18 +37,39 @@ local SETTINGS = {
         tooltip = "Keep confirmed player abandonment separate from uncertain automatic removal.",
     },
     {
+        variable = "QUEST_CHRONICLE_SHOW_QUEST_IDS",
+        key = "showQuestIDs",
+        label = "Show quest IDs in the UI",
+        default = true,
+        tooltip = "Display numeric quest IDs beside quest names in Chronicle and Active Quest views.",
+    },
+    {
+        variable = "QUEST_CHRONICLE_DATE_SEPARATORS",
+        key = "showDateSeparators",
+        label = "Group Chronicle events by date",
+        default = true,
+        tooltip = "Insert date headings between Chronicle events recorded on different days.",
+    },
+    {
+        variable = "QUEST_CHRONICLE_CONFIRM_CLEAR_DRAFT",
+        key = "confirmClearDraft",
+        label = "Confirm before clearing note drafts",
+        default = true,
+        tooltip = "Ask for confirmation before erasing an unfinished RP note.",
+    },
+    {
         variable = "QUEST_CHRONICLE_REMEMBER_WINDOW",
         key = "rememberWindowPosition",
-        label = "Remember window position",
+        label = "Remember window position and size",
         default = true,
-        tooltip = "Restore the Quest Chronicle window where you last placed it.",
+        tooltip = "Restore the Quest Chronicle window where you last placed and sized it.",
     },
     {
         variable = "QUEST_CHRONICLE_LOCK_WINDOW",
         key = "lockWindow",
-        label = "Lock window position",
+        label = "Lock window position and size",
         default = false,
-        tooltip = "Prevent the Quest Chronicle window from being dragged.",
+        tooltip = "Prevent the Quest Chronicle window from being dragged or resized.",
     },
 }
 

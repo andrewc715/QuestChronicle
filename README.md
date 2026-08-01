@@ -1,59 +1,64 @@
-# Quest Chronicle v0.4.0
+# Quest Chronicle v0.4.1
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.4.0 adds a standalone Blizzard-styled interface while preserving the lifecycle recorder and Courier export introduced in v0.3.0.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.4.1 polishes the standalone Blizzard-styled interface introduced in v0.4.0 while preserving the tested lifecycle recorder and Courier export.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
-## UI foundation
-
-Open the window with:
+## Opening the interface
 
 ```text
 /qc
 /qc show
 ```
 
-You can also open it through WoW's AddOn Compartment beside the minimap:
+The AddOn Compartment beside the minimap also opens it:
 
 - Left-click: toggle the main window.
 - Right-click: open Status & Maintenance.
 
-The window remembers its position unless that option is disabled. It can also be locked in WoW's AddOns settings.
+The window remembers both its position and size. Drag the lower-right resize grip to enlarge it, lock it through WoW's AddOns settings, or use **Reset Window** on the Status tab.
 
 ## Chronicle tab
 
 The Chronicle tab browses the complete event history for the current character.
 
-Features in v0.4.0:
+Features:
 
-- 25-event pages, so thousands of records do not create thousands of UI frames.
+- 25-event pages suitable for histories containing thousands of records.
 - Newest-first or oldest-first display.
-- Text search across event type, quest name and ID, objective text, RP notes, location, and change reason.
+- Search across event type, quest name and ID, objective text, RP notes, locations, removal reasons, and friendly quest-state names.
 - Filters for all events, quest lifecycle, objectives and state, RP notes, and removals.
-- Event sequence, timestamp, location, level, quest rewards, and lifecycle details.
+- Optional date separators.
+- Human-readable event labels and quest-state transitions.
+- Quest IDs that can be shown or hidden through Settings.
+- Persisted search text, filter, sort direction, and page-safe refresh behavior.
 
 ## Active Quests tab
 
 The Active Quests tab shows the addon's current quest-log snapshot:
 
-- quest name, ID, and state;
-- quest level;
-- accepted or first-seen time;
-- elapsed active time;
-- all current objectives and completion marks;
-- ready-for-turn-in state.
+- friendly states such as **Active**, **Ready for Turn-In**, and **Failed**;
+- ready-for-turn-in, active, and failed filters;
+- sorting by Ready First, Quest Name, or Recently Accepted;
+- quest level, accepted or first-seen time, and elapsed active time;
+- explicit **Complete** and **In Progress** objective labels;
+- summary counts and manual quest-log rescan.
 
-`Rescan Quest Log` performs the same underlying operation as `/qc sync` and refreshes the Courier snapshot.
+The old unsupported checkmark and bullet glyphs were removed so objective rows render reliably in the default WoW font.
 
 ## Write Note tab
 
-The note editor replaces the need to compose longer RP observations inside a slash command.
+The multiline RP-note editor supports:
 
-- Multiline notes up to 4,000 characters.
-- Automatic character, level, time, zone, map, and coordinate context.
-- Per-character draft preservation.
-- Record, Record & Close, and Clear controls.
-- `Ctrl+Enter` records the current note.
+- notes up to 4,000 characters;
+- automatic character, level, time, zone, map, and coordinate context;
+- per-character draft preservation;
+- a visible empty-editor prompt;
+- live character-count warnings near the limit;
+- disabled record buttons while the note is empty or recording is disabled;
+- optional confirmation before clearing an unfinished draft;
+- `Ctrl+Enter` to record without closing;
+- Record, Record & Close, and Clear Draft controls.
 
 The underlying event remains `RP_NOTE`, so Courier behavior is unchanged.
 
@@ -61,19 +66,17 @@ The underlying event remains `RP_NOTE`, so Courier behavior is unchanged.
 
 The status page contains:
 
-- current character and recorder health;
-- event, active quest, acceptance, completion, abandonment, removal, and RP-note counts;
+- addon, schema, and Courier-format versions;
+- recorder and Courier snapshot readiness;
+- event, active quest, note, acceptance, completion, objective, state-change, abandonment, and removal counts;
 - last event and quest-sync timestamps;
-- Courier snapshot size;
-- manual quest-log rescan;
-- manual Courier export refresh;
-- all existing recording toggles.
+- manual quest-log rescan and Courier export refresh;
+- recording toggles;
+- a Reset Window command.
 
-WoW still decides when SavedVariables are written to disk. Use `/reload`, log out, or exit WoW after refreshing the Courier export when you need the external Courier to see it immediately.
+WoW still decides when SavedVariables are written to disk. Use `/reload`, log out, or exit WoW after refreshing the Courier export when the external Courier needs the new snapshot immediately.
 
 ## WoW AddOns settings
-
-Quest Chronicle registers a native category under:
 
 ```text
 Escape → Options → AddOns → Quest Chronicle
@@ -86,12 +89,13 @@ Settings include:
 - Record quest lifecycle
 - Record objective progress
 - Record abandonments and removals
-- Remember window position
-- Lock window position
+- Show quest IDs in the UI
+- Group Chronicle events by date
+- Confirm before clearing note drafts
+- Remember window position and size
+- Lock window position and size
 
-## Existing slash commands
-
-All v0.3.0 commands remain available:
+## Slash commands
 
 ```text
 /qc help
@@ -108,7 +112,7 @@ All v0.3.0 commands remain available:
 /qc removals on|off
 ```
 
-The only intentional behavior change is that bare `/qc` now opens the main window. Use `/qc help` for the command list.
+Bare `/qc` toggles the main window. `/qc help` displays command help.
 
 ## Recorded event types
 
@@ -123,8 +127,8 @@ The only intentional behavior change is that bare `/qc` now opens the main windo
 
 ## Compatibility
 
-- Existing v0.1, v0.2, and v0.3 SavedVariables are retained.
-- Addon schema version remains 2 because the recorded data model is unchanged.
+- Existing v0.1 through v0.4.0 SavedVariables and historical records are retained.
+- Addon schema remains version 2 because the recorded data model is unchanged.
 - Courier export `formatVersion` remains 1.
 - Warcraft Quest Chronicle Courier v1.0.0 remains compatible.
 
@@ -145,7 +149,8 @@ QuestChronicle\
 ├── CHANGELOG.md
 ├── LIVE_TEST_CHECKLIST.md
 ├── UI_FOUNDATION_TEST_CHECKLIST.md
+├── POLISH_TEST_CHECKLIST.md
 └── COURIER_CONFIG_PATCH.json
 ```
 
-The recorder remains in `QuestChronicle.lua`. UI modules use a small public API instead of reaching into the recorder's local state.
+The lifecycle recorder remains in `QuestChronicle.lua`. UI modules use the public addon API and callback bus rather than reaching into the recorder's local tracking state.
