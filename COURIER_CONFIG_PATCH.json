@@ -1,0 +1,12 @@
+{
+  "includeEventTypes": [
+    "QUEST_ACCEPTED",
+    "QUEST_BECAME_ACTIVE",
+    "QUEST_OBJECTIVE_UPDATED",
+    "QUEST_STATE_CHANGED",
+    "QUEST_ABANDONED",
+    "QUEST_REMOVED",
+    "QUEST_TURNED_IN",
+    "RP_NOTE"
+  ]
+}

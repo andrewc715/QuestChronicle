@@ -1,0 +1,8 @@
+## Interface: 120000
+## Title: Quest Chronicle
+## Notes: Records quest lifecycle, objective progress, completions, and roleplay notes for character journey storytelling.
+## Author: OpenAI & Andrew
+## Version: 0.3.0
+## SavedVariables: QuestChronicleDB, QuestChronicleCourierExport
+
+QuestChronicle.lua
