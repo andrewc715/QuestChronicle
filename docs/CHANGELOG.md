@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.7.1 - 2026-08-01
+
+### Fixed
+
+- Separates physical dual-weapon topology from Blizzard native linked-secondary appearance state.
+- Builds One-Hand and Two-Hand pair routes for physically equipped Main Hand and Secondary Hand weapons even when `GetLinkedSlotInfo()` returns no native link.
+- Queries each physical hand independently while probing shared primary options against the real Secondary Hand slot when needed.
+- Splits mixed Fury options into family-specific pair routes instead of rejecting the full option.
+- Topology-gates Ranged out of melee layouts and keeps Shield/Holdable restricted to independent companion slots.
+- Stores distinct Main Hand and Secondary Hand native option provenance on pair routes.
+- Prevents shields/focuses from remaining attached to generated Two-Hand routes.
+- Expands `/qc weapon debug` with physical-pair, native-link, per-hand option, and suppressed-family diagnostics.
+
+### Compatibility
+
+- Preserves SavedVariables schema 2, Courier format 1, and wardrobe cache format 6.
+- No wardrobe rescan, concept migration, or Custom Set rebuild is required.
+
 ## 1.7.0 - 2026-08-01
 
 ### Changed

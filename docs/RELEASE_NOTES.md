@@ -1,100 +1,81 @@
-# Quest Chronicle v1.7.0: Weapon Appearance Routes
+# Quest Chronicle v1.7.1: Physical Weapon Pair Routes
 
-Version 1.7.0 replaces the flattened weapon-permission matrix with complete, provenance-preserving weapon appearance routes.
+Version 1.7.1 corrects the route-construction defect exposed by `/qc weapon debug` on a Fury Warrior with two physically equipped two-handed weapons.
 
-## Why this refactor was necessary
+## Live evidence
 
-The v1.6.x rule engine correctly discovered Fury's one-handed appearance option, but then merged every category permitted by every native weapon option into one large capability union. That discarded the option that granted each category and caused unrelated families to leak into the UI:
-
-- Ranged could appear available beside Fury's linked melee pair.
-- Shield and holdable categories could appear available even though the Secondary Hand was another linked weapon.
-- Main Hand and Secondary Hand could be generated from different option families.
-
-The native Transmog UI keeps one weapon option active at a time and queries categories for that specific slot-and-option combination. Blizzard also lets a linked primary weapon slot handle its secondary appearance with the same weapon option. Quest Chronicle now preserves that structure.
-
-## Route model
-
-Quest Chronicle first detects the physical equipment topology, then constructs separate native routes:
-
-- `ONE_HAND_PAIR` or `ONE_HAND_SINGLE`
-- `TWO_HAND_PAIR` or `TWO_HAND_SINGLE`
-- `RANGED_PAIR` or `RANGED_SINGLE` when Blizzard genuinely exposes such a route
-- `OFF_HAND_COMPANION` only for an independent shield or holdable slot
-
-Every route retains:
-
-- native option owner slot;
-- weapon option ID and name;
-- primary and linked-secondary target slots;
-- exact permitted collection categories for each target;
-- whether Secondary Hand permission was inherited from Blizzard's linked primary route;
-- standard, artifact, or equipped-option provenance.
-
-An option that exposes multiple unrelated main-weapon families is rejected rather than flattened. Unknown or ambiguous data fails closed.
-
-## Correct family behavior
-
-For Fury with dual two-handed weapons, a typical result is now:
+The v1.7.0 diagnostic correctly reported:
 
 ```text
-One-Hand: available through a complete linked pair route
-Two-Hand: available through a complete linked pair route
-Ranged: unavailable unless Blizzard exposes a distinct ranged route
-Off-Hand: unavailable because Secondary Hand is part of the linked weapon pair
+Topology: Dual two-handed weapons equipped
+Inventory slots: MH 16 | OH 17
+Outfit slots: MH 12 | OH 13
 ```
 
-A sword generated into Secondary Hand remains part of the One-Hand route. It does not activate the separate Off-Hand family. Off-Hand continues to mean shields and holdables only.
+But it also reported `linked pair false`, then created only `ONE_HAND_SINGLE` and `RANGED_SINGLE` routes. Generation therefore had no Secondary Hand target and committed only Main Hand.
 
-## Atomic generation
+## Root cause
 
-Weapon generation now follows this transaction:
+Quest Chronicle incorrectly treated `C_TransmogOutfitInfo.GetLinkedSlotInfo()` as the definition of every dual-weapon pair.
 
-1. Choose one valid native route.
-2. Choose a selected subtype within that route.
-3. Resolve and validate Main Hand.
-4. Resolve and validate every required linked or companion target.
-5. Commit all weapon selections together.
+That API describes Blizzard's native primary/secondary appearance relationship for a transmog slot. It does not replace physical equipment topology. Main Hand and Off Hand may be two independent native outfit slots while still forming a real dual-weapon layout that must be generated as one pair.
 
-If any required hand cannot be resolved, no part of the new weapon bundle is committed. This prevents half-applied looks and stale weapons from a previous route.
+## Changes
 
-Linked hands remain strict:
-
-1. exact same visual;
-2. same exact subtype;
-3. fail the complete route rather than substitute an unrelated weapon family.
-
-With linking disabled, both hands may differ, but they remain inside the same selected route.
-
-## Browser, reroll, and manual-selection behavior
-
-The route-derived capability model now drives:
-
-- Equipment Slot family checkboxes;
-- subtype flyouts;
-- appearance browser filtering;
-- Generate Outfit;
-- Reroll Unlocked;
-- individual weapon rerolls;
-- manual Main Hand selection and linked-secondary synchronization.
-
-The familiar four-family UI is retained. Only the internal permission and generation model changed.
+- Adds a distinct `physicalWeaponPair` state derived from equipped Main Hand and Secondary Hand inventory types.
+- Retains `nativeLinkedPair` separately for Blizzard-native secondary appearances.
+- Keeps the existing `linkedPair` compatibility field generation-facing and maps it to the physical weapon pair.
+- Queries Main Hand and Secondary Hand weapon permissions independently.
+- Probes primary-slot weapon options against the actual Secondary Hand slot when Blizzard does not list those options independently there.
+- Preserves separate Main Hand and Secondary Hand option IDs, option names, owner slots, subtype permissions, and source kinds on every pair route.
+- Creates `ONE_HAND_PAIR` and `TWO_HAND_PAIR` whenever both physical hands permit the same family.
+- Splits a native option that exposes both One-Hand and Two-Hand categories into separate family-specific routes instead of rejecting the complete option.
+- Suppresses Ranged routes for physical melee layouts.
+- Restricts Off-Hand to a genuine independent Shield or Holdable / Focus companion slot.
+- Prevents a shield or focus from accompanying a generated Two-Hand route.
+- Continues validating the full weapon bundle before committing either hand.
+- Keeps same-option pair routes preferentially and uses cross-option pair routes only when the secondary hand rejects the primary option.
 
 ## Diagnostics
 
-`/qc weapon debug` now prints:
+`/qc weapon debug` now distinguishes:
 
-- physical topology;
-- Main Hand and Secondary Hand inventory and native outfit slots;
-- whether Blizzard reports a linked pair;
-- every accepted route with its option, route kind, primary subtype count, and secondary subtype count;
-- ambiguous options rejected by fail-closed classification;
-- the last atomically committed route and source IDs.
+```text
+physical pair true
+native linked pair false
+```
+
+Pair routes display separate native options for both hands:
+
+```text
+ONE_HAND_PAIR MH option=One Handed Weapon OH option=One Handed Weapon
+TWO_HAND_PAIR MH option=Two Handed Weapon (Fury) OH option=Two Handed Weapon (Fury)
+```
+
+Topology-gated permissions are reported explicitly:
+
+```text
+SUPPRESSED RANGED ... incompatible with the current physical topology
+```
+
+## Expected Fury result
+
+With dual two-handed weapons physically equipped:
+
+```text
+One-Hand: available when Blizzard permits it for both hands
+Two-Hand: available when Blizzard permits it for both hands
+Ranged: unavailable
+Off-Hand companion: unavailable
+```
+
+Generating a linked One-Hand or Two-Hand outfit must commit both Main Hand and Secondary Hand selections atomically.
 
 ## Compatibility
 
-- Addon version: 1.7.0
+- Addon version: 1.7.1
 - SavedVariables schema: 2
 - Courier format: 1
 - Wardrobe cache format: 6
 
-No wardrobe rescan, concept migration, or Custom Set rebuild is required solely for this update. Existing concepts continue storing user intent, subtype choices, selected appearances, and linked-hand preference. Native option IDs are diagnostic runtime data and are not treated as permanent concept truth.
+No wardrobe rescan, concept migration, or Custom Set rebuild is required solely for this update.

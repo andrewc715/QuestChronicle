@@ -1,8 +1,8 @@
-# Quest Chronicle v1.7.0
+# Quest Chronicle v1.7.1
 
-> **Weapon appearance routes:** v1.7.0 replaces the flat union of weapon permissions with provenance-preserving Blizzard option routes. One-Hand, Two-Hand, Ranged, and shield/focus companion layouts are now generated as complete atomic bundles.
+> **Physical weapon-pair routes:** v1.7.1 distinguishes Blizzard native linked appearances from the character's actual two-weapon topology. Dual melee layouts now build complete One-Hand and Two-Hand pair routes even when `GetLinkedSlotInfo()` reports no native linked secondary.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.7.0 separates physical weapon topology from Blizzard appearance-option routes, prevents unrelated weapon families from leaking into generation, and commits complete Main Hand and Secondary Hand bundles atomically.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.7.1 pairs Main Hand and Secondary Hand from physical equipment topology, topology-gates unrelated Ranged and shield/focus families, and preserves native option provenance independently for each hand.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
