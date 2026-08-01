@@ -1,8 +1,8 @@
-# Quest Chronicle v1.6.5
+# Quest Chronicle v1.6.6
 
-> **Emergency preview stabilization:** v1.6.5 restores the last stable character-preview path and fixes Fury secondary one-hand generation by trusting Blizzard's native per-hand transmog permission over stale legacy usability fields.
+> **Weapon-option matrix repair:** v1.6.6 mirrors Blizzard's complete per-hand weapon-option dropdown rather than testing only the physically equipped option, allowing Fury one-hand appearances to resolve independently for both weapon hands.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.6.5 stabilizes the embedded model while preserving Blizzard-driven weapon appearance rules.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.6.6 preserves physical weapon topology while inheriting Blizzard's complete enabled appearance-option rules for each hand.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

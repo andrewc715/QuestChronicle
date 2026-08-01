@@ -1189,27 +1189,75 @@ local function GetTransmogOutfitSlotForInventorySlotName(slotName)
     return SafeCall(C_TransmogOutfitInfo.GetTransmogOutfitSlotFromInventorySlot, inventorySlotID)
 end
 
-local function GetEquippedWeaponOptionForOutfitSlot(outfitSlot)
-    if outfitSlot == nil or not C_TransmogOutfitInfo then return nil end
+local function GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)
+    if outfitSlot == nil or not C_TransmogOutfitInfo then return {} end
 
+    local candidates = {}
+    local seen = {}
+    local equippedOption
     if type(C_TransmogOutfitInfo.GetEquippedSlotOptionFromTransmogSlot) == "function" then
-        local option = SafeCall(C_TransmogOutfitInfo.GetEquippedSlotOptionFromTransmogSlot, outfitSlot)
-        if option ~= nil then return option end
+        equippedOption = SafeCall(C_TransmogOutfitInfo.GetEquippedSlotOptionFromTransmogSlot, outfitSlot)
     end
 
-    -- The equipped-option API can briefly return nil while the transmog system
-    -- initializes. Prefer the first enabled standard option before falling back
-    -- to None, mirroring Blizzard's slot-option model without changing it.
+    local function AddOption(optionInfo, isArtifact)
+        if not optionInfo or optionInfo.enabled == false or optionInfo.weaponOption == nil then return end
+        local key = tostring(optionInfo.weaponOption)
+        if seen[key] then return end
+        seen[key] = true
+        table.insert(candidates, {
+            weaponOption = optionInfo.weaponOption,
+            name = optionInfo.name,
+            enabled = optionInfo.enabled ~= false,
+            isArtifact = isArtifact == true,
+            isEquipped = equippedOption ~= nil and optionInfo.weaponOption == equippedOption,
+        })
+    end
+
+    local weaponOptions, artifactOptions
     if type(C_TransmogOutfitInfo.GetWeaponOptionsForSlot) == "function" then
-        local options = SafeCall(C_TransmogOutfitInfo.GetWeaponOptionsForSlot, outfitSlot)
-        for _, optionInfo in ipairs(options or {}) do
-            if optionInfo and optionInfo.enabled and optionInfo.weaponOption ~= nil then
-                return optionInfo.weaponOption
-            end
+        weaponOptions, artifactOptions = SafeCall(C_TransmogOutfitInfo.GetWeaponOptionsForSlot, outfitSlot)
+    end
+
+    -- Blizzard exposes every enabled editing option for the hand. The equipped
+    -- option is only the preferred default in the native UI; it is not the full
+    -- permission set. Put it first for stable ordinary-item behavior, then test
+    -- every other enabled standard and artifact option.
+    for _, optionInfo in ipairs(weaponOptions or {}) do
+        if equippedOption ~= nil and optionInfo.weaponOption == equippedOption then
+            AddOption(optionInfo, false)
         end
     end
+    for _, optionInfo in ipairs(artifactOptions or {}) do
+        if equippedOption ~= nil and optionInfo.weaponOption == equippedOption then
+            AddOption(optionInfo, true)
+        end
+    end
+    for _, optionInfo in ipairs(weaponOptions or {}) do AddOption(optionInfo, false) end
+    for _, optionInfo in ipairs(artifactOptions or {}) do AddOption(optionInfo, true) end
 
-    return Enum and Enum.TransmogOutfitSlotOption and Enum.TransmogOutfitSlotOption.None or 0
+    -- During early transmog initialization the option lists can briefly be
+    -- unavailable. Preserve the equipped-option fallback used by prior builds.
+    if #candidates == 0 and equippedOption ~= nil then
+        table.insert(candidates, {
+            weaponOption = equippedOption,
+            name = "Equipped weapon option",
+            enabled = true,
+            isArtifact = false,
+            isEquipped = true,
+        })
+    end
+
+    if #candidates == 0 then
+        table.insert(candidates, {
+            weaponOption = Enum and Enum.TransmogOutfitSlotOption and Enum.TransmogOutfitSlotOption.None or 0,
+            name = "Default weapon option",
+            enabled = true,
+            isArtifact = false,
+            isEquipped = true,
+        })
+    end
+
+    return candidates, equippedOption
 end
 
 local function GetBlizzardWeaponCategoryPermission(slotName, categoryID)
@@ -1222,23 +1270,41 @@ local function GetBlizzardWeaponCategoryPermission(slotName, categoryID)
     local outfitSlot = GetTransmogOutfitSlotForInventorySlotName(slotName)
     if outfitSlot == nil then return nil, nil end
 
-    local weaponOption = GetEquippedWeaponOptionForOutfitSlot(outfitSlot)
-    if weaponOption == nil then return nil, nil end
+    local options, equippedOption = GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)
+    local checked = {}
+    for _, optionInfo in ipairs(options) do
+        local collectionInfo = SafeCall(
+            C_TransmogOutfitInfo.GetCollectionInfoForSlotAndOption,
+            outfitSlot,
+            optionInfo.weaponOption,
+            categoryID
+        )
+        table.insert(checked, {
+            weaponOption = optionInfo.weaponOption,
+            name = optionInfo.name,
+            enabled = optionInfo.enabled,
+            isArtifact = optionInfo.isArtifact,
+            isEquipped = optionInfo.isEquipped,
+            allowed = collectionInfo ~= nil and collectionInfo.isWeapon == true,
+        })
+        if collectionInfo ~= nil and collectionInfo.isWeapon == true then
+            return true, {
+                outfitSlot = outfitSlot,
+                weaponOption = optionInfo.weaponOption,
+                weaponOptionName = optionInfo.name,
+                equippedWeaponOption = equippedOption,
+                collectionName = collectionInfo.name,
+                method = "OUTFIT_SLOT_OPTION_MATRIX",
+                optionsChecked = checked,
+            }
+        end
+    end
 
-    local collectionInfo = SafeCall(
-        C_TransmogOutfitInfo.GetCollectionInfoForSlotAndOption,
-        outfitSlot,
-        weaponOption,
-        categoryID
-    )
-
-    -- Blizzard's native weapon-category dropdown uses this exact test.
-    -- A nil result means the category is not available for the slot/option.
-    return collectionInfo ~= nil and collectionInfo.isWeapon == true, {
+    return false, {
         outfitSlot = outfitSlot,
-        weaponOption = weaponOption,
-        collectionName = collectionInfo and collectionInfo.name or nil,
-        method = "OUTFIT_SLOT_OPTION",
+        equippedWeaponOption = equippedOption,
+        method = "OUTFIT_SLOT_OPTION_MATRIX",
+        optionsChecked = checked,
     }
 end
 
@@ -1295,12 +1361,19 @@ local function BuildWeaponHandCapability(handKey, itemInfo, slotName, allowWitho
             permissionMethod = permissionDetails and permissionDetails.method or nil,
             outfitSlot = permissionDetails and permissionDetails.outfitSlot or nil,
             weaponOption = permissionDetails and permissionDetails.weaponOption or nil,
-            reason = available and (permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION"
-                    and "Blizzard's native outfit-slot rules permit this appearance category for the equipped hand."
+            weaponOptionName = permissionDetails and permissionDetails.weaponOptionName or nil,
+            equippedWeaponOption = permissionDetails and permissionDetails.equippedWeaponOption or nil,
+            optionsChecked = permissionDetails and permissionDetails.optionsChecked or nil,
+            reason = available and (permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX"
+                    and (permissionDetails.weaponOptionName
+                        and ("Blizzard permits this appearance through the " .. tostring(permissionDetails.weaponOptionName) .. " option for this hand.")
+                        or "Blizzard permits this appearance through an enabled weapon option for this hand.")
                     or "Blizzard permits this appearance category for the equipped hand.")
                 or (count == 0 and "No collected previewable appearances are cached for this type."
+                or (itemInfo and permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX"
+                    and ("Blizzard rejected this appearance across " .. tostring(#(permissionDetails.optionsChecked or {})) .. " enabled weapon option(s) for this hand.")
                 or (itemInfo and "Blizzard does not permit this appearance category for the equipped hand."
-                or "No equipped item is available for Blizzard compatibility validation.")),
+                or "No equipped item is available for Blizzard compatibility validation."))),
         }
         capability.families[subtype.familyKey] = capability.families[subtype.familyKey] or { available = false, count = 0 }
         capability.families[subtype.familyKey].count = capability.families[subtype.familyKey].count + (available and count or 0)
@@ -1662,7 +1735,7 @@ local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, cont
     if equippedItem then
         permitted, permissionDetails = IsWeaponCategoryPermitted(definition and definition.slotName, source.categoryID, equippedItem)
         if permitted == nil then
-            return Finish(false, "WoW's equipped-slot transmog compatibility check is unavailable.")
+            return Finish(false, "WoW's slot weapon-option compatibility check is unavailable.")
         end
         if permitted ~= true then
             return Finish(false, "That appearance category is not permitted for the equipped weapon slot and option.")
@@ -1676,7 +1749,7 @@ local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, cont
     -- is the authoritative answer. The older appearance usability flags can
     -- remain false even while the native Transmog UI permits the category.
     local appearance = GetGenerationAppearance(source, definition, context)
-    local nativeSlotRule = permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION"
+    local nativeSlotRule = permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX"
 
     if appearance and appearance.isCollected == false then
         return Finish(false, "WoW no longer reports this weapon visual as collected.")
@@ -1726,8 +1799,8 @@ local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, cont
         end
     end
 
-    return Finish(true, permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION"
-        and "Compatible with Blizzard's equipped slot and weapon option"
+    return Finish(true, permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX"
+        and "Compatible with Blizzard's enabled slot and weapon option"
         or "Compatible with the equipped item")
 end
 

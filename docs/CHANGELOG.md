@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.6.6 - 2026-08-01
+
+### Fixed
+
+- Replaced the single equipped-weapon-option query with Blizzard's complete enabled weapon-option matrix for each hand.
+- Enumerates standard and artifact options returned by `GetWeaponOptionsForSlot()`.
+- Treats the equipped option as the preferred default rather than the full permission set, matching Blizzard's native Transmog UI.
+- Restores Fury secondary-hand one-handed appearance generation while both physical weapons remain two-handed.
+- Records the exact native option granting each subtype and exposes it through subtype tooltips.
+- Preserves strict linked-hand generation and the stable synchronous preview path from v1.6.5.
+- Keeps non-Fury two-handed layouts restricted when Blizzard exposes no one-hand option.
+
+### Compatibility
+
+- Preserves SavedVariables schema 2, Courier format 1, and wardrobe cache format 6.
+- No wardrobe rescan or concept migration is required.
+
 ## 1.6.5 - 2026-08-01
 
 ### Stabilized
