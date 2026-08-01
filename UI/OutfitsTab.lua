@@ -426,7 +426,7 @@ function UI.CreateOutfitsTab(parent)
         if not ok and UIErrorsFrame then UIErrorsFrame:AddMessage(message or "Unable to change hand linking.", 1, 0.25, 0.25) end
         pane:Refresh(message)
     end)
-    UI.SetTooltip(linkHands, "Link Weapon Hands", "When two weapon hands are equipped, prefer the same appearance family and exact weapon type in both hands. Disable this to let each hand generate independently.", "ANCHOR_RIGHT")
+    UI.SetTooltip(linkHands, "Link Weapon Hands", "When two weapon hands are equipped, use the same visual in both hands whenever Blizzard permits it. If that exact visual is unavailable, remain within the same exact weapon type. Quest Chronicle will not substitute an unrelated type while linking is enabled.", "ANCHOR_RIGHT")
     pane.linkWeaponHands = linkHands
 
     local currentLookButton = UI.CreateButton(slotPanel, "Current Look", 128, 24)

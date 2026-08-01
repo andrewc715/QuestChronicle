@@ -1498,7 +1498,7 @@ function Wardrobe.SetLinkWeaponHands(enabled)
     state.linkWeaponHands = enabled ~= false
     state.selectedConceptID = nil
     if QC.Notify then QC.Notify("WARDROBE_WEAPON_OPTIONS_CHANGED", "LINK_HANDS", state.linkWeaponHands) end
-    return true, state.linkWeaponHands and "Weapon hands will use coordinated families and types." or "Weapon hands may generate independently."
+    return true, state.linkWeaponHands and "Weapon hands will match the same visual when possible and otherwise remain within the same exact weapon type." or "Weapon hands may generate independently."
 end
 
 function Wardrobe.GetLinkWeaponHands()
@@ -1797,6 +1797,87 @@ local function ChooseGeneratedWeaponSource(familyKeys, equippedItem, context, ex
     return nil
 end
 
+local function ChooseLinkedWeaponSource(primarySource, equippedItem, context, excludedBySlot, targetSlotKey, styleMode, styleContext, handCapability)
+    if not primarySource then return nil, nil, "No primary weapon appearance is selected." end
+
+    local state = EnsurePreviewState()
+    local subtypeKey = GetWeaponSubtypeKeyForCategoryID(primarySource.categoryID)
+    local subtype = subtypeKey and Wardrobe.weaponSubtypeDefinitions[subtypeKey]
+    local capability = subtypeKey and handCapability and handCapability.subtypes[subtypeKey]
+    if not subtype or not capability or not capability.available or not state.weaponSubtypes[subtypeKey] then
+        return nil, nil, "The linked weapon type is not permitted for the second hand."
+    end
+
+    -- Strongest link: use the exact same collapsed visual in the second hand.
+    -- Prefer the slot-specific cached representative, then try the selected
+    -- source itself copied to the target hand. Blizzard validates the result.
+    local exactCandidates = {}
+    local seen = {}
+    local byVisual = FindSourceByVisualID(targetSlotKey, primarySource.visualID)
+    if byVisual then
+        table.insert(exactCandidates, byVisual)
+        seen[byVisual.sourceID] = true
+    end
+    local copied = CopySourceForSlot(primarySource, targetSlotKey)
+    if copied and not seen[copied.sourceID] then
+        table.insert(exactCandidates, copied)
+    end
+
+    for _, candidate in ipairs(exactCandidates) do
+        local valid = ValidateGeneratedWeaponSource(candidate, targetSlotKey, equippedItem, context)
+        if valid then
+            return candidate, "EXACT_VISUAL", nil
+        end
+    end
+
+    -- Secondary link: stay inside the exact same Blizzard weapon subtype.
+    -- Never fall through to an unrelated family or type while linking is on.
+    local source = ChooseGeneratedWeaponSource(
+        { subtype.familyKey },
+        equippedItem,
+        context,
+        excludedBySlot,
+        targetSlotKey,
+        styleMode,
+        styleContext,
+        handCapability,
+        subtypeKey,
+        true
+    )
+    if source then
+        return source, "SAME_SUBTYPE", "The exact visual was unavailable for the second hand, so Quest Chronicle matched the same weapon type instead."
+    end
+
+    return nil, nil, "No valid second-hand appearance matched the linked visual or weapon type."
+end
+
+local function SynchronizeLinkedOffHand(state, primarySource, styleMode, styleContext, excludedSourceID)
+    if state.linkWeaponHands == false or not primarySource then return nil, nil end
+    local styleEngine = QC.ZoneStyle
+    if styleEngine and not styleContext then
+        styleMode = styleEngine.NormalizeMode and styleEngine.NormalizeMode(styleMode or state.styleMode) or (styleMode or state.styleMode)
+        local baseContext = styleEngine.GetCurrentContext and styleEngine.GetCurrentContext() or nil
+        styleContext = CreateStyleGenerationContext(state, styleEngine, baseContext, nil, false)
+    end
+    local context = CreateWeaponGenerationContext()
+    local topology = context.topology
+    if not topology.offItem or topology.offHandKind == "OFF_HAND" then return nil, nil end
+
+    local excluded = excludedSourceID and { OFF_HAND = excludedSourceID } or nil
+    local source, linkKind, notice = ChooseLinkedWeaponSource(
+        primarySource,
+        context.offItem,
+        context,
+        excluded,
+        "OFF_HAND",
+        styleMode,
+        styleContext,
+        context.capabilities.off
+    )
+    SetSelectedSource(state, "OFF_HAND", source)
+    return linkKind, notice
+end
+
 local function GetLockedWeaponMode(state)
     local lockedMode
     for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
@@ -1909,18 +1990,31 @@ local function GenerateWeapons(state, reroll, styleMode, styleContext)
             end
             if #offFamilies > 0 then
                 local excluded = reroll and { OFF_HAND = state.selections.OFF_HAND } or nil
-                local requirePreferred = state.linkWeaponHands and topology.offHandKind ~= "OFF_HAND" and mainSubtype ~= nil
-                local offHand, _, offSubtype = ChooseGeneratedWeaponSource(offFamilies, context.offItem, context, excluded, "OFF_HAND", styleMode, styleContext, capabilities.off, requirePreferred and mainSubtype or nil, requirePreferred)
-                if not offHand and requirePreferred then
+                local offHand
+                if state.linkWeaponHands and topology.offHandKind ~= "OFF_HAND" then
+                    local linkKind, linkNotice
+                    offHand, linkKind, linkNotice = ChooseLinkedWeaponSource(
+                        selectedMain,
+                        context.offItem,
+                        context,
+                        excluded,
+                        "OFF_HAND",
+                        styleMode,
+                        styleContext,
+                        capabilities.off
+                    )
+                    notice = linkNotice
+                else
                     offHand = ChooseGeneratedWeaponSource(offFamilies, context.offItem, context, excluded, "OFF_HAND", styleMode, styleContext, capabilities.off)
-                    notice = "The off-hand could not use the linked weapon type, so Quest Chronicle chose another permitted type."
                 end
                 SetSelectedSource(state, "OFF_HAND", offHand)
                 if offHand then
                     if QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then QC.ZoneStyle.AddSourceToGenerationContext(styleContext, offHand) end
                     selectedWeapons = selectedWeapons + 1
                 else
-                    notice = notice or "No valid appearance matched the equipped off-hand and selected type filters."
+                    notice = notice or (state.linkWeaponHands
+                        and "Linked hands remained strict, so Quest Chronicle left the second hand on its equipped appearance rather than choose an unrelated weapon type."
+                        or "No valid appearance matched the equipped off-hand and selected type filters.")
                 end
             elseif not state.locks.OFF_HAND then
                 SetSelectedSource(state, "OFF_HAND", nil)
@@ -2055,6 +2149,9 @@ function Wardrobe.RerollSlot(slotKey)
         SetSelectedSource(state, slotKey, source)
         if styleEngine and styleEngine.AddSourceToGenerationContext then styleEngine.AddSourceToGenerationContext(styleContext, source) end
         ApplyWeaponSelectionRules(state, slotKey)
+        if slotKey ~= "OFF_HAND" and state.linkWeaponHands then
+            SynchronizeLinkedOffHand(state, source, styleMode, styleContext, state.selections.OFF_HAND)
+        end
     elseif not SetRandomSelection(state, slotKey, true, styleMode, styleContext) then
         return false, "No compatible appearance is cached for this slot."
     end
@@ -3387,6 +3484,9 @@ function Wardrobe.SelectSource(slotKey, sourceID)
             state.generatedName = nil
             state.generatedAt = nil
             ApplyWeaponSelectionRules(state, slotKey)
+            if slotKey ~= "OFF_HAND" and state.linkWeaponHands then
+                SynchronizeLinkedOffHand(state, source, state.styleMode, nil, state.selections.OFF_HAND)
+            end
             if QC.Notify then
                 QC.Notify("WARDROBE_SELECTION_CHANGED", slotKey, source)
             end

@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.6.2 - 2026-08-01
+
+### Fixed
+
+- Strengthened **Link weapon hands** from a loose type preference into an enforced coordination rule.
+- Attempts the exact same collapsed visual in both weapon hands first.
+- Falls back only to another appearance from the same exact Blizzard weapon subtype.
+- Prevents linked generation from substituting an unrelated family or weapon type.
+- Keeps manual main-hand selections and main-hand rerolls synchronized with the second hand.
+- Leaves the equipped second-hand appearance untouched when no valid linked match exists.
+- Updated the Link Weapon Hands tooltip and status text to describe the stricter behavior.
+
+### Compatibility
+
+- Preserves SavedVariables schema 2, Courier format 1, and wardrobe cache format 6.
+- No wardrobe rescan or concept migration is required.
+
 ## 1.6.1 - 2026-08-01
 
 ### Fixed

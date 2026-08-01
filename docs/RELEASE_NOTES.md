@@ -1,63 +1,45 @@
-# Quest Chronicle v1.6.1: Fury Appearance Permission Fix
+# Quest Chronicle v1.6.2: Linked Weapon Hands Fix
 
-Version 1.6.1 fixes the Fury Warrior exception introduced with Midnight's Single-Minded Fury transmog rule.
+Version 1.6.2 repairs the final coordination step in the Weapon Appearance Rules system.
 
 ## The problem
 
-Quest Chronicle v1.6.0 correctly detected a Fury Warrior's physical layout as dual two-handed weapons, but it used `C_TransmogCollection.IsCategoryValidForItem()` as the final appearance-family permission check. That older item-category query did not expose Fury's new ability to place ordinary one-handed appearances over equipped two-handed weapons.
+The v1.6.1 Fury permission fix correctly allowed one-handed appearances over equipped two-handed weapons. However, **Link weapon hands** only preferred the same broad family and exact subtype before falling back to any other legal second-hand type.
 
-The result was a contradictory interface:
+That allowed a generated main-hand one-handed sword to be paired with an unrelated two-handed axe even though linking was enabled.
 
-- physical layout: **Dual two-handed weapons equipped**;
-- Two-Hand types: correctly available;
-- ordinary One-Hand types: incorrectly unavailable;
-- Paired Artifact: sometimes the only surviving One-Hand category.
+## The corrected link contract
 
-## The fix
+When two weapon hands are equipped and linking is enabled, Quest Chronicle now follows this strict order:
 
-Quest Chronicle now mirrors Blizzard's native Transmog weapon-category dropdown.
+1. Use the exact same collapsed transmog visual in both hands when Blizzard permits it.
+2. If the exact visual cannot be used in the second hand, choose another appearance from the same exact weapon subtype.
+3. If neither is possible, retain the equipped second-hand appearance and report the limitation.
 
-For each equipped hand and each weapon category it resolves:
+Quest Chronicle will no longer substitute an unrelated family or type while the hands are linked.
 
-1. the native `TransmogOutfitSlot` for the inventory hand;
-2. the currently equipped `TransmogOutfitSlotOption`;
-3. `C_TransmogOutfitInfo.GetCollectionInfoForSlotAndOption(slot, option, category)`.
+## Where the rule applies
 
-Blizzard's own Transmog UI treats a returned `collectionInfo.isWeapon` as the authoritative answer for whether a category belongs in that hand's weapon dropdown. This is the rule layer that includes Fury's Single-Minded Fury exception and other current slot/option-specific behavior.
+The stricter link behavior now governs:
 
-`IsCategoryValidForItem()` remains only as a compatibility fallback on clients where the newer outfit-slot API is unavailable.
-
-## Generation and validation
-
-The same native slot/option permission check now governs:
-
-- family checkbox availability;
-- exact subtype flyouts;
-- weapon appearance browsing;
 - Generate Outfit;
 - Reroll Unlocked;
-- Reroll Slot;
-- locked-weapon validation.
+- main-hand Reroll Slot;
+- manual main-hand appearance selection.
 
-This prevents the UI from enabling a Fury one-handed category and then rejecting it later during generation.
+Independent weapon generation remains available by clearing **Link weapon hands**.
 
-## Expected Fury result
+## Fury example
 
-With dual two-handed weapons equipped, Blizzard should now determine the exact allowed categories. A typical Fury result is:
+With dual two-handed weapons physically equipped, Fury may choose One-Handed Sword appearances when Blizzard permits them. If linking is enabled and the main hand receives a collected sword visual, Quest Chronicle attempts that same sword visual in the second hand.
 
-- One-Hand enabled for the one-handed categories Blizzard exposes;
-- Two-Hand enabled;
-- Ranged disabled;
-- Off-Hand shield/focus disabled;
-- each weapon hand validated independently.
-
-Quest Chronicle does not hardcode a Fury category list. Blizzard remains the authority, so future class, specialization, or weapon-option exceptions can flow through the same API.
+If Blizzard rejects that exact visual for the second hand, Quest Chronicle may choose a different One-Handed Sword, but it will not switch to an axe, mace, staff, or another unrelated type.
 
 ## Compatibility
 
-- Addon version: `1.6.1`
+- Addon version: `1.6.2`
 - SavedVariables schema: `2`
 - Courier format: `1`
 - Wardrobe cache format: `6`
 
-No collection rescan or concept migration is required.
+No collection rescan, saved-concept migration, or Custom Set rebuild is required solely for this update.
