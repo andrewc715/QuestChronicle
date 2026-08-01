@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.0 - 2026-07-31
+
+### Added
+
+- Fifth Outfits tab.
+- Collected-appearance scanner and account-wide cache by equipment slot.
+- Batched scanning with live progress callbacks.
+- Embedded character preview model.
+- Manual source selection, pagination, rotation, clearing, and persistent preview state.
+- Source compatibility validation.
+- Transmog collection change detection and rescan prompting.
+
+### Compatibility
+
+- Preserves SavedVariables schema 2 and Courier format 1.
+- No changes to the tested quest lifecycle recorder.
+
 ## 0.4.1 - 2026-07-30
 
 ### Polished

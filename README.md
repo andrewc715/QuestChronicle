@@ -1,4 +1,4 @@
-# Quest Chronicle v0.4.1
+# Quest Chronicle v0.5.0
 
 Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.4.1 polishes the standalone Blizzard-styled interface introduced in v0.4.0 while preserving the tested lifecycle recorder and Courier export.
 
@@ -154,3 +154,10 @@ QuestChronicle\
 ```
 
 The lifecycle recorder remains in `QuestChronicle.lua`. UI modules use the public addon API and callback bus rather than reaching into the recorder's local tracking state.
+
+
+## Outfits: Wardrobe Foundation
+
+The Outfits tab can scan the account wardrobe for appearances collected and displayable by the current character. It caches compatible sources by equipment slot and lets the player manually assemble a non-destructive preview on an embedded character model.
+
+The preview does not apply transmogrification, spend gold, or alter Blizzard outfit slots. Use **Scan Collection** after installation and **Rescan Collection** whenever the tab reports that the collection changed.

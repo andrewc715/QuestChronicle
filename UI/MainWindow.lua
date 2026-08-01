@@ -13,6 +13,7 @@ local TAB_DEFINITIONS = {
     { key = "active", label = "Active Quests", tooltip = "Review the current active quest snapshot and objective progress.", constructor = UI.CreateActiveQuestsTab },
     { key = "note", label = "Write Note", tooltip = "Record an RP observation with location and character context.", constructor = UI.CreateNoteTab },
     { key = "status", label = "Status", tooltip = "Review recorder health, Courier readiness, settings, and maintenance tools.", constructor = UI.CreateStatusTab },
+    { key = "outfits", label = "Outfits", tooltip = "Scan collected appearances and manually build a character preview.", constructor = UI.CreateOutfitsTab },
 }
 
 local function Clamp(value, minimum, maximum)
