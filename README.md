@@ -1,8 +1,8 @@
-# Quest Chronicle v1.6.3
+# Quest Chronicle v1.6.4
 
-> **Linked weapon hands fix:** v1.6.2 now matches the same visual in both weapon hands whenever Blizzard permits it, falls back only to the same exact weapon type, and never substitutes an unrelated type while linking is enabled.
+> **Preview sequencing fix:** v1.6.4 waits for the player actor to load, applies the main weapon first, and replays the secondary weapon on the following frame. This repairs Fury one-hand linked previews and prevents rapid refreshes from collapsing the character model.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.6.2 strengthens linked dual-weapon generation while preserving Fury's Blizzard-driven appearance permissions while preserving the complete lifecycle, journal, Courier, Custom Set, and outfit-design toolset.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.6.4 preserves Blizzard-driven weapon permissions, strict linked-hand generation, Custom Set integration, and the complete Chronicle and Courier toolset.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

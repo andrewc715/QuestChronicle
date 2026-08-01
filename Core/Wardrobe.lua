@@ -3545,66 +3545,83 @@ local function ApplyWeaponSourceToModel(model, source, definition)
         return false
     end
 
-    -- Slot-based transmog exceptions such as Fury's one-hand appearances over
-    -- equipped two-handers are represented by the inventory slot, not merely by
-    -- trying an appearance on the model. Clear the equipped visual first so a
-    -- silent no-op can never masquerade as a successful linked preview.
-    if type(model.UndressSlot) == "function" then
-        SafeCall(model.UndressSlot, model, slotID)
-    end
-
+    -- Do not undress the weapon slot before the player model finishes loading.
+    -- Clearing a Fury weapon slot during the SetUnit transition can leave the
+    -- DressUpModel with a stale child-weapon relationship or an empty actor.
     if type(model.SetItemTransmogInfo) == "function" then
         local info = CreateItemTransmogInfo(source.sourceID)
-        -- Let a main-hand weapon update any child state first. The explicitly
-        -- assigned secondary hand is replayed afterward and must not disturb the
-        -- main hand or inherit a two-handed child relationship.
         local ignoreChildItems = definition.slotName == "SECONDARYHANDSLOT"
         local ok, result = pcall(model.SetItemTransmogInfo, model, info, slotID, ignoreChildItems)
         if ok and ModelTryOnSucceeded(result) then
-            local verified = VerifyModelSlotAppearance(model, slotID, source.sourceID)
-            if verified ~= false then
-                return true
-            end
+            return true
         end
     end
 
-    -- Compatibility fallback for older clients. Verify the slot afterward when
-    -- the model exposes GetItemTransmogInfo; TryOn can otherwise return success
-    -- while leaving the equipped secondary-hand visual unchanged.
+    -- Compatibility fallback. TryOn expects an item representation rather than
+    -- the source ID on several Retail clients. Prefer the collected source's
+    -- item ID and explicitly target the hand.
     if type(model.TryOn) == "function" then
-        local ok, result = pcall(model.TryOn, model, source.sourceID, definition.slotName)
+        local itemInfo = source.styleItemLink or source.itemLink or source.itemID or source.sourceID
+        local ok, result = pcall(model.TryOn, model, itemInfo, definition.slotName)
         if ok and ModelTryOnSucceeded(result) then
-            local verified = VerifyModelSlotAppearance(model, slotID, source.sourceID)
-            if verified ~= false then
-                return true
-            end
+            return true
         end
     end
 
     return false
 end
 
-function Wardrobe.ApplyPreview(model)
-    if not model then
-        return false, "Preview model is unavailable."
+local function InstallPreviewModelLoadHook(model)
+    if not model or model.qcPreviewLoadHookInstalled then
+        return
+    end
+    model.qcPreviewLoadHookInstalled = true
+
+    local function OnModelLoaded(self)
+        local callback = self.qcPendingPreviewCallback
+        if callback then
+            self.qcPendingPreviewCallback = nil
+            callback("MODEL_LOADED")
+        end
     end
 
-    SafeCall(model.SetUnit, model, "player")
+    if type(model.HookScript) == "function" then
+        pcall(model.HookScript, model, "OnModelLoaded", OnModelLoaded)
+    elseif type(model.GetScript) == "function" and type(model.SetScript) == "function" then
+        local previous = model:GetScript("OnModelLoaded")
+        model:SetScript("OnModelLoaded", function(self, ...)
+            if previous then previous(self, ...) end
+            OnModelLoaded(self)
+        end)
+    end
+end
+
+local function ApplyPreviewToLoadedModel(model, token)
+    if not model or model.qcPreviewToken ~= token then
+        return false, "A newer preview request replaced this one."
+    end
+
     SafeCall(model.SetAutoDress, model, true)
     SafeCall(model.SetUseTransmogChoices, model, true)
     SafeCall(model.SetUseTransmogSkin, model, true)
 
     local applied = 0
-    local failed = 0
     local failedSlots = {}
     local state = EnsurePreviewState()
+    local secondaryDefinition
+    local secondarySource
+
+    -- Apply armor and the main weapon only after the player actor exists. The
+    -- secondary weapon is deliberately delayed one additional frame because
+    -- main-hand weapon-option updates can asynchronously rewrite its child slot.
     for _, definition in ipairs(Wardrobe.slotDefinitions) do
         local source = Wardrobe.GetSelectedSource(definition.key)
-        if state.hidden[definition.key] and definition.hideable and model.UndressSlot then
+        if definition.slotName == "SECONDARYHANDSLOT" then
+            secondaryDefinition = definition
+            secondarySource = source
+        elseif state.hidden[definition.key] and definition.hideable and model.UndressSlot then
             local slotID = SafeCall(GetInventorySlotInfo, definition.slotName)
-            if slotID then
-                SafeCall(model.UndressSlot, model, slotID)
-            end
+            if slotID then SafeCall(model.UndressSlot, model, slotID) end
         elseif source then
             local valid = Wardrobe.ValidateSource(source, definition.key)
             if valid and source.sourceID then
@@ -3619,20 +3636,75 @@ function Wardrobe.ApplyPreview(model)
                 if success then
                     applied = applied + 1
                 else
-                    failed = failed + 1
                     table.insert(failedSlots, definition.label)
                 end
             end
         end
     end
-    if failed > 0 then
-        return false, string.format(
-            "Previewed %d selected appearances; WoW could not apply %s.",
-            applied,
-            table.concat(failedSlots, ", ")
-        )
+
+    local function FinishSecondaryHand()
+        if not model or model.qcPreviewToken ~= token then return end
+        if secondarySource and secondaryDefinition then
+            local valid = Wardrobe.ValidateSource(secondarySource, "OFF_HAND")
+            if valid and secondarySource.sourceID then
+                if ApplyWeaponSourceToModel(model, secondarySource, secondaryDefinition) then
+                    applied = applied + 1
+                else
+                    table.insert(failedSlots, secondaryDefinition.label)
+                end
+            end
+        end
+
+        model.qcPreviewLastApplied = applied
+        model.qcPreviewFailedSlots = failedSlots
+        if QC.Notify then
+            QC.Notify("WARDROBE_PREVIEW_APPLIED", applied, failedSlots)
+        end
     end
-    return true, string.format("Previewed %d selected appearances.", applied)
+
+    if secondarySource and C_Timer and C_Timer.After then
+        C_Timer.After(0, FinishSecondaryHand)
+    else
+        FinishSecondaryHand()
+    end
+
+    return true, string.format("Queued %d selected appearances for preview.", applied + (secondarySource and 1 or 0))
+end
+
+function Wardrobe.ApplyPreview(model)
+    if not model then
+        return false, "Preview model is unavailable."
+    end
+
+    InstallPreviewModelLoadHook(model)
+    model.qcPreviewToken = (tonumber(model.qcPreviewToken) or 0) + 1
+    local token = model.qcPreviewToken
+    local completed = false
+
+    local function ApplyOnce(_reason)
+        if completed or not model or model.qcPreviewToken ~= token then return end
+        completed = true
+        model.qcPendingPreviewCallback = nil
+        ApplyPreviewToLoadedModel(model, token)
+    end
+
+    -- SetUnit restores the equipped baseline, but dressing must wait until the
+    -- asynchronous actor load completes. A short timer is retained as a fallback
+    -- for clients that do not emit OnModelLoaded when refreshing the same unit.
+    model.qcPendingPreviewCallback = ApplyOnce
+    SafeCall(model.SetUnit, model, "player")
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0.10, function()
+            if model and model.qcPreviewToken == token and not completed then
+                ApplyOnce("TIMER_FALLBACK")
+            end
+        end)
+    else
+        ApplyOnce("SYNCHRONOUS_FALLBACK")
+    end
+
+    return true, "Character preview refresh queued."
 end
 
 local eventFrame = CreateFrame("Frame")

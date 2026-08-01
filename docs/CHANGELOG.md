@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.6.4 - 2026-08-01
+
+### Fixed
+
+- Defers preview dressing until the player actor reports `OnModelLoaded`.
+- Cancels stale preview requests when the Outfits UI refreshes several times in quick succession.
+- Applies Main Hand before Secondary Hand.
+- Replays Secondary Hand on the following timer frame so Fury weapon-option child updates cannot overwrite the linked appearance.
+- Stops clearing weapon slots while the actor is still loading.
+- Uses the collected source item as the compatibility fallback for explicit hand previews.
+- Repairs the black or tiny character-model race introduced by immediate slot assignment.
+- Preserves strict same-visual or same-subtype linked-hand selection.
+
+### Compatibility
+
+- Preserves SavedVariables schema 2, Courier format 1, and wardrobe cache format 6.
+- No wardrobe rescan, concept migration, or Custom Set rebuild is required.
+
 ## 1.6.3 - 2026-08-01
 
 ### Fixed
