@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.1 - 2026-07-31
+
+### Improved
+
+- Gives selected Current Look rows the same compatibility, generation-pool, active style score, Chronicle Echo reasons, and zone-preference details as appearance-browser rows.
+- Preserves Current Look's Selected, Locked, and Hidden state line above the shared appearance intelligence.
+- Gives equipped-only rows a truthful equipment tooltip instead of presenting unsupported appearance scoring.
+- Routes both views through one shared tooltip builder so their behavior cannot drift independently.
+
+### Preserved
+
+- Chronicle Intelligence, generated outfit names, per-zone favorites and exclusions, and all v0.7 eligibility and coherence safeguards.
+- Wardrobe cache format 5, SavedVariables schema 2, and Courier format 1; no rescan is required.
+
 ## 0.8.0 - 2026-07-31
 
 ### Added

@@ -1,8 +1,8 @@
-# Quest Chronicle v0.8.0
+# Quest Chronicle v0.8.1
 
-> **Chronicle Intelligence:** v0.8.0 lets recent quests, factions, and enemies influence generated looks through Chronicle Echo, with generated names and per-zone favorites and exclusions.
+> **Current Look Tooltip Parity:** v0.8.1 gives selected Current Look layers the same compatibility, generation-pool, style-score, Chronicle Echo, and zone-preference details as the appearance browser.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.8.0 turns that existing history into an explainable outfit signal without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.8.1 keeps the preview manifest and appearance browser equally informative without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -161,6 +161,7 @@ QuestChronicle\
 ├── PROMO_COHERENCE_V072_TEST_CHECKLIST.md
 ├── STARTING_ZONE_PROVENANCE_V073_TEST_CHECKLIST.md
 ├── CHRONICLE_INTELLIGENCE_V080_TEST_CHECKLIST.md
+├── CURRENT_LOOK_TOOLTIPS_V081_TEST_CHECKLIST.md
 ├── WARDROBE_SCANNER_RECOVERY_TEST_CHECKLIST.md
 └── COURIER_CONFIG_PATCH.json
 ```
@@ -225,6 +226,8 @@ For visual coherence, the generator establishes the outfit from major armor silh
 Every equipment-slot button now shows the icon currently represented by the embedded model, whether it comes from a selected appearance or equipped gear. Hidden icons are desaturated, while locked slots retain the gold padlock and border.
 
 The **Current Look** button opens a compact two-column manifest listing every preview layer, its exact appearance or equipped-item name, and its Selected, Equipped, Hidden, and Locked state. Only the active weapon configuration is listed.
+
+Selected Current Look layers use the same detailed tooltip as the appearance browser: source and item IDs, compatibility, generated-pool eligibility, the active style or Chronicle Echo score, matching terms, and zone preferences. Equipped-only rows use a truthful equipment summary because no collected appearance source is available to score.
 
 
 ## Outfits: Wardrobe Foundation

@@ -30,6 +30,35 @@ local function SourceLabel(source)
     return string.format("%s%s|r", color, source.name or ("Appearance " .. tostring(source.sourceID or 0)))
 end
 
+local function ShowAppearanceTooltip(owner, source, slotKey, leadText)
+    if not source then return end
+    local styleMode = ZoneStyle.GetMode()
+    local styleContext = ZoneStyle.GetCurrentContext()
+    GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
+    GameTooltip:SetText(source.name or "Appearance", 1, 0.82, 0)
+    GameTooltip:AddLine(leadText or "Click to preview this collected appearance.", 1, 1, 1, true)
+    GameTooltip:AddLine("Source ID: " .. tostring(source.sourceID or 0), 0.65, 0.65, 0.65)
+    if source.itemID then
+        GameTooltip:AddLine("Item ID: " .. tostring(source.itemID), 0.65, 0.65, 0.65)
+    end
+
+    local valid, reason = Wardrobe.ValidateSource(source, slotKey)
+    GameTooltip:AddLine(valid and "Compatible" or reason, valid and 0.2 or 1, valid and 1 or 0.25, valid and 0.2 or 0.25, true)
+    if valid then
+        local definition = Wardrobe.GetSlotDefinition(slotKey)
+        local eligible, _, eligibilityReason = ZoneStyle.GetEligibilitySummary(source, styleMode, styleContext)
+        GameTooltip:AddLine((eligible and "Generated pool: " or "Excluded from generation: ") .. tostring(eligibilityReason), eligible and 0.2 or 1, eligible and 1 or 0.35, eligible and 0.2 or 0.2, true)
+        GameTooltip:AddLine(ZoneStyle.GetScoreSummary(source, definition, styleMode, styleContext), 1, 0.82, 0, true)
+        local preference = Wardrobe.GetSourceZonePreference(source, styleContext)
+        if preference == "favorite" then
+            GameTooltip:AddLine("Zone favorite: strongly weighted when eligible.", 1, 0.82, 0, true)
+        elseif preference == "excluded" then
+            GameTooltip:AddLine("Zone exclusion: never generated here; manual preview remains available.", 1, 0.25, 0.25, true)
+        end
+    end
+    GameTooltip:Show()
+end
+
 local function CountMap(values)
     local count = 0
     for _, value in pairs(values or {}) do
@@ -746,28 +775,7 @@ function UI.CreateOutfitsTab(parent)
         row:SetScript("OnEnter", function(self)
             if self.source then
                 self.background:SetColorTexture(0.13, 0.13, 0.13, 0.9)
-                GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-                GameTooltip:SetText(self.source.name or "Appearance", 1, 0.82, 0)
-                GameTooltip:AddLine("Click to preview this collected appearance.", 1, 1, 1, true)
-                GameTooltip:AddLine("Source ID: " .. tostring(self.source.sourceID or 0), 0.65, 0.65, 0.65)
-                if self.source.itemID then
-                    GameTooltip:AddLine("Item ID: " .. tostring(self.source.itemID), 0.65, 0.65, 0.65)
-                end
-                local valid, reason = Wardrobe.ValidateSource(self.source, GetCurrentSlot())
-                GameTooltip:AddLine(valid and "Compatible" or reason, valid and 0.2 or 1, valid and 1 or 0.25, valid and 0.2 or 0.25, true)
-                if valid and ZoneStyle then
-                    local definition = Wardrobe.GetSlotDefinition(GetCurrentSlot())
-                    local eligible, _, eligibilityReason = ZoneStyle.GetEligibilitySummary(self.source, ZoneStyle.GetMode(), ZoneStyle.GetCurrentContext())
-                    GameTooltip:AddLine((eligible and "Generated pool: " or "Excluded from generation: ") .. tostring(eligibilityReason), eligible and 0.2 or 1, eligible and 1 or 0.35, eligible and 0.2 or 0.2, true)
-                    GameTooltip:AddLine(ZoneStyle.GetScoreSummary(self.source, definition, ZoneStyle.GetMode(), ZoneStyle.GetCurrentContext()), 1, 0.82, 0, true)
-                    local preference = Wardrobe.GetSourceZonePreference(self.source, ZoneStyle.GetCurrentContext())
-                    if preference == "favorite" then
-                        GameTooltip:AddLine("Zone favorite: strongly weighted when eligible.", 1, 0.82, 0, true)
-                    elseif preference == "excluded" then
-                        GameTooltip:AddLine("Zone exclusion: never generated here; manual preview remains available.", 1, 0.25, 0.25, true)
-                    end
-                end
-                GameTooltip:Show()
+                ShowAppearanceTooltip(self, self.source, GetCurrentSlot())
             end
         end)
         row:SetScript("OnLeave", function(self)
@@ -837,11 +845,19 @@ function UI.CreateOutfitsTab(parent)
         row:SetScript("OnEnter", function(self)
             if not self.entry then return end
             self.background:SetColorTexture(0.13, 0.13, 0.13, 0.95)
-            GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-            GameTooltip:SetText(self.entry.label .. ": " .. self.entry.name, 1, 0.82, 0)
-            if self.entry.sourceID then GameTooltip:AddLine("Appearance source " .. tostring(self.entry.sourceID), 0.65, 0.65, 0.65) end
-            if self.entry.itemID then GameTooltip:AddLine("Item " .. tostring(self.entry.itemID), 0.65, 0.65, 0.65) end
-            GameTooltip:Show()
+            if self.entry.source then
+                local previewState = self.entry.kind or "Selected"
+                if self.entry.locked then previewState = previewState .. " • Locked" end
+                if self.entry.hidden then previewState = previewState .. " • Hidden" end
+                ShowAppearanceTooltip(self, self.entry.source, self.entry.slotKey, "Current preview: " .. previewState .. ".")
+            else
+                GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+                GameTooltip:SetText(self.entry.name or (self.entry.label .. " equipment"), 1, 0.82, 0)
+                GameTooltip:AddLine("Currently equipped in the " .. tostring(self.entry.label) .. " slot.", 1, 1, 1, true)
+                if self.entry.itemID then GameTooltip:AddLine("Item ID: " .. tostring(self.entry.itemID), 0.65, 0.65, 0.65) end
+                GameTooltip:AddLine("No collected appearance is overriding this slot in the preview.", 0.65, 0.65, 0.65, true)
+                GameTooltip:Show()
+            end
         end)
         row:SetScript("OnLeave", function(self)
             self.background:SetColorTexture(0.07, 0.07, 0.07, 0.88)

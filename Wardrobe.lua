@@ -1348,6 +1348,7 @@ function Wardrobe.GetPreviewManifest()
                     name = source and (source.name or ("Appearance " .. tostring(source.sourceID))) or (equipped and equipped.name or "Empty"),
                     icon = source and source.icon or equipped and equipped.icon,
                     sourceID = source and source.sourceID,
+                    source = source,
                     itemID = source and source.itemID or equipped and equipped.itemID,
                     itemLink = source and source.styleItemLink or equipped and equipped.itemLink,
                     kind = kind,
