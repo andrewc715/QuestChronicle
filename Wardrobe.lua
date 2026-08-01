@@ -6,6 +6,11 @@ local Wardrobe = QC.Wardrobe
 Wardrobe.CACHE_VERSION = 5
 Wardrobe.PAGE_SIZE = 7
 
+local AUTO_REFRESH_DELAY = 3.0
+local AUTO_REFRESH_RETRY_DELAY = 2.0
+local AUTO_REFRESH_MAX_ATTEMPTS = 15
+local autoRefreshToken = 0
+
 -- Resolve collection enum values when the scan runs instead of when this file loads.
 -- Some Blizzard enum tables are not ready during early addon loading.
 Wardrobe.slotDefinitions = {
@@ -70,6 +75,7 @@ local function ResetCache(cache, state)
     cache.scanWarning = nil
     cache.dirty = true
     cache.dirtyReason = "CACHE_UPGRADE"
+    cache.autoRefreshPending = false
 end
 
 local function EnsureCache()
@@ -88,6 +94,7 @@ local function EnsureCache()
     cache.totalSources = cache.totalSources or 0
     cache.totalVisuals = cache.totalVisuals or 0
     cache.expectedCollectedVisuals = cache.expectedCollectedVisuals or 0
+    cache.autoRefreshPending = cache.autoRefreshPending == true
     return cache
 end
 
@@ -95,6 +102,7 @@ local function EnsurePreviewState()
     local state = QC.GetUIState()
     state.outfits = state.outfits or {}
     state.outfits.selections = state.outfits.selections or {}
+    state.outfits.selectionVisuals = state.outfits.selectionVisuals or {}
     state.outfits.selectedSlot = state.outfits.selectedSlot or "HEAD"
     state.outfits.pages = state.outfits.pages or {}
     state.outfits.locks = state.outfits.locks or {}
@@ -573,6 +581,111 @@ local function GetSourceByID(slotKey, sourceID)
     return nil
 end
 
+local function FindSourceByVisualID(slotKey, visualID)
+    if visualID == nil then return nil end
+    for _, source in ipairs(Wardrobe.GetSlotSources(slotKey)) do
+        if source.visualID == visualID then return source end
+    end
+    if slotKey == "OFF_HAND" then
+        for _, source in ipairs(Wardrobe.GetSlotSources("ONE_HAND")) do
+            if source.visualID == visualID then return CopySourceForSlot(source, "OFF_HAND") end
+        end
+    end
+    return nil
+end
+
+local function SetSelectedSource(state, slotKey, source)
+    state.selectionVisuals = state.selectionVisuals or {}
+    state.selections[slotKey] = source and source.sourceID or nil
+    state.selectionVisuals[slotKey] = source and source.visualID or nil
+end
+
+local function SnapshotSelectionVisuals(selections, previousVisuals)
+    local visuals = {}
+    for slotKey, sourceID in pairs(selections or {}) do
+        local source = GetSourceByID(slotKey, sourceID)
+        local visualID = source and source.visualID or (previousVisuals and previousVisuals[slotKey])
+        if visualID ~= nil then visuals[slotKey] = visualID end
+    end
+    return visuals
+end
+
+local function CaptureRecoveryIdentities()
+    local state = EnsurePreviewState()
+    state.selectionVisuals = SnapshotSelectionVisuals(state.selections, state.selectionVisuals)
+    local concepts = EnsureConceptStore()
+    for _, concept in pairs(concepts) do
+        concept.visuals = SnapshotSelectionVisuals(concept.selections, concept.visuals)
+    end
+end
+
+local function RebindSelectionMap(selections, visuals, preserveMissing)
+    local rebound, reboundVisuals = {}, {}
+    local recovered, missing = 0, 0
+    for slotKey, sourceID in pairs(selections or {}) do
+        local source = GetSourceByID(slotKey, sourceID)
+        local valid = source and Wardrobe.ValidateSource(source, slotKey)
+        local visualID = source and source.visualID or (visuals and visuals[slotKey])
+        if not valid and visualID ~= nil then
+            local replacement = FindSourceByVisualID(slotKey, visualID)
+            local replacementValid = replacement and Wardrobe.ValidateSource(replacement, slotKey)
+            if replacementValid then
+                source = replacement
+                valid = true
+                if replacement.sourceID ~= sourceID then recovered = recovered + 1 end
+            end
+        end
+        if valid and source then
+            rebound[slotKey] = source.sourceID
+            reboundVisuals[slotKey] = source.visualID or visualID
+        else
+            missing = missing + 1
+            if preserveMissing then
+                rebound[slotKey] = sourceID
+                if visualID ~= nil then reboundVisuals[slotKey] = visualID end
+            end
+        end
+    end
+    return rebound, reboundVisuals, recovered, missing
+end
+
+local function RecoverAppearanceReferences(cache)
+    local settings = QC.GetSettings and QC.GetSettings() or {}
+    if settings.recoverMissingAppearances == false then
+        return 0, 0, 0
+    end
+
+    local state = EnsurePreviewState()
+    local selections, visuals, previewRecovered, previewMissing = RebindSelectionMap(state.selections, state.selectionVisuals, false)
+    state.selections = selections
+    state.selectionVisuals = visuals
+
+    local concepts = EnsureConceptStore()
+    local conceptRecovered, conceptMissing = 0, 0
+    for _, concept in pairs(concepts) do
+        local rebound, reboundVisuals, recovered, missing = RebindSelectionMap(concept.selections, concept.visuals, true)
+        concept.selections = rebound
+        concept.visuals = reboundVisuals
+        conceptRecovered = conceptRecovered + recovered
+        conceptMissing = conceptMissing + missing
+    end
+
+    cache.lastRecovery = {
+        at = time and time() or 0,
+        previewRecovered = previewRecovered,
+        conceptRecovered = conceptRecovered,
+        missing = previewMissing + conceptMissing,
+    }
+    local totalRecovered = previewRecovered + conceptRecovered
+    if totalRecovered > 0 and settings.announceWardrobeUpdates ~= false and QC.Print then
+        QC.Print(string.format("Recovered %d outfit appearance%s after Blizzard changed the cached source.", totalRecovered, totalRecovered == 1 and "" or "s"))
+    end
+    if QC.Notify then
+        QC.Notify("WARDROBE_APPEARANCES_RECOVERED", cache.lastRecovery)
+    end
+    return previewRecovered, conceptRecovered, previewMissing + conceptMissing
+end
+
 local function GetSourcePreferenceIdentity(source)
     if not source then return nil end
     if source.visualID then return "visual:" .. tostring(source.visualID) end
@@ -661,7 +774,7 @@ function Wardrobe.GetGeneratedOutfitName()
 end
 
 local function ClearWeaponSlot(state, slotKey)
-    state.selections[slotKey] = nil
+    SetSelectedSource(state, slotKey, nil)
     state.locks[slotKey] = nil
     state.hidden[slotKey] = nil
 end
@@ -718,10 +831,10 @@ local function SetRandomSelection(state, slotKey, reroll, styleMode, styleContex
     local current = reroll and state.selections[slotKey] or nil
     local source = ChooseRandomSource(slotKey, current, styleMode, styleContext)
     if not source then
-        if not reroll then state.selections[slotKey] = nil end
+        if not reroll then SetSelectedSource(state, slotKey, nil) end
         return false
     end
-    state.selections[slotKey] = source.sourceID
+    SetSelectedSource(state, slotKey, source)
     if not state.hidden[slotKey] and QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then
         QC.ZoneStyle.AddSourceToGenerationContext(styleContext, source)
     end
@@ -955,12 +1068,12 @@ local function GenerateWeapons(state, reroll, styleMode, styleContext)
             if state.locks[slotKey] and state.selections[slotKey] then
                 return false, "A main-hand weapon appearance is locked, but no main-hand item is equipped. Equip a weapon or unlock that slot."
             end
-            state.selections[slotKey] = nil
+            SetSelectedSource(state, slotKey, nil)
         end
         if state.locks.OFF_HAND and state.selections.OFF_HAND then
             return false, "An off-hand appearance is locked, but no main-hand item is equipped. Equip your weapons or unlock the slot."
         end
-        state.selections.OFF_HAND = nil
+        SetSelectedSource(state, "OFF_HAND", nil)
         return true, 0, "No main-hand item is equipped, so Quest Chronicle generated armor only."
     end
 
@@ -992,23 +1105,23 @@ local function GenerateWeapons(state, reroll, styleMode, styleContext)
         end
         selectedMain, mode = ChooseGeneratedWeaponSource(allowedSlots, context.mainItem, context, excluded, nil, styleMode, styleContext)
         if selectedMain then
-            state.selections[mode] = selectedMain.sourceID
+            SetSelectedSource(state, mode, selectedMain)
         end
     end
 
     for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
         if slotKey ~= mode and not state.locks[slotKey] then
-            state.selections[slotKey] = nil
+            SetSelectedSource(state, slotKey, nil)
         end
     end
     if not selectedMain then
         for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
             if not state.locks[slotKey] then
-                state.selections[slotKey] = nil
+                SetSelectedSource(state, slotKey, nil)
             end
         end
         if not state.locks.OFF_HAND then
-            state.selections.OFF_HAND = nil
+            SetSelectedSource(state, "OFF_HAND", nil)
         end
         return true, 0, "WoW found no cached weapon visual valid for the equipped main-hand item; armor was generated and the equipped weapon was left unchanged."
     end
@@ -1025,7 +1138,7 @@ local function GenerateWeapons(state, reroll, styleMode, styleContext)
         elseif not state.locks.OFF_HAND then
             local excluded = reroll and { OFF_HAND = state.selections.OFF_HAND } or nil
             local offHand = ChooseGeneratedWeaponSource({ "OFF_HAND", "ONE_HAND" }, context.offItem, context, excluded, "OFF_HAND", styleMode, styleContext)
-            state.selections.OFF_HAND = offHand and offHand.sourceID or nil
+            SetSelectedSource(state, "OFF_HAND", offHand)
             if offHand then
                 if QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then
                     QC.ZoneStyle.AddSourceToGenerationContext(styleContext, offHand)
@@ -1036,7 +1149,7 @@ local function GenerateWeapons(state, reroll, styleMode, styleContext)
             end
         end
     elseif not state.locks.OFF_HAND then
-        state.selections.OFF_HAND = nil
+        SetSelectedSource(state, "OFF_HAND", nil)
     end
 
     return true, selectedWeapons, notice
@@ -1059,6 +1172,7 @@ function Wardrobe.GenerateOutfit(reroll, requestedStyleMode)
     end
 
     local originalSelections = CopyPrimitiveMap(state.selections)
+    local originalVisuals = CopyPrimitiveMap(state.selectionVisuals)
     local selected = 0
     for _, slotKey in ipairs(ARMOR_GENERATION_ORDER) do
         local definition = slotByKey[slotKey]
@@ -1075,6 +1189,7 @@ function Wardrobe.GenerateOutfit(reroll, requestedStyleMode)
     local weaponsOK, weaponCount, weaponNotice = GenerateWeapons(state, reroll == true, styleMode, styleContext)
     if not weaponsOK then
         state.selections = originalSelections
+        state.selectionVisuals = originalVisuals
         return false, weaponCount
     end
 
@@ -1135,7 +1250,7 @@ function Wardrobe.RerollSlot(slotKey)
         if not source then
             return false, "No cached appearance in this weapon category is valid for the currently equipped item."
         end
-        state.selections[slotKey] = source.sourceID
+        SetSelectedSource(state, slotKey, source)
         if styleEngine and styleEngine.AddSourceToGenerationContext then
             styleEngine.AddSourceToGenerationContext(styleContext, source)
         end
@@ -1143,7 +1258,7 @@ function Wardrobe.RerollSlot(slotKey)
         if slotKey == "OFF_HAND" and not state.selections.ONE_HAND then
             local mainHand = ChooseGeneratedWeaponSource({ "ONE_HAND" }, context.mainItem, context, nil, nil, styleMode, styleContext)
             if mainHand then
-                state.selections.ONE_HAND = mainHand.sourceID
+                SetSelectedSource(state, "ONE_HAND", mainHand)
                 if styleEngine and styleEngine.AddSourceToGenerationContext then
                     styleEngine.AddSourceToGenerationContext(styleContext, mainHand)
                 end
@@ -1218,6 +1333,8 @@ function Wardrobe.SaveConcept(name)
     concept.name = name
     concept.updatedAt = now
     concept.selections = CopyPrimitiveMap(state.selections)
+    state.selectionVisuals = SnapshotSelectionVisuals(state.selections, state.selectionVisuals)
+    concept.visuals = CopyPrimitiveMap(state.selectionVisuals)
     concept.locks = CopyPrimitiveMap(state.locks)
     concept.hidden = CopyPrimitiveMap(state.hidden)
     concept.styleMode = QC.ZoneStyle and QC.ZoneStyle.NormalizeMode(state.styleMode) or state.styleMode
@@ -1238,18 +1355,9 @@ function Wardrobe.LoadConcept(conceptID)
     end
 
     local state = EnsurePreviewState()
-    local selections = {}
-    local missing = 0
-    for slotKey, sourceID in pairs(concept.selections or {}) do
-        local source = GetSourceByID(slotKey, sourceID)
-        local valid = source and Wardrobe.ValidateSource(source, slotKey)
-        if valid then
-            selections[slotKey] = sourceID
-        else
-            missing = missing + 1
-        end
-    end
+    local selections, visuals, recovered, missing = RebindSelectionMap(concept.selections, concept.visuals, false)
     state.selections = selections
+    state.selectionVisuals = visuals
     state.locks = CopyPrimitiveMap(concept.locks)
     state.hidden = CopyPrimitiveMap(concept.hidden)
     state.generatedName = concept.generatedName
@@ -1263,8 +1371,11 @@ function Wardrobe.LoadConcept(conceptID)
     if QC.Notify then
         QC.Notify("WARDROBE_WORKBENCH_CHANGED")
     end
-    if missing > 0 then
-        return true, string.format("Loaded %s; %d unavailable appearances were skipped.", concept.name or "concept", missing), concept
+    if recovered > 0 or missing > 0 then
+        local details = {}
+        if recovered > 0 then table.insert(details, string.format("%d changed appearance source%s recovered", recovered, recovered == 1 and "" or "s")) end
+        if missing > 0 then table.insert(details, string.format("%d unavailable appearance%s skipped", missing, missing == 1 and "" or "s")) end
+        return true, string.format("Loaded %s; %s.", concept.name or "concept", table.concat(details, ", ")), concept
     end
     return true, "Loaded outfit concept: " .. tostring(concept.name or "Unnamed"), concept
 end
@@ -1561,6 +1672,61 @@ function Wardrobe.IsScanning()
     return Wardrobe.scanning == true
 end
 
+local function ScheduleAutomaticRefresh(reason)
+    local cache = EnsureCache()
+    local settings = QC.GetSettings and QC.GetSettings() or {}
+    cache.lastCollectionChangeAt = time and time() or 0
+    if settings.autoRefreshWardrobe == false
+        or (cache.scanState ~= "COMPLETE" and cache.scanState ~= "COMPLETE_WITH_WARNINGS")
+        or (cache.totalVisuals or 0) == 0
+        or not C_Timer or type(C_Timer.After) ~= "function"
+    then
+        cache.autoRefreshPending = false
+        return
+    end
+
+    autoRefreshToken = autoRefreshToken + 1
+    local token = autoRefreshToken
+    local attempts = 0
+    cache.autoRefreshPending = true
+    cache.autoRefreshReason = reason or "COLLECTION_CHANGED"
+    cache.autoRefreshDeferredReason = nil
+    if QC.Notify then QC.Notify("WARDROBE_AUTO_REFRESH_SCHEDULED", cache.autoRefreshReason) end
+
+    local function TryRefresh()
+        if token ~= autoRefreshToken then return end
+        if settings.autoRefreshWardrobe == false then
+            cache.autoRefreshPending = false
+            return
+        end
+        attempts = attempts + 1
+        local blockedByCombat = type(InCombatLockdown) == "function" and InCombatLockdown() == true
+        local blockedByWardrobe = IsBlizzardWardrobeVisible()
+        if Wardrobe.scanning or blockedByCombat or blockedByWardrobe then
+            if attempts < AUTO_REFRESH_MAX_ATTEMPTS then
+                C_Timer.After(AUTO_REFRESH_RETRY_DELAY, TryRefresh)
+                return
+            end
+            cache.autoRefreshPending = false
+            cache.autoRefreshDeferredReason = blockedByCombat and "COMBAT" or (blockedByWardrobe and "BLIZZARD_WARDROBE_OPEN" or "SCAN_BUSY")
+            if settings.announceWardrobeUpdates ~= false and QC.Print then
+                QC.Print("Wardrobe refresh deferred. Close Blizzard's Wardrobe and leave combat, then use Rescan Collection.")
+            end
+            if QC.Notify then QC.Notify("WARDROBE_AUTO_REFRESH_DEFERRED", cache.autoRefreshDeferredReason) end
+            return
+        end
+
+        cache.autoRefreshPending = false
+        local started, message = Wardrobe.Scan(true, "AUTO_COLLECTION_CHANGE")
+        if not started then
+            cache.autoRefreshDeferredReason = message or "SCAN_UNAVAILABLE"
+            if QC.Notify then QC.Notify("WARDROBE_AUTO_REFRESH_DEFERRED", cache.autoRefreshDeferredReason) end
+        end
+    end
+
+    C_Timer.After(AUTO_REFRESH_DELAY, TryRefresh)
+end
+
 function Wardrobe.MarkDirty(reason)
     local cache = EnsureCache()
     cache.dirty = true
@@ -1568,9 +1734,12 @@ function Wardrobe.MarkDirty(reason)
     if QC.Notify then
         QC.Notify("WARDROBE_CACHE_DIRTY", cache.dirtyReason)
     end
+    if not Wardrobe.scanning then
+        ScheduleAutomaticRefresh(cache.dirtyReason)
+    end
 end
 
-function Wardrobe.Scan(force)
+function Wardrobe.Scan(force, trigger)
     if Wardrobe.scanning then
         return false, "A wardrobe scan is already running."
     end
@@ -1589,6 +1758,9 @@ function Wardrobe.Scan(force)
         return false, "The wardrobe cache is current."
     end
 
+    autoRefreshToken = autoRefreshToken + 1
+    cache.autoRefreshPending = false
+    CaptureRecoveryIdentities()
     Wardrobe.scanning = true
     Wardrobe.scanCollectionState = CaptureCollectionState()
     ApplyScanCollectionState()
@@ -1596,6 +1768,7 @@ function Wardrobe.Scan(force)
 
     cache.scanState = "PREPARING"
     cache.scanStartedAt = time()
+    cache.scanTrigger = trigger or "MANUAL"
     cache.scanCompletedAt = nil
     cache.scanError = nil
     cache.scanWarning = nil
@@ -1611,6 +1784,7 @@ function Wardrobe.Scan(force)
         scanError = nil,
     }
     local index = 1
+    local scanStartedPrecise = GetTime and GetTime() or nil
 
     local function RestoreFilters()
         RestoreCollectionState(Wardrobe.scanCollectionState)
@@ -1626,6 +1800,7 @@ function Wardrobe.Scan(force)
         cache.scanWarning = nil
         cache.dirty = true
         cache.dirtyReason = "SCAN_FAILED"
+        if scanStartedPrecise and GetTime then cache.scanDurationMS = math.floor(((GetTime() - scanStartedPrecise) * 1000) + 0.5) end
         if QC.Notify then
             QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
         end
@@ -1642,6 +1817,7 @@ function Wardrobe.Scan(force)
             cache.scanWarning = nil
             cache.dirty = true
             cache.dirtyReason = "EMPTY_COLLECTION_RESPONSE"
+            if scanStartedPrecise and GetTime then cache.scanDurationMS = math.floor(((GetTime() - scanStartedPrecise) * 1000) + 0.5) end
             if QC.Notify then
                 QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
             end
@@ -1659,6 +1835,18 @@ function Wardrobe.Scan(force)
         cache.dirty = false
         cache.dirtyReason = nil
         cache.characterKey = QC.GetCurrentCharacter().key
+        cache.scanDurationMS = scanStartedPrecise and GetTime and math.floor(((GetTime() - scanStartedPrecise) * 1000) + 0.5) or nil
+        RecoverAppearanceReferences(cache)
+        if cache.scanTrigger == "AUTO_COLLECTION_CHANGE" then
+            cache.lastAutoRefreshAt = cache.scanCompletedAt
+            cache.lastAutoRefreshReason = cache.autoRefreshReason
+            cache.autoRefreshReason = nil
+            cache.autoRefreshDeferredReason = nil
+            local settings = QC.GetSettings and QC.GetSettings() or {}
+            if settings.announceWardrobeUpdates ~= false and QC.Print then
+                QC.Print(string.format("Wardrobe refreshed automatically: %d previewable appearances in %.1f seconds.", cache.totalVisuals or 0, (cache.scanDurationMS or 0) / 1000))
+            end
+        end
 
         -- Collected source counts and cached visual counts describe different things.
         -- Multiple item sources may share one visual, and character-incompatible
@@ -1758,7 +1946,7 @@ function Wardrobe.SelectSource(slotKey, sourceID)
                 return false, reason
             end
             local state = EnsurePreviewState()
-            state.selections[slotKey] = sourceID
+            SetSelectedSource(state, slotKey, source)
             state.hidden[slotKey] = nil
             state.selectedConceptID = nil
             state.generatedName = nil
@@ -1778,7 +1966,7 @@ end
 
 function Wardrobe.ClearSelection(slotKey)
     local state = EnsurePreviewState()
-    state.selections[slotKey] = nil
+    SetSelectedSource(state, slotKey, nil)
     state.locks[slotKey] = nil
     state.hidden[slotKey] = nil
     state.selectedConceptID = nil
@@ -1792,6 +1980,7 @@ end
 function Wardrobe.ClearAllSelections()
     local state = EnsurePreviewState()
     state.selections = {}
+    state.selectionVisuals = {}
     state.locks = {}
     state.hidden = {}
     state.selectedConceptID = nil
@@ -1853,11 +2042,16 @@ eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_ENTERING_WORLD" then
         local cache = EnsureCache()
+        cache.autoRefreshPending = false
+        cache.autoRefreshReason = nil
         EnsurePreviewState()
         local character = QC.GetCurrentCharacter and QC.GetCurrentCharacter()
         if character and cache.characterKey and cache.characterKey ~= character.key then
             ResetCache(cache, "STALE")
             cache.dirtyReason = "CHARACTER_CHANGED"
+        end
+        if cache.dirty then
+            ScheduleAutomaticRefresh(cache.dirtyReason or "COLLECTION_CHANGED")
         end
     else
         Wardrobe.MarkDirty(event)

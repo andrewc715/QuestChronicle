@@ -1,8 +1,8 @@
-# Quest Chronicle v0.8.1
+# Quest Chronicle v0.9.0
 
-> **Current Look Tooltip Parity:** v0.8.1 gives selected Current Look layers the same compatibility, generation-pool, style-score, Chronicle Echo, and zone-preference details as the appearance browser.
+> **Era and Collection Polish:** v0.9.0 finishes strict expansion progression, automatic collection refresh, stable-visual recovery, broad zone coverage, scan timing, and accessible outfit-state controls.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.8.1 keeps the preview manifest and appearance browser equally informative without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.9.0 hardens the outfit systems built across v0.7 and v0.8 without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -96,6 +96,11 @@ Settings include:
 - Confirm before clearing note drafts
 - Remember window position and size
 - Lock window position and size
+- Restrict generated outfits to the zone's expansion
+- Refresh the wardrobe after collection changes
+- Recover changed appearance sources
+- Announce wardrobe maintenance in chat
+- High-contrast outfit states
 
 ## Slash commands
 
@@ -130,7 +135,7 @@ Bare `/qc` toggles the main window. `/qc help` displays command help.
 ## Compatibility
 
 - Existing v0.1 through v0.4.0 SavedVariables and historical records are retained.
-- Existing v0.6.x and v0.7.x wardrobe caches, outfit selections, locks, hidden slots, style modes, and saved concepts are retained.
+- Existing v0.6.x through v0.8.x wardrobe caches, outfit selections, locks, hidden slots, style modes, generated names, zone preferences, and saved concepts are retained.
 - Addon schema remains version 2 because the recorded data model is unchanged.
 - Courier export `formatVersion` remains 1.
 - Warcraft Quest Chronicle Courier v1.0.0 remains compatible.
@@ -162,6 +167,7 @@ QuestChronicle\
 ├── STARTING_ZONE_PROVENANCE_V073_TEST_CHECKLIST.md
 ├── CHRONICLE_INTELLIGENCE_V080_TEST_CHECKLIST.md
 ├── CURRENT_LOOK_TOOLTIPS_V081_TEST_CHECKLIST.md
+├── ERA_COLLECTION_POLISH_V090_TEST_CHECKLIST.md
 ├── WARDROBE_SCANNER_RECOVERY_TEST_CHECKLIST.md
 └── COURIER_CONFIG_PATCH.json
 ```
@@ -177,7 +183,7 @@ The Outfit Workbench offers four weighted generation modes:
 - **Class Fantasy** favors iconic class terms and silhouettes with a smaller accent from the current zone.
 - **Chronicle Echo** favors themes found in the character's recent quests, recognizable factions, and recurring enemies.
 
-Quest Chronicle detects the current map, zone, subzone, and parent-map trail. Profiles cover the Midnight regions—Quel'Thalas, the Amani Highlands, Harandar, and the Voidstorm—plus major cultures and expansion regions across Azeroth. Unknown areas fall back to an Azeroth Adventurer profile.
+Quest Chronicle detects the current map, zone, subzone, and parent-map trail. Profiles cover the Midnight regions—Quel'Thalas, Zul'Aman, Harandar, and the Voidstorm—plus Classic questing zones across both continents, Cataclysm's launch and patch regions, the missing Pandaria and Battle for Azeroth areas, Siren Isle, K'aresh, and the major culture and expansion profiles across Azeroth. Unknown areas fall back to an Azeroth Adventurer profile.
 
 When the character enters a different zone or profile, Quest Chronicle announces a new Zone Native suggestion and marks the Outfits tab. Opening Outfits acknowledges the notice; generating a Zone Native outfit consumes it. Suggestions never replace the preview automatically.
 
@@ -204,7 +210,7 @@ Favorites and exclusions are mutually exclusive and follow Blizzard's collapsed 
 
 Generated outfits and rerolls now pass two eligibility gates before weighted scoring:
 
-- The **era ceiling** admits the current expansion and everything before it. Blade's Edge, for example, admits Classic and The Burning Crusade but rejects Wrath and later items.
+- The **era ceiling** admits the current expansion and everything before it. Blade's Edge, for example, admits Classic and The Burning Crusade but rejects Wrath and later items. This strict progression rule is enabled by default and can be changed in WoW's AddOns settings.
 - The **zone provenance gate** admits boss drops whose Blizzard-provided instance or encounter belongs to the current curated zone family. Gruul's Lair is local to Blade's Edge; Sunwell Plateau is not.
 
 Quest rewards now receive a second provenance lookup through WoW's appearance-tracking map. Quest Chronicle resolves that map and its parent trail through the same local-source profiles, accepting rewards tracked to the current pool and rejecting rewards tracked elsewhere. The engine covers every retail racial start, allied-race arrival area, both death-knight openings, Mardum, and Exile's Reach.
@@ -232,6 +238,8 @@ Selected Current Look layers use the same detailed tooltip as the appearance bro
 
 ## Outfits: Wardrobe Foundation
 
-The Outfits tab can scan the account wardrobe for appearances collected and displayable by the current character. It caches compatible sources by equipment slot and lets the player manually assemble a non-destructive preview on an embedded character model.
+The Outfits tab can scan the account wardrobe for appearances collected and displayable by the current character. It caches compatible sources by equipment slot and lets the player manually assemble a non-destructive preview on an embedded character model. Collection events are debounced into one automatic refresh, which waits for combat and Blizzard's Wardrobe windows to clear. Each scan records its duration.
 
-The preview does not apply transmogrification, spend gold, or alter Blizzard outfit slots. Use **Scan Collection** after installation and **Rescan Collection** whenever the tab reports that the collection changed.
+Selections and concepts now retain each collapsed visual ID beside Blizzard's representative source ID. If a later scan chooses a different compatible source for the same visual, Quest Chronicle rebinds the preview and saved concept instead of treating the appearance as missing. Legacy selections and concepts gain this identity additively from the existing cache.
+
+The preview does not apply transmogrification, spend gold, or alter Blizzard outfit slots. Use **Scan Collection** after installation; automatic collection refresh is enabled by default afterward, while **Rescan Collection** remains available at any time.

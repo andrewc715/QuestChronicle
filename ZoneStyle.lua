@@ -50,7 +50,7 @@ ZoneStyle.expansions = {
 
 local eraRules = {
     { maxExpansionID = 11, match = { "midnight", "amani highlands", "harandar", "har mara", "voidstorm" } },
-    { maxExpansionID = 10, match = { "khaz algar", "isle of dorn", "dornogal", "ringing deeps", "hall of awakening", "hallowfall", "azjkahet", "azj kahet", "undermine", "karesh", "k aresh" } },
+    { maxExpansionID = 10, match = { "khaz algar", "isle of dorn", "dornogal", "ringing deeps", "hall of awakening", "hallowfall", "azjkahet", "azj kahet", "undermine", "siren isle", "karesh", "k aresh" } },
     { maxExpansionID = 9, match = { "dragon isles", "forbidden reach", "war creche", "waking shores", "ohnahran", "ohn ahran", "azure span", "thaldraszus", "valdrakken", "zaralek", "emerald dream", "amirdrassil" } },
     { maxExpansionID = 8, match = { "shadowlands", "exiles reach", "darkmaul citadel", "oribos", "bastion", "maldraxxus", "ardenweald", "revendreth", "the maw", "korthia", "zereth mortis" } },
     { maxExpansionID = 7, match = { "kul tiras", "zandalar", "boralus", "tiragarde", "drustvar", "stormsong", "zuldazar", "nazmir", "voldun", "vol dun", "nazjatar", "mechagon" } },
@@ -126,8 +126,56 @@ ZoneStyle.provenanceProfiles = {
     { key = "orgrimmar", label = "Orgrimmar", match = { "orgrimmar", "valley of honor" }, origins = { "orgrimmar", "valley of honor" } },
     { key = "hallofawakening", label = "Hall of Awakening", match = { "hall of awakening" }, origins = { "hall of awakening", "ringing deeps" } },
 
+    -- Classic questing regions. These profiles keep old-world generation local
+    -- even when an appearance's expansion metadata alone would permit it.
+    { key = "elwynn", label = "Elwynn Forest", match = { "elwynn forest", "goldshire" }, origins = { "elwynn forest", "goldshire", "stormwind", "the stockade" } },
+    { key = "westfall", label = "Westfall", match = { "westfall", "sentinel hill", "moonbrook" }, origins = { "westfall", "sentinel hill", "moonbrook", "deadmines" } },
+    { key = "redridge", label = "Redridge Mountains", match = { "redridge mountains", "lakeshire" }, origins = { "redridge", "lakeshire", "stonewatch" } },
+    { key = "duskwood", label = "Duskwood", match = { "duskwood", "darkshire", "raven hill" }, origins = { "duskwood", "darkshire", "raven hill" } },
+    { key = "stranglethorn", label = "Stranglethorn", match = { "stranglethorn", "northern stranglethorn", "cape of stranglethorn", "booty bay" }, origins = { "stranglethorn", "booty bay", "zul gurub", "gurubashi" } },
+    { key = "lochmodan", label = "Loch Modan", match = { "loch modan", "thelsamar" }, origins = { "loch modan", "thelsamar" } },
+    { key = "wetlands", label = "Wetlands", match = { "wetlands", "menethil harbor" }, origins = { "wetlands", "menethil" } },
+    { key = "silverpine", label = "Silverpine Forest", match = { "silverpine forest" }, origins = { "silverpine", "shadowfang keep" } },
+    { key = "hillsbrad", label = "Hillsbrad Foothills", match = { "hillsbrad foothills" }, origins = { "hillsbrad", "durnholde" } },
+    { key = "arathi", label = "Arathi Highlands", match = { "arathi highlands", "refuge pointe", "hammerfall" }, origins = { "arathi highlands", "stromgarde", "refuge pointe", "hammerfall" } },
+    { key = "hinterlands", label = "The Hinterlands", match = { "the hinterlands", "aerie peak" }, origins = { "hinterlands", "aerie peak", "jintha alor" } },
+    { key = "badlands", label = "Badlands", match = { "badlands", "new kargath" }, origins = { "badlands", "uldaman", "new kargath" } },
+    { key = "searinggorge", label = "Searing Gorge", match = { "searing gorge", "thorium point" }, origins = { "searing gorge", "thorium point", "blackrock depths", "molten core" } },
+    { key = "burningsteppes", label = "Burning Steppes", match = { "burning steppes", "morgan vigil" }, origins = { "burning steppes", "blackrock spire", "blackwing lair" } },
+    { key = "swampofsorrows", label = "Swamp of Sorrows", match = { "swamp of sorrows", "stonard" }, origins = { "swamp of sorrows", "stonard", "sunken temple", "temple of atal hakkar" } },
+    { key = "blastedlands", label = "Blasted Lands", match = { "blasted lands", "nethergarde keep" }, origins = { "blasted lands", "nethergarde", "dark portal" } },
+    { key = "westernplaguelands", label = "Western Plaguelands", match = { "western plaguelands", "andorhal" }, origins = { "western plaguelands", "andorhal", "scholomance" } },
+    { key = "easternplaguelands", label = "Eastern Plaguelands", match = { "eastern plaguelands", "lights hope chapel" }, origins = { "eastern plaguelands", "lights hope", "stratholme", "naxxramas" } },
+    { key = "bloodmyst", label = "Bloodmyst Isle", match = { "bloodmyst isle", "blood watch" }, origins = { "bloodmyst", "blood watch" } },
+    { key = "ghostlands", label = "Ghostlands", maxExpansionID = 1, match = { "ghostlands", "tranquillien", "deatholme" }, origins = { "ghostlands", "tranquillien", "deatholme" } },
+
+    { key = "darkshore", label = "Darkshore", match = { "darkshore", "lor danel", "auberdine" }, origins = { "darkshore", "lor danel", "auberdine" } },
+    { key = "ashenvale", label = "Ashenvale", match = { "ashenvale", "astranaar" }, origins = { "ashenvale", "astranaar", "blackfathom deeps" } },
+    { key = "stonetalon", label = "Stonetalon Mountains", match = { "stonetalon mountains", "stonetalon" }, origins = { "stonetalon" } },
+    { key = "barrens", label = "The Barrens", match = { "northern barrens", "southern barrens", "the barrens", "crossroads" }, origins = { "barrens", "crossroads", "wailing caverns", "razorfen kraul", "razorfen downs" } },
+    { key = "dustwallow", label = "Dustwallow Marsh", match = { "dustwallow marsh", "theramore" }, origins = { "dustwallow", "theramore", "onyxias lair" } },
+    { key = "thousandneedles", label = "Thousand Needles", match = { "thousand needles", "freewind post" }, origins = { "thousand needles", "freewind" } },
+    { key = "desolace", label = "Desolace", match = { "desolace", "nijels point", "shadowprey village" }, origins = { "desolace", "maraudon" } },
+    { key = "feralas", label = "Feralas", match = { "feralas", "feathermoon stronghold", "camp mojache" }, origins = { "feralas", "dire maul", "feathermoon", "mojache" } },
+    { key = "tanaris", label = "Tanaris", match = { "tanaris", "gadgetzan" }, origins = { "tanaris", "gadgetzan", "zul farrak", "caverns of time" } },
+    { key = "ungoro", label = "Un'Goro Crater", match = { "un goro crater", "marshals stand" }, origins = { "un goro", "marshals stand" } },
+    { key = "silithus", label = "Silithus", match = { "silithus", "cenarion hold" }, origins = { "silithus", "ahn qiraj", "cenarion hold" } },
+    { key = "felwood", label = "Felwood", match = { "felwood", "emerald sanctuary" }, origins = { "felwood", "emerald sanctuary" } },
+    { key = "winterspring", label = "Winterspring", match = { "winterspring", "everlook" }, origins = { "winterspring", "everlook" } },
+    { key = "azshara", label = "Azshara", match = { "azshara", "bilgewater harbor" }, origins = { "azshara", "bilgewater harbor" } },
+
+    -- Cataclysm launch and patch zones.
+    { key = "hyjal", label = "Mount Hyjal", match = { "mount hyjal", "nordrassil" }, origins = { "mount hyjal", "nordrassil", "firelands", "molten front" } },
+    { key = "vashjir", label = "Vashj'ir", match = { "vashjir", "vashj ir", "kelpthar forest", "shimmering expanse", "abyssal depths" }, origins = { "vashj ir", "throne of the tides" } },
+    { key = "deepholm", label = "Deepholm", match = { "deepholm", "temple of earth" }, origins = { "deepholm", "stonecore" } },
+    { key = "uldum", label = "Uldum", match = { "uldum", "ramkahen" }, origins = { "uldum", "ramkahen", "halls of origination", "vortex pinnacle", "throne of the four winds" } },
+    { key = "twilighthighlands", label = "Twilight Highlands", match = { "twilight highlands", "dragonmaw port", "highbank" }, origins = { "twilight highlands", "grim batol", "bastion of twilight" } },
+    { key = "tolbarad", label = "Tol Barad", match = { "tol barad", "tol barad peninsula" }, origins = { "tol barad", "baradin hold" } },
+    { key = "moltenfront", label = "Molten Front", match = { "molten front" }, origins = { "molten front", "firelands" } },
+
     { key = "sunwell", label = "Isle of Quel'Danas", match = { "queldanas", "quel danas", "sunwell" }, origins = { "sunwell", "magisters terrace", "queldanas", "quel danas", "kiljaeden", "kil jaeden", "muru", "eredar twins", "felmyst", "brutallus" } },
-    { key = "eversong", label = "Eversong and Ghostlands", match = { "silvermoon", "eversong", "ghostlands" }, origins = { "silvermoon", "eversong", "ghostlands", "deatholme" } },
+    { key = "eversong_midnight", label = "Renewed Eversong Woods", minExpansionID = 11, match = { "silvermoon", "eversong woods", "ghostlands" }, origins = { "silvermoon", "eversong woods", "ghostlands", "march on quel danas", "lightbloom" } },
+    { key = "eversong", label = "Eversong and Ghostlands", maxExpansionID = 1, match = { "silvermoon", "eversong", "ghostlands" }, origins = { "silvermoon", "eversong", "ghostlands", "deatholme" } },
     { key = "zulaman", label = "Amani Highlands", match = { "zulaman", "zul aman", "amani highlands", "atal aman" }, origins = { "zulaman", "zul aman", "amani", "nalorakk", "akilzon", "janalai", "halazzi", "malacrass" } },
     { key = "harandar", label = "Harandar", match = { "harandar", "har athir", "har mara", "har kuai", "sporefall" }, origins = { "harandar", "har athir", "har mara", "har kuai", "sporefall", "rootway" } },
     { key = "voidstorm", label = "Voidstorm", match = { "voidstorm", "voidspire", "sunkiller" }, origins = { "voidstorm", "voidspire", "sunkiller", "shadowguard point" } },
@@ -154,6 +202,10 @@ ZoneStyle.provenanceProfiles = {
     { key = "kunlai", label = "Kun-Lai Summit", match = { "kun lai" }, origins = { "kun lai", "shado pan monastery", "mogu shan vaults" } },
     { key = "vale", label = "Vale of Eternal Blossoms", match = { "vale of eternal blossoms" }, origins = { "vale of eternal blossoms", "mogu shan palace", "siege of orgrimmar" } },
     { key = "thunderisle", label = "Isle of Thunder", match = { "isle of thunder" }, origins = { "isle of thunder", "throne of thunder" } },
+    { key = "krasarang", label = "Krasarang Wilds", match = { "krasarang wilds" }, origins = { "krasarang", "domination point", "lions landing" } },
+    { key = "townlong", label = "Townlong Steppes", match = { "townlong steppes" }, origins = { "townlong", "siege of niuzao temple" } },
+    { key = "dreadwastes", label = "Dread Wastes", match = { "dread wastes" }, origins = { "dread wastes", "heart of fear" } },
+    { key = "timelessisle", label = "Timeless Isle", match = { "timeless isle" }, origins = { "timeless isle", "ordos", "celestials" } },
 
     { key = "frostfire", label = "Frostfire Ridge", match = { "frostfire ridge" }, origins = { "frostfire ridge", "bloodmaul slag mines", "the slag mines" } },
     { key = "gorgrond", label = "Gorgrond", match = { "gorgrond" }, origins = { "gorgrond", "iron docks", "blackrock foundry", "everbloom" } },
@@ -162,6 +214,7 @@ ZoneStyle.provenanceProfiles = {
     { key = "arak", label = "Spires of Arak", match = { "spires of arak" }, origins = { "spires of arak", "skyreach" } },
     { key = "nagrand_draenor", label = "Nagrand", match = { "nagrand draenor" }, origins = { "nagrand", "highmaul" } },
     { key = "tanaan", label = "Tanaan Jungle", match = { "tanaan jungle" }, origins = { "tanaan jungle", "hellfire citadel" } },
+    { key = "ashran", label = "Ashran", match = { "ashran", "warspear", "stormshield" }, origins = { "ashran", "warspear", "stormshield" } },
 
     { key = "azsuna", label = "Azsuna", match = { "azsuna" }, origins = { "azsuna", "eye of azshara", "vault of the wardens" } },
     { key = "valsharah", label = "Val'sharah", match = { "valsharah", "val sharah" }, origins = { "valsharah", "val sharah", "darkheart thicket", "emerald nightmare" } },
@@ -177,6 +230,7 @@ ZoneStyle.provenanceProfiles = {
     { key = "zuldazar", label = "Zuldazar", match = { "zuldazar", "dazaralor", "dazar alor" }, origins = { "zuldazar", "atal dazar", "kings rest", "battle of dazaralor" } },
     { key = "nazmir", label = "Nazmir", match = { "nazmir" }, origins = { "nazmir", "underrot", "uldir" } },
     { key = "voldun", label = "Vol'dun", match = { "voldun", "vol dun" }, origins = { "voldun", "vol dun", "temple of sethraliss" } },
+    { key = "nazjatar", label = "Nazjatar", match = { "nazjatar", "newhome", "mezzamere" }, origins = { "nazjatar", "eternal palace", "newhome", "mezzamere" } },
 
     { key = "bastion", label = "Bastion", match = { "bastion" }, origins = { "bastion", "spires of ascension", "necrotic wake" } },
     { key = "maldraxxus", label = "Maldraxxus", match = { "maldraxxus" }, origins = { "maldraxxus", "theater of pain", "plaguefall" } },
@@ -197,6 +251,8 @@ ZoneStyle.provenanceProfiles = {
     { key = "hallowfall", label = "Hallowfall", match = { "hallowfall" }, origins = { "hallowfall", "priory of the sacred flame", "dawnbreaker" } },
     { key = "azjkahet", label = "Azj-Kahet", match = { "azj kahet" }, origins = { "azj kahet", "ara kara", "city of threads", "nerub ar palace" } },
     { key = "undermine", label = "Undermine", match = { "undermine" }, origins = { "undermine", "liberation of undermine", "operation floodgate" } },
+    { key = "sirenisle", label = "Siren Isle", match = { "siren isle" }, origins = { "siren isle", "storm phase", "flame blessed" } },
+    { key = "karesh", label = "K'aresh", match = { "karesh", "k aresh", "tazavesh" }, origins = { "karesh", "k aresh", "tazavesh", "eco dome", "manaforge omega" } },
 }
 
 local provenanceByKey = {}
@@ -541,6 +597,46 @@ ZoneStyle.profiles = {
         avoid = {},
         description = "Shattered-world survival gear, nether and crystal motifs, draenei relics, fel scars, and ethereal craft.",
     },
+    cataclysm = {
+        label = "Cataclysm Frontiers",
+        seed = 463,
+        match = { "mount hyjal", "vashj ir", "deepholm", "uldum", "twilight highlands", "tol barad", "molten front" },
+        keywords = { elemental = 10, dragon = 8, twilight = 8, earth = 7, stone = 6, flame = 7, tide = 7, wind = 6, titan = 6, explorer = 4 },
+        avoid = { cosmic = -3 },
+        description = "Elemental upheaval, dragon warfare, titan ruins, twilight corruption, and hard-worn expedition gear.",
+    },
+    draenor = {
+        label = "Draenor",
+        seed = 467,
+        match = { "draenor", "frostfire ridge", "shadowmoon valley draenor", "gorgrond", "talador", "spires of arak", "nagrand draenor", "tanaan jungle", "ashran" },
+        keywords = { draenor = 10, clan = 8, iron = 8, primal = 7, frostwolf = 8, warsong = 7, arakkoa = 9, draenei = 7, crystal = 6, gronn = 7 },
+        avoid = { cosmic = -3 },
+        description = "Orc clan craft, Iron Horde industry, arakkoa relics, draenei crystalwork, and untamed primal materials.",
+    },
+    brokenisles = {
+        label = "Broken Isles",
+        seed = 471,
+        match = { "broken isles", "azsuna", "valsharah", "val sharah", "highmountain", "stormheim", "suramar", "broken shore", "argus" },
+        keywords = { legion = 9, fel = 7, ancient = 6, runic = 7, nightborne = 9, vrykul = 7, highmountain = 8, sentinel = 5, demon = 6, titan = 5 },
+        avoid = {},
+        description = "Ancient elven relics, vrykul runes, Highmountain craft, Nightborne magic, and scars of the Legion war.",
+    },
+    nazjatar = {
+        label = "Nazjatar",
+        seed = 475,
+        match = { "nazjatar", "newhome", "mezzamere", "eternal palace" },
+        keywords = { naga = 12, tide = 9, sea = 8, coral = 8, shell = 7, serpent = 7, azshara = 9, abyss = 6, pearl = 6 },
+        avoid = { rustic = -3 },
+        description = "Naga scale, coral and shell, deep-sea magic, royal Azsharan detail, and tide-worn survival gear.",
+    },
+    bfa = {
+        label = "Fourth War",
+        seed = 477,
+        match = { "battle for azeroth", "arathi warfront", "darkshore warfront", "mechagon", "nazjatar" },
+        keywords = { alliance = 6, horde = 6, warfront = 9, marine = 6, expedition = 6, naval = 6, azerite = 9, mechanical = 6, soldier = 6 },
+        avoid = {},
+        description = "Fourth War uniforms, faction heraldry, naval campaigns, Azerite arms, and expedition equipment.",
+    },
     shadowlands = {
         label = "Shadowlands",
         seed = 479,
@@ -573,6 +669,22 @@ ZoneStyle.profiles = {
         avoid = { radiant = -3 },
         description = "Forsaken apothecary gear, blight, plague, ruined Lordaeron heraldry, dark leathers, and bone.",
     },
+    easternkingdoms = {
+        label = "Eastern Kingdoms Frontier",
+        seed = 587,
+        match = { "stranglethorn", "loch modan", "wetlands", "hinterlands", "badlands", "searing gorge", "burning steppes", "swamp of sorrows", "blasted lands" },
+        keywords = { adventurer = 8, militia = 6, explorer = 6, iron = 5, leather = 4, woodland = 5, mountain = 5, frontier = 7, guard = 5 },
+        avoid = { cosmic = -4 },
+        description = "Old-world militia, practical frontier layers, woodland leathers, mountain iron, and road-worn adventuring kit.",
+    },
+    kalimdor = {
+        label = "Kalimdor Wilds",
+        seed = 593,
+        match = { "darkshore", "ashenvale", "stonetalon", "barrens", "dustwallow", "thousand needles", "desolace", "feralas", "tanaris", "un goro", "silithus", "felwood", "winterspring", "azshara" },
+        keywords = { wild = 8, tribal = 6, hide = 6, leather = 5, bone = 4, desert = 5, jungle = 5, nature = 6, expedition = 5, ancient = 4 },
+        avoid = { regal = -3, cosmic = -3 },
+        description = "Wildland hides, tribal craft, desert and jungle survival gear, ancient ruins, and practical expedition pieces.",
+    },
     azeroth = {
         label = "Azeroth Adventurer",
         seed = 601,
@@ -585,8 +697,9 @@ ZoneStyle.profiles = {
 
 local profileOrder = {
     "quelthalas", "amani", "harandar", "voidstorm", "hallowfall", "khazalgar",
-    "dragonisles", "kaldorei", "zandalar", "kultiras", "pandaria", "northrend",
-    "outland", "shadowlands", "human", "orcish", "forsaken",
+    "dragonisles", "cataclysm", "draenor", "brokenisles", "kaldorei", "zandalar",
+    "nazjatar", "kultiras", "pandaria", "northrend", "outland", "bfa", "shadowlands",
+    "human", "orcish", "forsaken", "easternkingdoms", "kalimdor",
 }
 
 local function GetStyleState()
@@ -1372,7 +1485,10 @@ function ZoneStyle.GetSourceEligibility(source, modeKey, context)
     if expansionID == nil then
         return false, "pending", "Waiting for WoW to load this item's era."
     end
-    if expansionID > eraMax then
+    local settings = QC.GetSettings and QC.GetSettings() or {}
+    local restrictToZoneEra = settings.restrictOutfitsToZoneEra ~= false
+    local eraEligibilityText = restrictToZoneEra and ("through " .. tostring(eraLabel)) or "with the zone era limit disabled"
+    if restrictToZoneEra and expansionID > eraMax then
         local expansion = ZoneStyle.expansions[expansionID]
         return false, "era", string.format(
             "%s item; this zone permits Classic through %s.",
@@ -1389,14 +1505,14 @@ function ZoneStyle.GetSourceEligibility(source, modeKey, context)
     end
     local provenance = provenanceByKey[context.provenanceKey]
     if not provenance then
-        return true, "eligible", string.format("Eligible through %s.", eraLabel)
+        return true, "eligible", "Eligible " .. eraEligibilityText .. "."
     end
     context.provenanceKey = provenance.key
     context.provenanceLabel = provenance.label
 
     if curatedOrigin then
         if curatedOrigin.provenanceKey == provenance.key then
-            return true, "eligible", string.format("Curated %s origin; eligible for %s through %s.", curatedOrigin.label, provenance.label, eraLabel)
+            return true, "eligible", string.format("Curated %s origin; eligible for %s %s.", curatedOrigin.label, provenance.label, eraEligibilityText)
         end
         return false, "zone", string.format("%s starter reward; outside the %s source pool.", curatedOrigin.label, provenance.label)
     end
@@ -1404,7 +1520,7 @@ function ZoneStyle.GetSourceEligibility(source, modeKey, context)
     local dropText, dropLabel = GetDropOrigin(source)
     if dropText ~= "" then
         if TextMatchesAny(dropText, provenance.origins) then
-            return true, "eligible", string.format("Eligible for %s through %s.", provenance.label, eraLabel)
+            return true, "eligible", string.format("Eligible for %s %s.", provenance.label, eraEligibilityText)
         end
         return false, "zone", string.format("%s is outside the %s source pool.", dropLabel or "This boss drop", provenance.label)
     end
@@ -1412,14 +1528,14 @@ function ZoneStyle.GetSourceEligibility(source, modeKey, context)
     local trackedOrigin = GetTrackedSourceOrigin(source)
     if trackedOrigin and trackedOrigin.provenanceKey then
         if trackedOrigin.provenanceKey == provenance.key then
-            return true, "eligible", string.format("WoW tracks this appearance to %s; eligible through %s.", trackedOrigin.label, eraLabel)
+            return true, "eligible", string.format("WoW tracks this appearance to %s; eligible %s.", trackedOrigin.label, eraEligibilityText)
         end
         return false, "zone", string.format("WoW tracks this appearance to %s, outside the %s source pool.", trackedOrigin.label, provenance.label)
     end
 
     local metadata = SourceMetadata(source)
     if TextMatchesAny(metadata, provenance.origins) then
-        return true, "eligible", string.format("Eligible for %s through %s.", provenance.label, eraLabel)
+        return true, "eligible", string.format("Eligible for %s %s.", provenance.label, eraEligibilityText)
     end
     local paddedMetadata = " " .. metadata .. " "
     for _, marker in ipairs(provenanceOriginMarkers) do
@@ -1428,7 +1544,9 @@ function ZoneStyle.GetSourceEligibility(source, modeKey, context)
         end
     end
 
-    return true, "eligible", "Era eligible; no conflicting source zone is reported by WoW."
+    return true, "eligible", restrictToZoneEra
+        and "Era eligible; no conflicting source zone is reported by WoW."
+        or "Zone era limit disabled; no conflicting source zone is reported by WoW."
 end
 
 function ZoneStyle.GetContextRestrictionLabel(context)
@@ -1444,7 +1562,9 @@ function ZoneStyle.GetContextRestrictionLabel(context)
     end
     local eraLabel, eraShortLabel = context.eraLabel, context.eraShortLabel
     local provenance = provenanceByKey[context.provenanceKey]
-    return string.format("Through %s%s", eraShortLabel, provenance and (" • " .. provenance.label .. " sources") or ""), eraLabel, provenance
+    local settings = QC.GetSettings and QC.GetSettings() or {}
+    local eraText = settings.restrictOutfitsToZoneEra ~= false and ("Through " .. tostring(eraShortLabel)) or "Zone era limit off"
+    return string.format("%s%s", eraText, provenance and (" • " .. provenance.label .. " sources") or ""), eraLabel, provenance
 end
 
 AddKeywordScore = function(text, keywords, multiplier, reasons, reasonPrefix)

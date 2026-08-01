@@ -149,6 +149,7 @@ local function CacheSummary(cache, diagnostics, sourceCount)
     end
 
     local scanned = cache.scanCompletedAt and UI.FormatShortTimestamp(cache.scanCompletedAt) or "unknown"
+    local maintenance = cache.autoRefreshPending and " • Auto refresh queued" or (cache.dirty and " • Refresh recommended" or "")
     local expected = diagnostics and tonumber(diagnostics.expectedCollected) or 0
     if expected > 0 then
         return string.format(
@@ -156,7 +157,7 @@ local function CacheSummary(cache, diagnostics, sourceCount)
             UI.FormatNumber(sourceCount),
             UI.FormatNumber(expected),
             scanned,
-            cache.dirty and " • Refresh recommended" or ""
+            maintenance
         )
     end
 
@@ -164,7 +165,7 @@ local function CacheSummary(cache, diagnostics, sourceCount)
         "%s previewable visuals • Scanned %s%s",
         UI.FormatNumber(sourceCount),
         scanned,
-        cache.dirty and " • Refresh recommended" or ""
+        maintenance
     )
 end
 
@@ -199,10 +200,36 @@ local function BuildDiagnosticsTooltip(cache, diagnostics, sourceCount, selected
     if cache.scanError then
         table.insert(lines, "Last scan error: " .. tostring(cache.scanError))
     end
+    if cache.scanDurationMS then
+        table.insert(lines, string.format("Last scan duration: %.1f seconds", cache.scanDurationMS / 1000))
+    end
+    if cache.autoRefreshPending then
+        table.insert(lines, "Automatic refresh: waiting for a quiet moment")
+    elseif cache.lastAutoRefreshAt then
+        table.insert(lines, "Last automatic refresh: " .. UI.FormatShortTimestamp(cache.lastAutoRefreshAt))
+    end
+    if cache.lastRecovery then
+        local recovered = (cache.lastRecovery.previewRecovered or 0) + (cache.lastRecovery.conceptRecovered or 0)
+        table.insert(lines, string.format("Last recovery: %d rebound • %d still unavailable", recovered, cache.lastRecovery.missing or 0))
+    end
 
     table.insert(lines, "")
     table.insert(lines, "These counts are not expected to match exactly. Multiple item sources can share one visual, and unusable appearances are excluded from the preview cache.")
     return table.concat(lines, "\n")
+end
+
+local function SetSourceRowBackground(row, selected, preference)
+    local highContrast = QC.GetSettings and QC.GetSettings().highContrastOutfitStates == true
+    if preference == "excluded" then
+        row.background:SetColorTexture(highContrast and 0.34 or 0.16, highContrast and 0.035 or 0.055, highContrast and 0.035 or 0.055, highContrast and 0.96 or 0.82)
+    elseif preference == "favorite" then
+        row.background:SetColorTexture(highContrast and 0.32 or 0.16, highContrast and 0.22 or 0.13, highContrast and 0.025 or 0.045, highContrast and 0.96 or 0.82)
+    elseif selected then
+        row.background:SetColorTexture(highContrast and 0.055 or 0.12, highContrast and 0.32 or 0.18, highContrast and 0.055 or 0.10, highContrast and 0.96 or 0.78)
+    else
+        local shade = highContrast and 0.035 or 0.08
+        row.background:SetColorTexture(shade, shade, shade, highContrast and 0.94 or 0.78)
+    end
 end
 
 function UI.CreateOutfitsTab(parent)
@@ -781,7 +808,8 @@ function UI.CreateOutfitsTab(parent)
         row:SetScript("OnLeave", function(self)
             local selected = Wardrobe.GetSelectedSource(GetCurrentSlot())
             local isSelected = self.source and selected and selected.sourceID == self.source.sourceID
-            self.background:SetColorTexture(isSelected and 0.12 or 0.08, isSelected and 0.18 or 0.08, isSelected and 0.10 or 0.08, 0.78)
+            local preference = self.source and Wardrobe.GetSourceZonePreference(self.source, ZoneStyle.GetCurrentContext())
+            SetSourceRowBackground(self, isSelected, preference)
             GameTooltip:Hide()
         end)
         pane.sourceRows[index] = row
@@ -1087,7 +1115,7 @@ function UI.CreateOutfitsTab(parent)
                     or (eligible and "" or (eligibilityKind == "pending" and " • Loading era" or (eligibilityKind == "promotional" and " • Promo excluded" or " • Not generated"))))
                 row.detail:SetText(string.format("%s • Source %d%s%s", marker, source.sourceID or 0, valid and "" or (" • " .. tostring(reason)), generatedMarker))
                 row:SetEnabled(valid)
-                row.background:SetColorTexture(isSelected and 0.12 or 0.08, isSelected and 0.18 or 0.08, isSelected and 0.10 or 0.08, 0.78)
+                SetSourceRowBackground(row, isSelected, sourceZonePreference)
             end
         end
 
@@ -1115,6 +1143,18 @@ function UI.CreateOutfitsTab(parent)
     end)
     QC.RegisterCallback("WARDROBE_CACHE_DIRTY", pane, function()
         if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("WARDROBE_AUTO_REFRESH_SCHEDULED", pane, function()
+        if pane:IsShown() then pane:Refresh("Collection changed • automatic refresh queued.") end
+    end)
+    QC.RegisterCallback("WARDROBE_AUTO_REFRESH_DEFERRED", pane, function()
+        if pane:IsShown() then pane:Refresh("Automatic refresh deferred • use Rescan Collection when ready.") end
+    end)
+    QC.RegisterCallback("WARDROBE_APPEARANCES_RECOVERED", pane, function(recovery)
+        if pane:IsShown() and recovery then
+            local recovered = (recovery.previewRecovered or 0) + (recovery.conceptRecovered or 0)
+            pane:Refresh(string.format("Collection scan complete • %d changed appearance source%s recovered.", recovered, recovered == 1 and "" or "s"))
+        end
     end)
     QC.RegisterCallback("WARDROBE_SELECTION_CHANGED", pane, function()
         if pane:IsShown() then pane:Refresh() end
@@ -1145,6 +1185,11 @@ function UI.CreateOutfitsTab(parent)
     end)
     QC.RegisterCallback("ACTIVE_QUESTS_UPDATED", pane, function()
         if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("SETTINGS_CHANGED", pane, function(settingName)
+        if pane:IsShown() and (settingName == "restrictOutfitsToZoneEra" or settingName == "highContrastOutfitStates") then
+            pane:Refresh()
+        end
     end)
     QC.RegisterCallback("PLAYER_READY", pane, function()
         if model.SetUnit then model:SetUnit("player") end

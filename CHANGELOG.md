@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.9.0 - 2026-07-31
+
+### Added
+
+- Adds a default-on setting that makes the zone expansion ceiling an explicit progression rule for generated outfits and rerolls.
+- Debounces transmog collection events into one automatic refresh and waits until combat and Blizzard Wardrobe windows are clear.
+- Stores collapsed visual identities beside preview selections and saved concepts, then recovers them when Blizzard changes the representative source after a scan.
+- Records scan duration, automatic-refresh time, and appearance-recovery results in wardrobe diagnostics.
+- Expands local provenance across Classic Eastern Kingdoms and Kalimdor questing zones, Cataclysm regions, missing Pandaria and Battle for Azeroth zones, Ashran, Siren Isle, K'aresh, and current Midnight content.
+- Adds Cataclysm, Draenor, Broken Isles, Nazjatar, Fourth War, Eastern Kingdoms, and Kalimdor style profiles.
+- Adds settings for automatic refresh, source recovery, chat maintenance notices, and high-contrast selected/favorite/excluded rows.
+
+### Improved
+
+- Keeps repeated collection events from causing repeated rescans.
+- Preserves the healthy staging-cache scanner, empty-result protection, per-slot retry behavior, and source-query fallbacks.
+- Surfaces wardrobe readiness on Status & Maintenance and automatic refresh/recovery details in the Outfits diagnostics tooltip.
+
+### Compatibility
+
+- Preserves wardrobe cache format 5, SavedVariables schema 2, and Courier format 1.
+- Migrates existing selections and concepts additively; no cache reset or mandatory rescan is introduced by the release.
+
 ## 0.8.1 - 2026-07-31
 
 ### Improved

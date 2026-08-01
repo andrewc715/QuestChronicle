@@ -16,7 +16,7 @@ local questSyncToken = 0
 
 local SCHEMA_VERSION = 2
 local COURIER_FORMAT_VERSION = 1
-local ADDON_VERSION = "0.8.1"
+local ADDON_VERSION = "0.9.0"
 local PREFIX = "|cffd9b36cQuest Chronicle:|r "
 local OBJECTIVE_SYNC_DELAY = 0.35
 local REMOVAL_CLASSIFY_DELAY = 0.45
@@ -338,6 +338,11 @@ local function EnsureDatabase()
     QuestChronicleDB.settings.showQuestIDs = QuestChronicleDB.settings.showQuestIDs ~= false
     QuestChronicleDB.settings.showDateSeparators = QuestChronicleDB.settings.showDateSeparators ~= false
     QuestChronicleDB.settings.confirmClearDraft = QuestChronicleDB.settings.confirmClearDraft ~= false
+    QuestChronicleDB.settings.restrictOutfitsToZoneEra = QuestChronicleDB.settings.restrictOutfitsToZoneEra ~= false
+    QuestChronicleDB.settings.autoRefreshWardrobe = QuestChronicleDB.settings.autoRefreshWardrobe ~= false
+    QuestChronicleDB.settings.recoverMissingAppearances = QuestChronicleDB.settings.recoverMissingAppearances ~= false
+    QuestChronicleDB.settings.announceWardrobeUpdates = QuestChronicleDB.settings.announceWardrobeUpdates ~= false
+    QuestChronicleDB.settings.highContrastOutfitStates = QuestChronicleDB.settings.highContrastOutfitStates == true
     QuestChronicleDB.characters = QuestChronicleDB.characters or {}
     QuestChronicleDB.ui = QuestChronicleDB.ui or {}
     QuestChronicleDB.ui.lastTab = QuestChronicleDB.ui.lastTab or "chronicle"

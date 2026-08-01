@@ -107,6 +107,22 @@ function UI.CreateStatusTab(parent)
         local courier = status.courierSnapshotSize > 0
             and (UI.green .. "Ready|r • " .. UI.FormatBytes(status.courierSnapshotSize))
             or (UI.red .. "Not generated|r")
+        local wardrobeCache = QC.Wardrobe and QC.Wardrobe.GetCache and QC.Wardrobe.GetCache()
+        local wardrobeState = "Unavailable"
+        if wardrobeCache then
+            if wardrobeCache.autoRefreshPending then
+                wardrobeState = "Refresh queued"
+            elseif wardrobeCache.dirty then
+                wardrobeState = "Refresh recommended"
+            elseif wardrobeCache.scanState == "COMPLETE" or wardrobeCache.scanState == "COMPLETE_WITH_WARNINGS" then
+                wardrobeState = "Current"
+            elseif wardrobeCache.scanState == "FAILED" then
+                wardrobeState = "Last scan failed"
+            else
+                wardrobeState = "Collection scan required"
+            end
+        end
+        local wardrobe = wardrobeCache and string.format("%s • %s visuals", wardrobeState, UI.FormatNumber(wardrobeCache.totalVisuals or 0)) or wardrobeState
 
         statusText:SetText(table.concat({
             string.format("%s%s - %s|r", UI.gold, character.name or "Unknown", character.realm or "Unknown Realm"),
@@ -118,6 +134,7 @@ function UI.CreateStatusTab(parent)
             "Last event: " .. lastEvent,
             "Last quest sync: " .. lastSync,
             "Courier snapshot: " .. courier,
+            "Wardrobe: " .. wardrobe,
         }, "\n"))
 
         for _, checkBox in ipairs(self.checkBoxes) do
@@ -160,6 +177,15 @@ function UI.CreateStatusTab(parent)
         if pane:IsShown() then pane:Refresh() end
     end)
     QC.RegisterCallback("SETTINGS_CHANGED", pane, function()
+        if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("WARDROBE_CACHE_DIRTY", pane, function()
+        if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("WARDROBE_SCAN_COMPLETE", pane, function()
+        if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("WARDROBE_AUTO_REFRESH_SCHEDULED", pane, function()
         if pane:IsShown() then pane:Refresh() end
     end)
     QC.RegisterCallback("PLAYER_READY", pane, function()
