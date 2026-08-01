@@ -1085,6 +1085,16 @@ function UI.CreateOutfitsTab(parent)
         excludeSource:SetEnabled(selected ~= nil)
         favoriteSource:SetText(sourcePreference == "favorite" and "Unfavor" or "Favor in Zone")
         excludeSource:SetText(sourcePreference == "excluded" and "Allow in Zone" or "Exclude in Zone")
+        if sourcePreference == "favorite" then
+            UI.SetTooltip(favoriteSource, "Remove Zone Favorite", "Stop favoring the selected visual when generating outfits in this zone.")
+        else
+            UI.SetTooltip(favoriteSource, "Favorite for This Zone", "Strongly favor the selected visual when generating outfits in this zone. Favorites still obey era, provenance, promotion, coherence, and weapon rules.")
+        end
+        if sourcePreference == "excluded" then
+            UI.SetTooltip(excludeSource, "Allow in This Zone", "Remove the zone exclusion so this visual can be generated here again when it passes the other outfit rules.")
+        else
+            UI.SetTooltip(excludeSource, "Exclude for This Zone", "Never generate the selected visual in this zone. You can still browse and preview it manually.")
+        end
 
         local diagnostics = Wardrobe.GetSlotDiagnostics(slotKey)
         statusText:SetText(message or CacheSummary(cache, diagnostics, #sources))

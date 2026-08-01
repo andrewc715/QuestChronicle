@@ -1,8 +1,8 @@
-# Quest Chronicle v0.9.0
+# Quest Chronicle v0.9.1
 
-> **Era and Collection Polish:** v0.9.0 finishes strict expansion progression, automatic collection refresh, stable-visual recovery, broad zone coverage, scan timing, and accessible outfit-state controls.
+> **Zone Preference Toggle Hotfix:** v0.9.1 restores both directions of Favor/Unfavor and Exclude/Allow and keeps their tooltips synchronized with the current action.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.9.0 hardens the outfit systems built across v0.7 and v0.8 without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.9.1 includes the complete Era and Collection Polish release plus the zone-preference toggle repair, without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -168,6 +168,7 @@ QuestChronicle\
 ├── CHRONICLE_INTELLIGENCE_V080_TEST_CHECKLIST.md
 ├── CURRENT_LOOK_TOOLTIPS_V081_TEST_CHECKLIST.md
 ├── ERA_COLLECTION_POLISH_V090_TEST_CHECKLIST.md
+├── ZONE_PREFERENCE_TOGGLE_V091_TEST_CHECKLIST.md
 ├── WARDROBE_SCANNER_RECOVERY_TEST_CHECKLIST.md
 └── COURIER_CONFIG_PATCH.json
 ```

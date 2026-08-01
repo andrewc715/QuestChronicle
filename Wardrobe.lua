@@ -732,14 +732,20 @@ function Wardrobe.ToggleZoneFavorite(slotKey, sourceID, context)
     local source = GetSourceByID(slotKey, sourceID)
     if not source then return false, "Select a cached appearance first." end
     local current = Wardrobe.GetSourceZonePreference(source, context)
-    return Wardrobe.SetSourceZonePreference(source, current == "favorite" and nil or "favorite", context)
+    if current == "favorite" then
+        return Wardrobe.SetSourceZonePreference(source, nil, context)
+    end
+    return Wardrobe.SetSourceZonePreference(source, "favorite", context)
 end
 
 function Wardrobe.ToggleZoneExclusion(slotKey, sourceID, context)
     local source = GetSourceByID(slotKey, sourceID)
     if not source then return false, "Select a cached appearance first." end
     local current = Wardrobe.GetSourceZonePreference(source, context)
-    return Wardrobe.SetSourceZonePreference(source, current == "excluded" and nil or "excluded", context)
+    if current == "excluded" then
+        return Wardrobe.SetSourceZonePreference(source, nil, context)
+    end
+    return Wardrobe.SetSourceZonePreference(source, "excluded", context)
 end
 
 function Wardrobe.GetZonePreferenceSummary(context)

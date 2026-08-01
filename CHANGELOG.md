@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.9.1 - 2026-07-31
+
+### Fixed
+
+- Fixes **Unfavor** silently reapplying the current zone favorite instead of clearing it.
+- Fixes **Allow in Zone** silently reapplying the current zone exclusion instead of clearing it.
+- Replaces the invalid Lua `condition and nil or value` pseudo-ternary with explicit clear/apply branches.
+- Updates both preference-button tooltips with the action currently shown on the button.
+
+### Compatibility
+
+- Preserves every v0.9.0 era, collection, recovery, performance, coverage, settings, and accessibility improvement.
+- Preserves wardrobe cache format 5, SavedVariables schema 2, and Courier format 1.
+- Requires no collection rescan.
+
 ## 0.9.0 - 2026-07-31
 
 ### Added
