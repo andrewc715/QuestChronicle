@@ -1,65 +1,60 @@
-# Quest Chronicle v1.6.6: Weapon Option Matrix Repair
+# Quest Chronicle v1.6.7: Linked Weapon Option-Owner Repair
 
-Version 1.6.6 is a root-cause repair for Fury Warrior one-handed appearance generation over physically equipped two-handed weapons.
+Version 1.6.7 fixes the remaining Fury Warrior case where Quest Chronicle correctly recognized **Dual two-handed weapons equipped**, allowed one-handed appearances, and generated a one-handed Main Hand, but left the Secondary Hand on its physically equipped two-handed weapon.
 
-## What the live screenshots proved
+## What the live evidence proved
 
-- Physical topology was correct: Xyrkian remained **Dual two-handed weapons equipped**.
-- The Main Hand could generate a permitted one-handed appearance.
-- The Secondary Hand remained on its equipped two-handed appearance.
-- **Current Preview** confirmed this was not only a model-rendering defect: Main Hand was `Selected`, while Off-Hand was still `Equipped`.
-- Two-handed appearance generation continued to select both hands correctly.
+The topology label was already correct. Quest Chronicle knew that both physical weapon hands contained two-handed weapons.
 
-That combination isolated the defect to secondary-hand permission discovery rather than source linking or model dressing.
+The decisive evidence was the Current Preview manifest:
+
+- `One-Hand` was `Selected`;
+- `Off-Hand` remained `Equipped`.
+
+That means the problem occurred before model rendering. Quest Chronicle never committed a generated `OFF_HAND` selection.
 
 ## Root cause
 
-Quest Chronicle asked Blizzard for the currently equipped weapon option through `GetEquippedSlotOptionFromTransmogSlot()`, then checked appearance categories only against that one option.
+Blizzard models certain weapon slots as a linked primary/secondary pair.
 
-Blizzard's native Transmog interface uses a broader model:
+The primary slot owns the weapon-option dropdown. Blizzard then uses the option selected on the primary slot when it resolves the linked secondary appearance. The secondary slot does not necessarily expose the complete option list independently.
 
-1. `GetWeaponOptionsForSlot()` returns every enabled standard and artifact editing option for the hand.
-2. The equipped option is only the preferred default in the dropdown.
-3. `GetCollectionInfoForSlotAndOption()` decides which categories are valid for each selected option.
+Quest Chronicle v1.6.6 asked each hand for its own option list. In the live Fury case:
 
-For Fury, the physical item can remain a two-handed weapon while a separate enabled **One-Handed Weapon** option permits one-handed appearances. Checking only the equipped two-hand option caused the second hand to reject the one-hand family before linked generation could run.
+- Main Hand exposed the one-handed appearance option;
+- Secondary Hand independently exposed only the equipped two-handed option;
+- the one-handed secondary appearance was rejected before linked generation ran.
 
 ## Changes
 
-- Replaces the single equipped-option permission check with a complete per-hand weapon-option matrix.
-- Enumerates all enabled standard and artifact options returned by Blizzard for Main Hand and Secondary Hand.
-- Checks every selected appearance category against every enabled option for that hand.
-- Prefers the equipped option first for stable ordinary behavior, but no longer treats it as the complete permission set.
-- Records the exact Blizzard option that granted each subtype, including its native name.
-- Uses that resolved option consistently for:
-  - family availability;
-  - subtype flyouts;
-  - generation;
-  - linked secondary-hand generation;
-  - browser filtering;
-  - rerolls;
-  - locked-weapon validation.
-- Preserves the stable synchronous preview path restored in v1.6.5.
-- Keeps the existing strict linked-hand ladder: same visual first, same exact subtype second, no unrelated fallback.
-- Improves subtype tooltips so they identify the Blizzard weapon option granting permission, or report how many enabled options rejected it.
+- Uses `C_TransmogOutfitInfo.GetLinkedSlotInfo()` to identify linked primary and secondary weapon slots.
+- Fetches equipped, standard, and artifact weapon options from the linked **primary** slot.
+- Tests those shared options against the actual requested target slot through `GetCollectionInfoForSlotAndOption()`.
+- Records the primary option-owner slot and linked-secondary target in capability diagnostics.
+- Treats Blizzard's linked slot-and-option permission as authoritative during generated-source validation.
+- Improves subtype tooltips so a linked secondary permission explains that it was granted through the primary hand's weapon option.
+- Preserves strict linked generation:
+  - exact same visual first;
+  - same exact subtype second;
+  - no unrelated weapon fallback.
+- Does not modify the stable synchronous character-preview path restored in v1.6.5.
 
 ## Expected Fury behavior
 
-With two two-handed weapons physically equipped, **One-Hand** enabled, **Two-Hand** disabled, **One-Handed Sword** selected, and **Link weapon hands** enabled:
+With two physical two-handed weapons equipped, One-Hand enabled, Two-Hand disabled, One-Handed Sword selected, and Link weapon hands enabled:
 
-- the physical-topology label remains `Dual two-handed weapons equipped`;
-- Main Hand resolves One-Handed Sword through Blizzard's enabled one-hand option;
-- Secondary Hand independently resolves the same one-hand option;
+- topology remains `Dual two-handed weapons equipped`;
+- Main Hand and Secondary Hand both resolve the one-handed option owned by the linked primary slot;
 - generation writes both `ONE_HAND` and `OFF_HAND` selections;
-- Current Preview lists both weapons as `Selected`;
-- the model receives targeted `TryOn()` calls for `MAINHANDSLOT` and `SECONDARYHANDSLOT`.
+- Current Preview lists both weapon entries as `Selected`;
+- the embedded model receives targeted Main Hand and Secondary Hand preview calls.
 
-A non-Fury two-handed layout that exposes only the two-hand option remains Two-Hand only.
+A character whose linked primary slot exposes only a two-handed option remains restricted to Two-Hand appearances.
 
 ## Compatibility
 
 - SavedVariables schema remains 2.
 - Courier format remains 1.
 - Wardrobe cache format remains 6.
-- No wardrobe scan, concept migration, or Custom Set rebuild is required solely for this update.
-- Existing concepts, linked Custom Sets, Chronicle records, RP notes, settings, and Courier data remain intact.
+- No wardrobe rescan, concept migration, or Custom Set rebuild is required.
+- Existing concepts, Custom Set links, Chronicle records, RP notes, settings, and Courier data remain intact.

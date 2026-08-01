@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.6.7 - 2026-08-01
+
+### Fixed
+
+- Corrected Fury linked-hand permission discovery by treating Main Hand and Secondary Hand as Blizzard's linked weapon-slot pair.
+- Uses `GetLinkedSlotInfo()` to identify the primary slot that owns the weapon-option dropdown.
+- Resolves the secondary hand with the primary hand's enabled weapon options, matching Blizzard's native Transmog preview behavior.
+- Keeps the permission query targeted at the actual secondary slot while sharing the primary option channel.
+- Restores linked one-handed Fury generation so both `ONE_HAND` and `OFF_HAND` selections are committed.
+- Adds linked-slot diagnostics identifying the primary option owner and secondary target.
+- Leaves the stable synchronous preview path untouched.
+
+### Compatibility
+
+- Preserves SavedVariables schema 2, Courier format 1, and wardrobe cache format 6.
+- No wardrobe rescan, concept migration, or Custom Set rebuild is required.
+
 ## 1.6.6 - 2026-08-01
 
 ### Fixed

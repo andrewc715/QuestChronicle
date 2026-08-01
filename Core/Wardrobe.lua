@@ -1189,14 +1189,54 @@ local function GetTransmogOutfitSlotForInventorySlotName(slotName)
     return SafeCall(C_TransmogOutfitInfo.GetTransmogOutfitSlotFromInventorySlot, inventorySlotID)
 end
 
+local function GetLinkedWeaponSlotContext(outfitSlot)
+    local context = {
+        requestedSlot = outfitSlot,
+        optionOwnerSlot = outfitSlot,
+        primarySlot = outfitSlot,
+        secondarySlot = nil,
+        isLinked = false,
+        isSecondary = false,
+    }
+    if outfitSlot == nil or not C_TransmogOutfitInfo or type(C_TransmogOutfitInfo.GetLinkedSlotInfo) ~= "function" then
+        return context
+    end
+
+    local linked = SafeCall(C_TransmogOutfitInfo.GetLinkedSlotInfo, outfitSlot)
+    if type(linked) ~= "table" or type(linked.primarySlotInfo) ~= "table" or type(linked.secondarySlotInfo) ~= "table" then
+        return context
+    end
+
+    local primarySlot = linked.primarySlotInfo.slot
+    local secondarySlot = linked.secondarySlotInfo.slot
+    if primarySlot == nil or secondarySlot == nil then
+        return context
+    end
+
+    context.isLinked = true
+    context.primarySlot = primarySlot
+    context.secondarySlot = secondarySlot
+    context.optionOwnerSlot = primarySlot
+    context.isSecondary = outfitSlot == secondarySlot
+    context.linkedSlotInfo = linked
+    return context
+end
+
 local function GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)
-    if outfitSlot == nil or not C_TransmogOutfitInfo then return {} end
+    if outfitSlot == nil or not C_TransmogOutfitInfo then return {}, nil, GetLinkedWeaponSlotContext(outfitSlot) end
+
+    -- Blizzard treats linked weapon hands as one option channel. The primary
+    -- slot owns the weapon-option dropdown, while the selected option is also
+    -- used to resolve the secondary slot's appearance. Asking the secondary
+    -- slot for an independent option list can omit Fury's one-hand option.
+    local slotContext = GetLinkedWeaponSlotContext(outfitSlot)
+    local optionOwnerSlot = slotContext.optionOwnerSlot or outfitSlot
 
     local candidates = {}
     local seen = {}
     local equippedOption
     if type(C_TransmogOutfitInfo.GetEquippedSlotOptionFromTransmogSlot) == "function" then
-        equippedOption = SafeCall(C_TransmogOutfitInfo.GetEquippedSlotOptionFromTransmogSlot, outfitSlot)
+        equippedOption = SafeCall(C_TransmogOutfitInfo.GetEquippedSlotOptionFromTransmogSlot, optionOwnerSlot)
     end
 
     local function AddOption(optionInfo, isArtifact)
@@ -1215,7 +1255,7 @@ local function GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)
 
     local weaponOptions, artifactOptions
     if type(C_TransmogOutfitInfo.GetWeaponOptionsForSlot) == "function" then
-        weaponOptions, artifactOptions = SafeCall(C_TransmogOutfitInfo.GetWeaponOptionsForSlot, outfitSlot)
+        weaponOptions, artifactOptions = SafeCall(C_TransmogOutfitInfo.GetWeaponOptionsForSlot, optionOwnerSlot)
     end
 
     -- Blizzard exposes every enabled editing option for the hand. The equipped
@@ -1257,7 +1297,7 @@ local function GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)
         })
     end
 
-    return candidates, equippedOption
+    return candidates, equippedOption, slotContext
 end
 
 local function GetBlizzardWeaponCategoryPermission(slotName, categoryID)
@@ -1270,7 +1310,7 @@ local function GetBlizzardWeaponCategoryPermission(slotName, categoryID)
     local outfitSlot = GetTransmogOutfitSlotForInventorySlotName(slotName)
     if outfitSlot == nil then return nil, nil end
 
-    local options, equippedOption = GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)
+    local options, equippedOption, slotContext = GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)
     local checked = {}
     for _, optionInfo in ipairs(options) do
         local collectionInfo = SafeCall(
@@ -1294,7 +1334,11 @@ local function GetBlizzardWeaponCategoryPermission(slotName, categoryID)
                 weaponOptionName = optionInfo.name,
                 equippedWeaponOption = equippedOption,
                 collectionName = collectionInfo.name,
-                method = "OUTFIT_SLOT_OPTION_MATRIX",
+                method = slotContext and slotContext.isLinked and "LINKED_OUTFIT_SLOT_OPTION_MATRIX" or "OUTFIT_SLOT_OPTION_MATRIX",
+                optionOwnerSlot = slotContext and slotContext.optionOwnerSlot or outfitSlot,
+                linkedPrimarySlot = slotContext and slotContext.primarySlot or nil,
+                linkedSecondarySlot = slotContext and slotContext.secondarySlot or nil,
+                linkedSecondary = slotContext and slotContext.isSecondary == true or false,
                 optionsChecked = checked,
             }
         end
@@ -1303,7 +1347,11 @@ local function GetBlizzardWeaponCategoryPermission(slotName, categoryID)
     return false, {
         outfitSlot = outfitSlot,
         equippedWeaponOption = equippedOption,
-        method = "OUTFIT_SLOT_OPTION_MATRIX",
+        method = slotContext and slotContext.isLinked and "LINKED_OUTFIT_SLOT_OPTION_MATRIX" or "OUTFIT_SLOT_OPTION_MATRIX",
+        optionOwnerSlot = slotContext and slotContext.optionOwnerSlot or outfitSlot,
+        linkedPrimarySlot = slotContext and slotContext.primarySlot or nil,
+        linkedSecondarySlot = slotContext and slotContext.secondarySlot or nil,
+        linkedSecondary = slotContext and slotContext.isSecondary == true or false,
         optionsChecked = checked,
     }
 end
@@ -1363,14 +1411,20 @@ local function BuildWeaponHandCapability(handKey, itemInfo, slotName, allowWitho
             weaponOption = permissionDetails and permissionDetails.weaponOption or nil,
             weaponOptionName = permissionDetails and permissionDetails.weaponOptionName or nil,
             equippedWeaponOption = permissionDetails and permissionDetails.equippedWeaponOption or nil,
+            optionOwnerSlot = permissionDetails and permissionDetails.optionOwnerSlot or nil,
+            linkedPrimarySlot = permissionDetails and permissionDetails.linkedPrimarySlot or nil,
+            linkedSecondarySlot = permissionDetails and permissionDetails.linkedSecondarySlot or nil,
+            linkedSecondary = permissionDetails and permissionDetails.linkedSecondary == true or false,
             optionsChecked = permissionDetails and permissionDetails.optionsChecked or nil,
-            reason = available and (permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX"
+            reason = available and (permissionDetails and (permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX" or permissionDetails.method == "LINKED_OUTFIT_SLOT_OPTION_MATRIX")
                     and (permissionDetails.weaponOptionName
-                        and ("Blizzard permits this appearance through the " .. tostring(permissionDetails.weaponOptionName) .. " option for this hand.")
+                        and (permissionDetails.method == "LINKED_OUTFIT_SLOT_OPTION_MATRIX" and permissionDetails.linkedSecondary
+                            and ("Blizzard permits this appearance in the linked secondary hand through the primary hand's " .. tostring(permissionDetails.weaponOptionName) .. " option.")
+                            or ("Blizzard permits this appearance through the " .. tostring(permissionDetails.weaponOptionName) .. " option for this hand."))
                         or "Blizzard permits this appearance through an enabled weapon option for this hand.")
                     or "Blizzard permits this appearance category for the equipped hand.")
                 or (count == 0 and "No collected previewable appearances are cached for this type."
-                or (itemInfo and permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX"
+                or (itemInfo and permissionDetails and (permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX" or permissionDetails.method == "LINKED_OUTFIT_SLOT_OPTION_MATRIX")
                     and ("Blizzard rejected this appearance across " .. tostring(#(permissionDetails.optionsChecked or {})) .. " enabled weapon option(s) for this hand.")
                 or (itemInfo and "Blizzard does not permit this appearance category for the equipped hand."
                 or "No equipped item is available for Blizzard compatibility validation."))),
@@ -1749,7 +1803,8 @@ local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, cont
     -- is the authoritative answer. The older appearance usability flags can
     -- remain false even while the native Transmog UI permits the category.
     local appearance = GetGenerationAppearance(source, definition, context)
-    local nativeSlotRule = permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX"
+    local nativeSlotRule = permissionDetails and (permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX"
+        or permissionDetails.method == "LINKED_OUTFIT_SLOT_OPTION_MATRIX")
 
     if appearance and appearance.isCollected == false then
         return Finish(false, "WoW no longer reports this weapon visual as collected.")
@@ -1799,8 +1854,11 @@ local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, cont
         end
     end
 
-    return Finish(true, permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX"
-        and "Compatible with Blizzard's enabled slot and weapon option"
+    return Finish(true, permissionDetails and (permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX"
+        or permissionDetails.method == "LINKED_OUTFIT_SLOT_OPTION_MATRIX")
+        and (permissionDetails.method == "LINKED_OUTFIT_SLOT_OPTION_MATRIX"
+            and "Compatible with Blizzard's linked primary weapon option"
+            or "Compatible with Blizzard's enabled slot and weapon option")
         or "Compatible with the equipped item")
 end
 

@@ -1,8 +1,8 @@
-# Quest Chronicle v1.6.6
+# Quest Chronicle v1.6.7
 
-> **Weapon-option matrix repair:** v1.6.6 mirrors Blizzard's complete per-hand weapon-option dropdown rather than testing only the physically equipped option, allowing Fury one-hand appearances to resolve independently for both weapon hands.
+> **Linked weapon option-owner repair:** v1.6.7 follows Blizzard's linked-slot model: the primary weapon slot owns the appearance-option list, and that same option is used to resolve the linked secondary hand.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.6.6 preserves physical weapon topology while inheriting Blizzard's complete enabled appearance-option rules for each hand.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.6.7 preserves physical dual-two-hand topology while correctly generating linked one-hand appearances for both Fury weapon hands.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
