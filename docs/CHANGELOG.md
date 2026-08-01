@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.1 - 2026-07-31
+
+### Fixed
+
+- Removed the protected `C_TransmogOutfitInfo` save pipeline that caused `ADDON_ACTION_FORBIDDEN`.
+- Ordinary concept Save / Update no longer performs any native save.
+- Migrates away obsolete `blizzardOutfitID` synchronization fields.
+
+### Added
+
+- Saves concepts to Blizzard Custom Sets through `C_TransmogCollection.NewCustomSet` and `ModifyCustomSet`.
+- Dynamic Save to Custom Sets / Update Custom Set action.
+- Save as New and Replace Existing workflows.
+- Native Custom Set picker and replacement backups.
+- `TRANSMOG_CUSTOM_SETS_CHANGED` verification with timeout fallback.
+
 ## 1.0.0 - 2026-07-31
 
 ### Added

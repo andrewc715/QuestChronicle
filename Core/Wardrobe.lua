@@ -11,8 +11,8 @@ local AUTO_REFRESH_RETRY_DELAY = 2.0
 local AUTO_REFRESH_MAX_ATTEMPTS = 15
 local autoRefreshToken = 0
 local internalUsabilityUpdateUntil
-local pendingNativeOutfitSync
-local NATIVE_OUTFIT_SYNC_TIMEOUT = 5.0
+local pendingCustomSetSync
+local CUSTOM_SET_SYNC_TIMEOUT = 5.0
 
 -- Resolve collection enum values when the scan runs instead of when this file loads.
 -- Some Blizzard enum tables are not ready during early addon loading.
@@ -142,11 +142,20 @@ local function EnsureConceptStore()
     cache.conceptsByCharacter[characterKey] = cache.conceptsByCharacter[characterKey] or {}
     local store = cache.conceptsByCharacter[characterKey]
     for _, concept in pairs(store) do
-        if concept.blizzardOutfitID ~= nil then
-            concept.blizzardOutfitID = tonumber(concept.blizzardOutfitID)
+        -- v1.0.1 retires the protected native Outfit-slot pipeline. Existing
+        -- concepts remain authoritative; only obsolete synchronization fields
+        -- are discarded during migration.
+        concept.blizzardOutfitID = nil
+        concept.blizzardOutfitName = nil
+        concept.blizzardOutfitIcon = nil
+        concept.blizzardSyncedAt = nil
+        concept.blizzardSyncPendingAt = nil
+        concept.blizzardSyncError = nil
+        if concept.blizzardCustomSetID ~= nil then
+            concept.blizzardCustomSetID = tonumber(concept.blizzardCustomSetID)
         end
-        if concept.blizzardSyncPendingAt and (not pendingNativeOutfitSync or pendingNativeOutfitSync.conceptID ~= concept.id) then
-            concept.blizzardSyncPendingAt = nil
+        if concept.customSetSyncPendingAt and (not pendingCustomSetSync or pendingCustomSetSync.conceptID ~= concept.id) then
+            concept.customSetSyncPendingAt = nil
         end
     end
     return store, characterKey
@@ -1428,47 +1437,28 @@ function Wardrobe.DeleteConcept(conceptID)
     return true, "Deleted outfit concept: " .. tostring(concept.name or "Unnamed")
 end
 
-local NATIVE_SLOT_FALLBACKS = {
-    HEAD = 0,
-    SHOULDER = 1,
-    BACK = 3,
-    CHEST = 4,
-    TABARD = 5,
+local CUSTOM_SET_SLOT_INDEX = {
+    HEAD = 1,
+    SHOULDER = 2,
+    BACK = 4,
+    CHEST = 5,
     SHIRT = 6,
-    WRIST = 7,
-    HANDS = 8,
-    WAIST = 9,
-    LEGS = 10,
-    FEET = 11,
-    MAIN_HAND = 12,
-    OFF_HAND = 13,
+    TABARD = 7,
+    WRIST = 8,
+    HANDS = 9,
+    WAIST = 10,
+    LEGS = 11,
+    FEET = 12,
+    ONE_HAND = 13,
+    TWO_HAND = 13,
+    RANGED = 13,
+    OFF_HAND = 16,
 }
 
-local function NativeEnum(groupName, valueName, fallback)
-    local group = Enum and Enum[groupName]
-    local value = group and group[valueName]
-    if value == nil then return fallback end
-    return value
-end
-
-local function GetNativeOutfitSlot(definition)
-    if definition and definition.slotName and C_TransmogOutfitInfo and C_TransmogOutfitInfo.GetTransmogOutfitSlotFromInventorySlot then
-        local inventorySlot = SafeCall(GetInventorySlotInfo, definition.slotName)
-        local nativeSlot = inventorySlot and SafeCall(C_TransmogOutfitInfo.GetTransmogOutfitSlotFromInventorySlot, inventorySlot)
-        if nativeSlot ~= nil then return nativeSlot end
-    end
-    return definition and NATIVE_SLOT_FALLBACKS[definition.key]
-end
+local CUSTOM_SET_LIST_SIZE = 17
 
 local function GetConceptSource(concept, slotKey)
     return concept and GetSourceByID(slotKey, concept.selections and concept.selections[slotKey]) or nil
-end
-
-local function GetConceptVisualID(concept, slotKey)
-    local visualID = concept and concept.visuals and concept.visuals[slotKey]
-    if visualID then return tonumber(visualID) end
-    local source = GetConceptSource(concept, slotKey)
-    return source and tonumber(source.visualID) or nil
 end
 
 local function GetConceptOutfitIcon(concept)
@@ -1479,279 +1469,266 @@ local function GetConceptOutfitIcon(concept)
     return 134938 -- INV_Misc_Book_09
 end
 
-local function GetNativeOutfitInfo(outfitID)
-    if not outfitID or not C_TransmogOutfitInfo then return nil end
-    return SafeCall(C_TransmogOutfitInfo.GetOutfitInfo, tonumber(outfitID))
+local function EmptyItemTransmogInfo()
+    if ItemUtil and type(ItemUtil.CreateItemTransmogInfo) == "function" then
+        return ItemUtil.CreateItemTransmogInfo(0, 0, 0)
+    end
+    return { appearanceID = 0, secondaryAppearanceID = 0, illusionID = 0 }
 end
 
-local function ResolveWeaponOption(slotKey, source)
-    if slotKey == "TWO_HAND" then
-        return NativeEnum("TransmogOutfitSlotOption", "TwoHandedWeapon", 2)
-    elseif slotKey == "RANGED" then
-        return NativeEnum("TransmogOutfitSlotOption", "RangedWeapon", 3)
-    elseif slotKey == "OFF_HAND" then
-        if source and tonumber(source.categoryID) == 18 then
-            return NativeEnum("TransmogOutfitSlotOption", "Shield", 5)
-        elseif source and tonumber(source.categoryID) == 19 then
-            return NativeEnum("TransmogOutfitSlotOption", "OffHand", 4)
+local function CreateItemTransmogInfo(sourceID)
+    sourceID = tonumber(sourceID) or 0
+    if ItemUtil and type(ItemUtil.CreateItemTransmogInfo) == "function" then
+        return ItemUtil.CreateItemTransmogInfo(sourceID, 0, 0)
+    end
+    return { appearanceID = sourceID, secondaryAppearanceID = 0, illusionID = 0 }
+end
+
+local function CreateEmptyCustomSetList()
+    if TransmogUtil and type(TransmogUtil.GetEmptyItemTransmogInfoList) == "function" then
+        local list = SafeCall(TransmogUtil.GetEmptyItemTransmogInfoList)
+        if type(list) == "table" then return list end
+    end
+    local list = {}
+    for index = 1, CUSTOM_SET_LIST_SIZE do
+        list[index] = EmptyItemTransmogInfo()
+    end
+    return list
+end
+
+local function BuildConceptCustomSetList(concept)
+    local list = CreateEmptyCustomSetList()
+    local populated = 0
+    for _, definition in ipairs(Wardrobe.slotDefinitions) do
+        local index = CUSTOM_SET_SLOT_INDEX[definition.key]
+        if index and not (concept.hidden and concept.hidden[definition.key]) then
+            local sourceID = concept.selections and tonumber(concept.selections[definition.key])
+            if sourceID then
+                list[index] = CreateItemTransmogInfo(sourceID)
+                populated = populated + 1
+            end
         end
-        return NativeEnum("TransmogOutfitSlotOption", "OneHandedWeapon", 1)
-    elseif source and tonumber(source.categoryID) == 16 then
-        return NativeEnum("TransmogOutfitSlotOption", "DeprecatedReuseMe", 6)
     end
-    return NativeEnum("TransmogOutfitSlotOption", "OneHandedWeapon", 1)
+    return list, populated
 end
 
-local function FinishNativeOutfitSync(success, message, outfitID)
-    local request = pendingNativeOutfitSync
-    if not request then return end
-    local store = EnsureConceptStore()
-    local concept = store[request.conceptID]
-    if concept then
-        concept.blizzardSyncPendingAt = nil
-        if success and outfitID then
-            concept.blizzardOutfitID = tonumber(outfitID)
-            concept.blizzardOutfitName = request.name
-            concept.blizzardOutfitIcon = request.icon
-            concept.blizzardSyncedAt = time()
-            concept.blizzardSyncError = nil
-        elseif not success then
-            concept.blizzardSyncError = message
-        end
-    end
-    pendingNativeOutfitSync = nil
-    if QC.Notify then
-        QC.Notify("WARDROBE_NATIVE_OUTFIT_SYNCED", concept, success, message)
-        QC.Notify("WARDROBE_CONCEPTS_CHANGED", concept)
-    end
+local function GetCustomSetInfo(customSetID)
+    if not customSetID or not C_TransmogCollection then return nil end
+    local name, icon = SafeCall(C_TransmogCollection.GetCustomSetInfo, tonumber(customSetID))
+    if not name then return nil end
+    return { customSetID = tonumber(customSetID), name = name, icon = icon }
 end
 
-local function FindNativeOutfitByName(name)
-    local info = SafeCall(C_TransmogOutfitInfo and C_TransmogOutfitInfo.GetOutfitInfoByName, name)
-    if info and info.outfitID then return info end
-    for _, candidate in ipairs(SafeCall(C_TransmogOutfitInfo and C_TransmogOutfitInfo.GetOutfitsInfo) or {}) do
-        if string.lower(candidate.name or "") == string.lower(name or "") then return candidate end
+function Wardrobe.GetCustomSets()
+    local sets = {}
+    if not C_TransmogCollection or type(C_TransmogCollection.GetCustomSets) ~= "function" then
+        return sets
+    end
+    for _, customSetID in ipairs(SafeCall(C_TransmogCollection.GetCustomSets) or {}) do
+        local info = GetCustomSetInfo(customSetID)
+        if info then table.insert(sets, info) end
+    end
+    table.sort(sets, function(left, right)
+        local leftName = string.lower(left.name or "")
+        local rightName = string.lower(right.name or "")
+        if leftName == rightName then return (left.customSetID or 0) < (right.customSetID or 0) end
+        return leftName < rightName
+    end)
+    return sets
+end
+
+local function FindCustomSetByName(name)
+    for _, info in ipairs(Wardrobe.GetCustomSets()) do
+        if string.lower(info.name or "") == string.lower(name or "") then return info end
     end
     return nil
 end
 
-local function SetNativePending(slot, option, transmogID, displayType)
-    local appearanceType = NativeEnum("TransmogType", "Appearance", 0)
-    return TryCall(
-        C_TransmogOutfitInfo and C_TransmogOutfitInfo.SetPendingTransmog,
-        slot,
-        appearanceType,
-        option,
-        tonumber(transmogID) or 0,
-        displayType
-    )
+local function GetAppearanceID(info)
+    if type(info) ~= "table" then return 0 end
+    return tonumber(info.appearanceID) or 0
 end
 
-local function StageNativeOutfitSync()
-    local request = pendingNativeOutfitSync
-    if not request or request.phase ~= "WAITING_VIEW" then return end
-    if request.outfitID and C_TransmogOutfitInfo and C_TransmogOutfitInfo.GetCurrentlyViewedOutfitID then
-        local viewedOutfitID = SafeCall(C_TransmogOutfitInfo.GetCurrentlyViewedOutfitID)
-        if viewedOutfitID and tonumber(viewedOutfitID) ~= tonumber(request.outfitID) then return end
+local function CustomSetListsMatch(left, right)
+    left, right = left or {}, right or {}
+    for index = 1, CUSTOM_SET_LIST_SIZE do
+        if GetAppearanceID(left[index]) ~= GetAppearanceID(right[index]) then return false end
     end
+    return true
+end
+
+local function VerifyCustomSet(customSetID, expectedList)
+    if not customSetID or not C_TransmogCollection then return false end
+    local actual = SafeCall(C_TransmogCollection.GetCustomSetItemTransmogInfoList, tonumber(customSetID))
+    return type(actual) == "table" and CustomSetListsMatch(actual, expectedList)
+end
+
+local function FinishCustomSetSync(success, message, customSetID)
+    local request = pendingCustomSetSync
+    if not request then return end
     local store = EnsureConceptStore()
     local concept = store[request.conceptID]
-    if not concept then
-        FinishNativeOutfitSync(false, "That outfit concept is no longer available.")
-        return
-    end
-
-    request.phase = "STAGING"
-    local equippedDisplay = NativeEnum("TransmogOutfitDisplayType", "Equipped", 2)
-    local assignedDisplay = NativeEnum("TransmogOutfitDisplayType", "Assigned", 1)
-    local hiddenDisplay = NativeEnum("TransmogOutfitDisplayType", "Hidden", 3)
-    local noOption = NativeEnum("TransmogOutfitSlotOption", "None", 0)
-    local ok, failure = TryCall(C_TransmogOutfitInfo and C_TransmogOutfitInfo.ClearAllPendingTransmogs)
-    if not ok then
-        FinishNativeOutfitSync(false, "Blizzard could not clear the outfit editor: " .. tostring(failure))
-        return
-    end
-
-    for _, definition in ipairs(Wardrobe.slotDefinitions) do
-        if not definition.weaponRole then
-            local nativeSlot = GetNativeOutfitSlot(definition)
-            if nativeSlot ~= nil then
-                local visualID = GetConceptVisualID(concept, definition.key)
-                local hidden = concept.hidden and concept.hidden[definition.key] and definition.hideable
-                local displayType = hidden and hiddenDisplay or (visualID and assignedDisplay or equippedDisplay)
-                ok, failure = SetNativePending(nativeSlot, noOption, visualID or 0, displayType)
-                if not ok then
-                    FinishNativeOutfitSync(false, string.format("Blizzard rejected the %s slot: %s", definition.label, tostring(failure)))
-                    return
-                end
-                if definition.key == "SHOULDER" and C_TransmogOutfitInfo.SetSecondarySlotState then
-                    TryCall(C_TransmogOutfitInfo.SetSecondarySlotState, nativeSlot, false)
-                end
-            end
+    if concept then
+        concept.customSetSyncPendingAt = nil
+        if success and customSetID then
+            concept.blizzardCustomSetID = tonumber(customSetID)
+            concept.blizzardCustomSetName = request.name
+            concept.blizzardCustomSetIcon = request.icon
+            concept.customSetSyncedAt = time()
+            concept.customSetSyncError = nil
+        else
+            concept.customSetSyncError = message
         end
     end
-
-    local mainKey = concept.selections and (concept.selections.TWO_HAND and "TWO_HAND" or (concept.selections.RANGED and "RANGED" or (concept.selections.ONE_HAND and "ONE_HAND")))
-    if mainKey then
-        local source = GetConceptSource(concept, mainKey)
-        local visualID = GetConceptVisualID(concept, mainKey)
-        local definition = slotByKey[mainKey]
-        local nativeSlot = GetNativeOutfitSlot(definition) or NATIVE_SLOT_FALLBACKS.MAIN_HAND
-        local option = ResolveWeaponOption(mainKey, source)
-        if C_TransmogOutfitInfo.SetViewedWeaponOptionForSlot then
-            ok, failure = TryCall(C_TransmogOutfitInfo.SetViewedWeaponOptionForSlot, nativeSlot, option)
-            if not ok then
-                FinishNativeOutfitSync(false, "Blizzard rejected the main-hand weapon mode: " .. tostring(failure))
-                return
-            end
-        end
-        ok, failure = SetNativePending(nativeSlot, option, visualID or 0, visualID and assignedDisplay or equippedDisplay)
-        if not ok then
-            FinishNativeOutfitSync(false, "Blizzard rejected the main-hand appearance: " .. tostring(failure))
-            return
-        end
-    end
-
-    if concept.selections and concept.selections.OFF_HAND then
-        local source = GetConceptSource(concept, "OFF_HAND")
-        local visualID = GetConceptVisualID(concept, "OFF_HAND")
-        local definition = slotByKey.OFF_HAND
-        local nativeSlot = GetNativeOutfitSlot(definition) or NATIVE_SLOT_FALLBACKS.OFF_HAND
-        local option = ResolveWeaponOption("OFF_HAND", source)
-        if C_TransmogOutfitInfo.SetViewedWeaponOptionForSlot then
-            ok, failure = TryCall(C_TransmogOutfitInfo.SetViewedWeaponOptionForSlot, nativeSlot, option)
-            if not ok then
-                FinishNativeOutfitSync(false, "Blizzard rejected the off-hand weapon mode: " .. tostring(failure))
-                return
-            end
-        end
-        ok, failure = SetNativePending(nativeSlot, option, visualID or 0, visualID and assignedDisplay or equippedDisplay)
-        if not ok then
-            FinishNativeOutfitSync(false, "Blizzard rejected the off-hand appearance: " .. tostring(failure))
-            return
-        end
-    end
-
-    request.phase = "WAITING_CONFIRM"
-    if request.outfitID then
-        ok, failure = TryCall(C_TransmogOutfitInfo.CommitOutfitInfo, request.outfitID, request.name, request.icon)
-    else
-        ok, failure = TryCall(C_TransmogOutfitInfo.AddNewOutfit, request.name, request.icon)
-    end
-    if not ok then
-        FinishNativeOutfitSync(false, "Blizzard could not save the outfit: " .. tostring(failure))
-        return
-    end
-
-    if pendingNativeOutfitSync and C_Timer and C_Timer.After then
-        local requestToken = request.token
-        C_Timer.After(NATIVE_OUTFIT_SYNC_TIMEOUT, function()
-            if pendingNativeOutfitSync and pendingNativeOutfitSync.token == requestToken then
-                local info = FindNativeOutfitByName(request.name)
-                if info and info.outfitID then
-                    FinishNativeOutfitSync(true, "Saved to a World of Warcraft outfit slot.", info.outfitID)
-                else
-                    FinishNativeOutfitSync(false, "World of Warcraft did not confirm the outfit save. Check the native outfit limit and try again.")
-                end
-            end
-        end)
+    pendingCustomSetSync = nil
+    if QC.Notify then
+        QC.Notify("WARDROBE_CUSTOM_SET_SYNCED", concept, success, message)
+        QC.Notify("WARDROBE_CONCEPTS_CHANGED", concept)
     end
 end
 
-function Wardrobe.IsNativeOutfitSavingSupported()
-    return C_TransmogOutfitInfo
-        and type(C_TransmogOutfitInfo.SetPendingTransmog) == "function"
-        and type(C_TransmogOutfitInfo.AddNewOutfit) == "function"
-        and type(C_TransmogOutfitInfo.CommitOutfitInfo) == "function"
+local function TryVerifyPendingCustomSet()
+    local request = pendingCustomSetSync
+    if not request then return false end
+    local customSetID = request.customSetID
+    if not customSetID then
+        local info = FindCustomSetByName(request.name)
+        customSetID = info and info.customSetID
+    end
+    if customSetID and VerifyCustomSet(customSetID, request.itemTransmogInfoList) then
+        FinishCustomSetSync(true, request.mode == "update" and "Updated linked Custom Set." or "Saved to WoW Custom Sets.", customSetID)
+        return true
+    end
+    return false
 end
 
-function Wardrobe.GetConceptNativeOutfitStatus(concept)
+function Wardrobe.IsCustomSetSavingSupported()
+    return C_TransmogCollection
+        and type(C_TransmogCollection.GetCustomSets) == "function"
+        and type(C_TransmogCollection.NewCustomSet) == "function"
+        and type(C_TransmogCollection.ModifyCustomSet) == "function"
+        and type(C_TransmogCollection.GetCustomSetItemTransmogInfoList) == "function"
+end
+
+function Wardrobe.GetConceptCustomSetStatus(concept)
     if not concept then return "local", "Quest Chronicle only" end
-    if pendingNativeOutfitSync and pendingNativeOutfitSync.conceptID == concept.id then
-        return "pending", "Saving to WoW..."
+    if pendingCustomSetSync and pendingCustomSetSync.conceptID == concept.id then
+        return "pending", "Saving Custom Set..."
     end
-    if concept.blizzardOutfitID then
-        local info = GetNativeOutfitInfo(concept.blizzardOutfitID)
-        if info then
-            return "synced", "WoW Outfit " .. tostring(info.playerFacingOutfitIndex or info.outfitID)
-        end
-        return "missing", "WoW outfit missing"
+    if concept.blizzardCustomSetID then
+        local info = GetCustomSetInfo(concept.blizzardCustomSetID)
+        if info then return "synced", "Custom Set: " .. tostring(info.name) end
+        return "missing", "Linked Custom Set missing"
     end
-    if concept.blizzardSyncError then return "error", "WoW save failed" end
+    if concept.customSetSyncError then return "error", "Custom Set save failed" end
     return "local", "Quest Chronicle only"
 end
 
-function Wardrobe.SaveConceptToBlizzard(conceptID)
+
+function Wardrobe.SaveConceptToCustomSet(conceptID, mode, targetCustomSetID)
     LoadTransmogSupport()
-    if not Wardrobe.IsNativeOutfitSavingSupported() then
-        return false, "World of Warcraft's native outfit-saving API is unavailable on this client."
+    if not Wardrobe.IsCustomSetSavingSupported() then
+        return false, "World of Warcraft's Custom Sets API is unavailable on this client."
     end
-    if pendingNativeOutfitSync then
-        return false, "Another outfit is still being saved. Wait for World of Warcraft to confirm it."
+    if pendingCustomSetSync then
+        return false, "Another Custom Set save is still awaiting confirmation."
     end
     if InCombatLockdown and InCombatLockdown() then
-        return false, "Native outfits cannot be changed during combat."
+        return false, "Custom Sets cannot be changed during combat."
     end
 
     local store = EnsureConceptStore()
     local concept = store[conceptID]
     if not concept then return false, "That outfit concept is no longer available." end
     local name = tostring(concept.name or ""):match("^%s*(.-)%s*$") or ""
-    if name == "" then return false, "Give the concept a name before saving it to WoW." end
-    if C_TransmogOutfitInfo.IsValidTransmogOutfitName and SafeCall(C_TransmogOutfitInfo.IsValidTransmogOutfitName, name) ~= true then
-        return false, "World of Warcraft does not allow that outfit name. Rename the concept and try again."
+    if name == "" then return false, "Give the concept a name before saving it to Custom Sets." end
+    if C_TransmogCollection.IsValidCustomSetName and SafeCall(C_TransmogCollection.IsValidCustomSetName, name) ~= true then
+        return false, "World of Warcraft does not allow that Custom Set name. Rename the concept and try again."
     end
 
-    local outfitID = tonumber(concept.blizzardOutfitID)
-    if outfitID and not GetNativeOutfitInfo(outfitID) then
-        concept.blizzardOutfitID = nil
-        outfitID = nil
+    mode = mode or "auto"
+    local customSetID = tonumber(targetCustomSetID)
+    if mode == "auto" then
+        customSetID = tonumber(concept.blizzardCustomSetID)
+        mode = customSetID and "update" or "new"
+    elseif mode == "replace" then
+        if not customSetID or not GetCustomSetInfo(customSetID) then
+            return false, "Choose an existing Custom Set to replace."
+        end
+    elseif mode == "update" then
+        customSetID = tonumber(concept.blizzardCustomSetID)
+        if not customSetID or not GetCustomSetInfo(customSetID) then
+            return false, "The linked Custom Set is missing. Use Save as New or Replace Existing."
+        end
+    elseif mode ~= "new" then
+        return false, "Unknown Custom Set save mode."
     end
-    local now = time()
-    pendingNativeOutfitSync = {
+
+    if mode == "new" then
+        local count = #Wardrobe.GetCustomSets()
+        local maximum = tonumber(SafeCall(C_TransmogCollection.GetNumMaxCustomSets)) or 0
+        if maximum > 0 and count >= maximum then
+            return false, "All WoW Custom Set slots are full. Choose Replace Existing instead."
+        end
+    end
+
+    local list, populated = BuildConceptCustomSetList(concept)
+    if populated == 0 then return false, "This concept has no selected appearances to save." end
+    local icon = GetConceptOutfitIcon(concept)
+
+    if mode == "replace" then
+        local previousInfo = GetCustomSetInfo(customSetID)
+        local previousList = SafeCall(C_TransmogCollection.GetCustomSetItemTransmogInfoList, customSetID)
+        if previousInfo and type(previousList) == "table" then
+            concept.customSetReplacementBackups = concept.customSetReplacementBackups or {}
+            table.insert(concept.customSetReplacementBackups, {
+                customSetID = customSetID,
+                name = previousInfo.name,
+                icon = previousInfo.icon,
+                itemTransmogInfoList = previousList,
+                backedUpAt = time(),
+            })
+            while #concept.customSetReplacementBackups > 5 do table.remove(concept.customSetReplacementBackups, 1) end
+        end
+    end
+    local ok, result
+    if mode == "new" then
+        ok, result = TryCall(C_TransmogCollection.NewCustomSet, name, icon, list)
+        if ok then customSetID = tonumber(result) end
+    else
+        ok, result = TryCall(C_TransmogCollection.ModifyCustomSet, customSetID, list)
+        if ok and C_TransmogCollection.RenameCustomSet then
+            local renameOK, renameError = TryCall(C_TransmogCollection.RenameCustomSet, customSetID, name)
+            if not renameOK then return false, "The appearances were staged, but WoW rejected the Custom Set name: " .. tostring(renameError) end
+        end
+    end
+    if not ok then return false, "World of Warcraft rejected the Custom Set save: " .. tostring(result) end
+
+    pendingCustomSetSync = {
         conceptID = concept.id,
-        outfitID = outfitID,
+        customSetID = customSetID,
         name = name,
-        icon = GetConceptOutfitIcon(concept),
-        phase = "WAITING_VIEW",
-        token = string.format("%s:%d", concept.id, now),
+        icon = icon,
+        mode = mode,
+        itemTransmogInfoList = list,
+        startedAt = time(),
     }
-    concept.blizzardSyncPendingAt = now
-    concept.blizzardSyncError = nil
+    concept.customSetSyncPendingAt = time()
+    concept.customSetSyncError = nil
+
+    if TryVerifyPendingCustomSet() then
+        return true, mode == "update" and "Updated linked Custom Set." or "Saved to WoW Custom Sets."
+    end
 
     if C_Timer and C_Timer.After then
-        local requestToken = pendingNativeOutfitSync.token
-        C_Timer.After(NATIVE_OUTFIT_SYNC_TIMEOUT, function()
-            if pendingNativeOutfitSync and pendingNativeOutfitSync.token == requestToken
-                and pendingNativeOutfitSync.phase ~= "WAITING_CONFIRM"
-            then
-                FinishNativeOutfitSync(false, "World of Warcraft did not make the native outfit editor ready. Open the Transmog interface and try again.")
+        local request = pendingCustomSetSync
+        C_Timer.After(CUSTOM_SET_SYNC_TIMEOUT, function()
+            if pendingCustomSetSync == request and not TryVerifyPendingCustomSet() then
+                FinishCustomSetSync(false, "World of Warcraft did not confirm the Custom Set save. Open the Custom Sets tab and check the result.")
             end
         end)
     end
-
-    local ok, failure
-    if outfitID then
-        ok, failure = TryCall(C_TransmogOutfitInfo.ChangeViewedOutfit, outfitID)
-    else
-        ok, failure = TryCall(C_TransmogOutfitInfo.ClearOutfit)
-    end
-    if not ok then
-        FinishNativeOutfitSync(false, "Blizzard could not open the outfit editor: " .. tostring(failure))
-        return false, "Blizzard could not prepare the native outfit slot."
-    end
-
-    if pendingNativeOutfitSync and pendingNativeOutfitSync.phase == "WAITING_VIEW" then
-        if C_Timer and C_Timer.After then
-            local requestToken = pendingNativeOutfitSync.token
-            C_Timer.After(0, function()
-                if pendingNativeOutfitSync and pendingNativeOutfitSync.token == requestToken then StageNativeOutfitSync() end
-            end)
-        else
-            StageNativeOutfitSync()
-        end
-    end
-    return true, outfitID and "Updating the linked World of Warcraft outfit..." or "Saving to a new World of Warcraft outfit slot..."
+    return true, mode == "update" and "Updating linked Custom Set..." or "Saving to WoW Custom Sets..."
 end
 
 function Wardrobe.GetSelectedSource(slotKey)
@@ -2395,8 +2372,7 @@ eventFrame:RegisterEvent("TRANSMOG_COLLECTION_UPDATED")
 eventFrame:RegisterEvent("TRANSMOG_COLLECTION_SOURCE_ADDED")
 eventFrame:RegisterEvent("TRANSMOG_COLLECTION_SOURCE_REMOVED")
 eventFrame:RegisterEvent("TRANSMOG_COSMETIC_COLLECTION_SOURCE_ADDED")
-eventFrame:RegisterEvent("TRANSMOG_OUTFITS_CHANGED")
-eventFrame:RegisterEvent("VIEWED_TRANSMOG_OUTFIT_CHANGED")
+pcall(eventFrame.RegisterEvent, eventFrame, "TRANSMOG_CUSTOM_SETS_CHANGED")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_ENTERING_WORLD" then
@@ -2412,20 +2388,8 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
         if cache.dirty then
             ScheduleAutomaticRefresh(cache.dirtyReason or "COLLECTION_CHANGED")
         end
-    elseif event == "VIEWED_TRANSMOG_OUTFIT_CHANGED" then
-        StageNativeOutfitSync()
-    elseif event == "TRANSMOG_OUTFITS_CHANGED" then
-        if pendingNativeOutfitSync and pendingNativeOutfitSync.phase == "WAITING_CONFIRM" then
-            local newOutfitID = ...
-            local outfitID = tonumber(newOutfitID) or pendingNativeOutfitSync.outfitID
-            if not outfitID then
-                local info = FindNativeOutfitByName(pendingNativeOutfitSync.name)
-                outfitID = info and info.outfitID
-            end
-            if outfitID then
-                FinishNativeOutfitSync(true, "Saved to a World of Warcraft outfit slot.", outfitID)
-            end
-        end
+    elseif event == "TRANSMOG_CUSTOM_SETS_CHANGED" then
+        TryVerifyPendingCustomSet()
     elseif event == "TRANSMOG_COLLECTION_UPDATED"
         and internalUsabilityUpdateUntil
         and GetTime

@@ -7,6 +7,7 @@ local SOURCE_ROWS = 7
 local SOURCE_ROW_HEIGHT = 37
 local SOURCE_ROW_SPACING = 2
 local CONCEPT_ROWS = 4
+local CUSTOM_SET_ROWS = 5
 
 local function GetState()
     return Wardrobe.GetPreviewState()
@@ -72,7 +73,7 @@ end
 local function ConceptDetail(concept)
     local updated = concept.updatedAt and UI.FormatShortTimestamp(concept.updatedAt) or "Unknown time"
     local mode = concept.styleMode and ZoneStyle and ZoneStyle.GetModeInfo(concept.styleMode)
-    local _, nativeStatus = Wardrobe.GetConceptNativeOutfitStatus(concept)
+    local _, nativeStatus = Wardrobe.GetConceptCustomSetStatus(concept)
     return string.format(
         "%d appearances • %d locked • %d hidden • %s • %s • %s",
         CountMap(concept.selections),
@@ -411,7 +412,7 @@ function UI.CreateOutfitsTab(parent)
     conceptBlocker:Hide()
 
     local conceptManager = UI.CreateInsetPanel(pane)
-    conceptManager:SetSize(560, 350)
+    conceptManager:SetSize(690, 390)
     conceptManager:SetPoint("CENTER", pane, "CENTER", 0, -4)
     conceptManager:SetFrameLevel(pane:GetFrameLevel() + 41)
     conceptManager:EnableMouse(true)
@@ -438,7 +439,7 @@ function UI.CreateOutfitsTab(parent)
 
     local saveCurrent = UI.CreateButton(conceptManager, "Save / Update", 122, 25)
     saveCurrent:SetPoint("LEFT", conceptName, "RIGHT", 11, 0)
-    UI.SetTooltip(saveCurrent, "Save Current Preview", "Save the concept in Quest Chronicle, then create or update its linked World of Warcraft transmog outfit. The outfit is saved but not applied, and no gold is spent.")
+    UI.SetTooltip(saveCurrent, "Save Current Preview", "Save or update the concept inside Quest Chronicle only. Native Custom Sets are managed separately with the buttons below.")
 
     local managerStatus = conceptManager:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     managerStatus:SetPoint("TOPLEFT", conceptManager, "TOPLEFT", 15, -89)
@@ -507,15 +508,119 @@ function UI.CreateOutfitsTab(parent)
     local nextConcepts = UI.CreateButton(conceptManager, ">", 28, 23)
     nextConcepts:SetPoint("LEFT", conceptPage, "RIGHT", 6, 0)
 
-    local syncSelected = UI.CreateButton(conceptManager, "Save to WoW", 108, 23)
-    syncSelected:SetPoint("BOTTOMRIGHT", conceptManager, "BOTTOMRIGHT", -235, 12)
-    local loadSelected = UI.CreateButton(conceptManager, "Load Selected", 110, 23)
-    loadSelected:SetPoint("LEFT", syncSelected, "RIGHT", 7, 0)
-    local deleteSelected = UI.CreateButton(conceptManager, "Delete", 96, 23)
-    deleteSelected:SetPoint("LEFT", loadSelected, "RIGHT", 7, 0)
-    UI.SetTooltip(syncSelected, "Save to World of Warcraft", "Create a native transmog outfit slot for this concept, or update the linked native outfit. This saves the design but does not apply or purchase the transmog.")
+    local syncSelected = UI.CreateButton(conceptManager, "Save to Custom Sets", 130, 23)
+    syncSelected:SetPoint("BOTTOMLEFT", conceptManager, "BOTTOMLEFT", 145, 12)
+    local saveAsNew = UI.CreateButton(conceptManager, "Save as New", 94, 23)
+    saveAsNew:SetPoint("LEFT", syncSelected, "RIGHT", 6, 0)
+    local replaceExisting = UI.CreateButton(conceptManager, "Replace Existing", 112, 23)
+    replaceExisting:SetPoint("LEFT", saveAsNew, "RIGHT", 6, 0)
+    local loadSelected = UI.CreateButton(conceptManager, "Load Selected", 105, 23)
+    loadSelected:SetPoint("LEFT", replaceExisting, "RIGHT", 6, 0)
+    local deleteSelected = UI.CreateButton(conceptManager, "Delete", 76, 23)
+    deleteSelected:SetPoint("LEFT", loadSelected, "RIGHT", 6, 0)
+    UI.SetTooltip(syncSelected, "Save to Custom Sets", "Create a new WoW Custom Set for this concept, or update its linked Custom Set. Quest Chronicle remains the authoritative backup and nothing is applied to your character.")
+    UI.SetTooltip(saveAsNew, "Save as New Custom Set", "Create another WoW Custom Set from the selected Quest Chronicle concept without replacing its currently linked set.")
+    UI.SetTooltip(replaceExisting, "Replace Existing Custom Set", "Choose an existing WoW Custom Set and replace its appearance recipe. Quest Chronicle keeps the original concept as the authoritative backup.")
     UI.SetTooltip(loadSelected, "Load Selected Concept", "Restore the selected appearances, locks, hidden slots, and weapon configuration to the preview.")
-    UI.SetTooltip(deleteSelected, "Delete Selected Concept", "Requires a second confirmation click. Deleting a concept does not change the current preview.")
+    UI.SetTooltip(deleteSelected, "Delete Selected Concept", "Requires a second confirmation click. Deleting a concept does not delete its linked WoW Custom Set.")
+
+    local customSetBlocker = CreateFrame("Button", nil, conceptManager)
+    customSetBlocker:SetAllPoints(conceptManager)
+    customSetBlocker:SetFrameLevel(conceptManager:GetFrameLevel() + 10)
+    local customSetShade = customSetBlocker:CreateTexture(nil, "BACKGROUND")
+    customSetShade:SetAllPoints(customSetBlocker)
+    customSetShade:SetColorTexture(0, 0, 0, 0.62)
+    customSetBlocker:Hide()
+
+    local customSetPicker = UI.CreateInsetPanel(conceptManager)
+    customSetPicker:SetSize(450, 315)
+    customSetPicker:SetPoint("CENTER", conceptManager, "CENTER", 0, 0)
+    customSetPicker:SetFrameLevel(conceptManager:GetFrameLevel() + 11)
+    customSetPicker:Hide()
+    customSetPicker.page = 1
+
+    local pickerTitle = customSetPicker:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    pickerTitle:SetPoint("TOPLEFT", customSetPicker, "TOPLEFT", 14, -13)
+    pickerTitle:SetText("Replace Existing Custom Set")
+    local pickerClose = UI.CreateButton(customSetPicker, "X", 26, 24)
+    pickerClose:SetPoint("TOPRIGHT", customSetPicker, "TOPRIGHT", -9, -8)
+    local pickerStatus = customSetPicker:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    pickerStatus:SetPoint("TOPLEFT", customSetPicker, "TOPLEFT", 15, -47)
+    pickerStatus:SetPoint("RIGHT", customSetPicker, "RIGHT", -15, 0)
+    pickerStatus:SetJustifyH("LEFT")
+    pickerStatus:SetText("Select the native Custom Set whose appearances should be replaced.")
+
+    customSetPicker.rows = {}
+    for index = 1, CUSTOM_SET_ROWS do
+        local row = CreateFrame("Button", nil, customSetPicker)
+        row:SetHeight(38)
+        row:SetPoint("LEFT", customSetPicker, "LEFT", 15, 0)
+        row:SetPoint("RIGHT", customSetPicker, "RIGHT", -15, 0)
+        if index == 1 then row:SetPoint("TOP", customSetPicker, "TOP", 0, -72)
+        else row:SetPoint("TOP", customSetPicker.rows[index - 1], "BOTTOM", 0, -4) end
+        local background = row:CreateTexture(nil, "BACKGROUND")
+        background:SetAllPoints(row)
+        background:SetColorTexture(0.07, 0.07, 0.07, 0.94)
+        row.background = background
+        local label = row:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+        label:SetPoint("LEFT", row, "LEFT", 9, 0)
+        label:SetPoint("RIGHT", row, "RIGHT", -9, 0)
+        label:SetJustifyH("LEFT")
+        row.label = label
+        row:SetScript("OnClick", function(self)
+            customSetPicker.selectedCustomSetID = self.customSet and self.customSet.customSetID or nil
+            customSetPicker:Refresh()
+        end)
+        customSetPicker.rows[index] = row
+    end
+
+    local pickerPrevious = UI.CreateButton(customSetPicker, "<", 28, 23)
+    pickerPrevious:SetPoint("BOTTOMLEFT", customSetPicker, "BOTTOMLEFT", 15, 12)
+    local pickerPage = customSetPicker:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    pickerPage:SetPoint("LEFT", pickerPrevious, "RIGHT", 6, 0)
+    pickerPage:SetWidth(72)
+    pickerPage:SetJustifyH("CENTER")
+    local pickerNext = UI.CreateButton(customSetPicker, ">", 28, 23)
+    pickerNext:SetPoint("LEFT", pickerPage, "RIGHT", 6, 0)
+    local pickerReplace = UI.CreateButton(customSetPicker, "Replace Selected", 125, 23)
+    pickerReplace:SetPoint("BOTTOMRIGHT", customSetPicker, "BOTTOMRIGHT", -15, 12)
+
+    function customSetPicker:Refresh(message)
+        local sets = Wardrobe.GetCustomSets()
+        local pageCount = math.max(1, math.ceil(#sets / CUSTOM_SET_ROWS))
+        self.page = math.max(1, math.min(self.page or 1, pageCount))
+        local startIndex = ((self.page - 1) * CUSTOM_SET_ROWS) + 1
+        for rowIndex, row in ipairs(self.rows) do
+            local info = sets[startIndex + rowIndex - 1]
+            row.customSet = info
+            row:SetShown(info ~= nil)
+            if info then
+                local selected = info.customSetID == self.selectedCustomSetID
+                row.label:SetText((selected and UI.gold or UI.white) .. tostring(info.name or "Unnamed Custom Set") .. UI.reset)
+                row.background:SetColorTexture(selected and 0.20 or 0.07, selected and 0.15 or 0.07, selected and 0.05 or 0.07, 0.94)
+            end
+        end
+        pickerPrevious:SetEnabled(self.page > 1)
+        pickerNext:SetEnabled(self.page < pageCount)
+        pickerPage:SetText(string.format("%d / %d", self.page, pageCount))
+        pickerReplace:SetEnabled(self.selectedCustomSetID ~= nil)
+        pickerStatus:SetText(message or (#sets > 0 and "Select the native Custom Set whose appearances should be replaced." or "No WoW Custom Sets are available to replace."))
+    end
+
+    local function CloseCustomSetPicker()
+        customSetPicker:Hide()
+        customSetBlocker:Hide()
+    end
+    pickerClose:SetScript("OnClick", CloseCustomSetPicker)
+    pickerPrevious:SetScript("OnClick", function() customSetPicker.page = customSetPicker.page - 1; customSetPicker.selectedCustomSetID = nil; customSetPicker:Refresh() end)
+    pickerNext:SetScript("OnClick", function() customSetPicker.page = customSetPicker.page + 1; customSetPicker.selectedCustomSetID = nil; customSetPicker:Refresh() end)
+    pickerReplace:SetScript("OnClick", function()
+        if not conceptManager.selectedConceptID or not customSetPicker.selectedCustomSetID then return end
+        local ok, message = Wardrobe.SaveConceptToCustomSet(conceptManager.selectedConceptID, "replace", customSetPicker.selectedCustomSetID)
+        if ok then CloseCustomSetPicker() end
+        conceptManager:Refresh(message)
+        if not ok and UIErrorsFrame then UIErrorsFrame:AddMessage(message or "Unable to replace the Custom Set.", 1, 0.25, 0.25) end
+    end)
 
     function conceptManager:Refresh(message)
         local concepts = Wardrobe.GetConcepts()
@@ -549,7 +654,16 @@ function UI.CreateOutfitsTab(parent)
 
         local canSave = next(GetState().selections) ~= nil or next(GetState().locks) ~= nil or next(GetState().hidden) ~= nil
         saveCurrent:SetEnabled(canSave)
-        syncSelected:SetEnabled(self.selectedConceptID ~= nil and Wardrobe.IsNativeOutfitSavingSupported())
+        local selectedConcept
+        if self.selectedConceptID then
+            for _, concept in ipairs(concepts) do if concept.id == self.selectedConceptID then selectedConcept = concept break end end
+        end
+        local customSetSupported = Wardrobe.IsCustomSetSavingSupported()
+        local linked = selectedConcept and selectedConcept.blizzardCustomSetID ~= nil
+        syncSelected:SetText(linked and "Update Custom Set" or "Save to Custom Sets")
+        syncSelected:SetEnabled(selectedConcept ~= nil and customSetSupported)
+        saveAsNew:SetEnabled(selectedConcept ~= nil and customSetSupported)
+        replaceExisting:SetEnabled(selectedConcept ~= nil and customSetSupported and #Wardrobe.GetCustomSets() > 0)
         loadSelected:SetEnabled(self.selectedConceptID ~= nil)
         deleteSelected:SetEnabled(self.selectedConceptID ~= nil)
         deleteSelected:SetText(self.pendingDeleteID == self.selectedConceptID and "Confirm Delete" or "Delete")
@@ -624,11 +738,23 @@ function UI.CreateOutfitsTab(parent)
     end)
     syncSelected:SetScript("OnClick", function()
         if not conceptManager.selectedConceptID then return end
-        local ok, message = Wardrobe.SaveConceptToBlizzard(conceptManager.selectedConceptID)
-        if not ok and UIErrorsFrame then
-            UIErrorsFrame:AddMessage(message or "Unable to save the native outfit.", 1, 0.25, 0.25)
-        end
+        local ok, message = Wardrobe.SaveConceptToCustomSet(conceptManager.selectedConceptID, "auto")
+        if not ok and UIErrorsFrame then UIErrorsFrame:AddMessage(message or "Unable to save the Custom Set.", 1, 0.25, 0.25) end
         conceptManager:Refresh(message)
+    end)
+    saveAsNew:SetScript("OnClick", function()
+        if not conceptManager.selectedConceptID then return end
+        local ok, message = Wardrobe.SaveConceptToCustomSet(conceptManager.selectedConceptID, "new")
+        if not ok and UIErrorsFrame then UIErrorsFrame:AddMessage(message or "Unable to create the Custom Set.", 1, 0.25, 0.25) end
+        conceptManager:Refresh(message)
+    end)
+    replaceExisting:SetScript("OnClick", function()
+        if not conceptManager.selectedConceptID then return end
+        customSetPicker.selectedCustomSetID = nil
+        customSetPicker.page = 1
+        customSetBlocker:Show()
+        customSetPicker:Show()
+        customSetPicker:Refresh()
     end)
     loadSelected:SetScript("OnClick", function()
         if conceptManager.selectedConceptID then
@@ -1004,14 +1130,6 @@ function UI.CreateOutfitsTab(parent)
 
     function pane:SaveConcept(name)
         local ok, message, concept = Wardrobe.SaveConcept(name)
-        if ok and concept then
-            local nativeOK, nativeMessage = Wardrobe.SaveConceptToBlizzard(concept.id)
-            if nativeOK then
-                local nativeState = Wardrobe.GetConceptNativeOutfitStatus(concept)
-                nativeMessage = nativeState == "synced" and "Saved to a World of Warcraft outfit slot." or nativeMessage
-            end
-            message = message .. " " .. tostring(nativeMessage or "")
-        end
         self:Refresh(message)
         if not ok and UIErrorsFrame then
             UIErrorsFrame:AddMessage(message or "Unable to save outfit concept.", 1, 0.25, 0.25)
@@ -1190,6 +1308,10 @@ function UI.CreateOutfitsTab(parent)
     end)
     QC.RegisterCallback("WARDROBE_SELECTION_CHANGED", pane, function()
         if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("WARDROBE_CUSTOM_SET_SYNCED", pane, function(_, success, message)
+        if pane:IsShown() then pane:Refresh(message) end
+        if conceptManager:IsShown() then conceptManager:Refresh(message) end
     end)
     QC.RegisterCallback("WARDROBE_WORKBENCH_CHANGED", pane, function()
         if pane:IsShown() then pane:Refresh() end
