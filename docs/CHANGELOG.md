@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.5 - 2026-08-01
+
+### Stabilized
+
+- Rolled back the v1.6.3/v1.6.4 deferred and slot-explicit embedded preview experiment.
+- Restored the stable synchronous player model plus targeted `TryOn()` preview path.
+- Removed preview tokens, model-load callbacks, delayed off-hand dressing, and preview timer races.
+- Fixed Fury one-hand linked generation by treating Blizzard's native slot-and-option permission as authoritative over stale legacy usability flags.
+- Preserved collection and display safety checks while allowing specialization-specific weapon appearance rules.
+- Added a focused model-stability and Fury secondary-hand regression checklist.
+
 ## 1.6.4 - 2026-08-01
 
 ### Fixed

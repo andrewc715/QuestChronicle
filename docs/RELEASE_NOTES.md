@@ -1,38 +1,39 @@
-# Quest Chronicle v1.6.4: Deferred Linked Preview Fix
+# Quest Chronicle v1.6.5: Preview Rollback and Fury Off-Hand Repair
 
-Version 1.6.4 repairs two related live-client failures in the embedded Outfits character preview.
+Version 1.6.5 is an emergency stabilization release after the v1.6.3 and v1.6.4 preview experiments caused model corruption and still failed to generate Fury's second one-handed weapon.
 
-## What the screenshots proved
+## What the live screenshots proved
 
-The generated outfit contained 13 selected appearances, confirming that Quest Chronicle had already created both weapon-hand selections. The missing one-handed secondary weapon was therefore not a generator failure. The model was restoring the physically equipped off-hand after Quest Chronicle applied the linked appearance.
+- Quest Chronicle correctly detected Fury's dual-two-hand physical topology.
+- Blizzard correctly allowed one-hand appearance categories in both equipped weapon hands.
+- Main-hand one-hand generation succeeded.
+- The secondary generated selection was rejected by older appearance `isUsable` fields even though Blizzard's native slot-and-option API allowed it.
+- The deferred `OnModelLoaded` and slot-explicit preview pipeline could leave the embedded actor tiny, dark, partially dressed, or otherwise corrupted.
 
-A separate screenshot showed the player actor reduced to a tiny dark silhouette. Both failures came from dressing the model while `SetUnit("player")` was still loading or refreshing its actor.
+## Changes
 
-## Fixed
+- Completely removes the v1.6.3/v1.6.4 deferred model-load preview experiment.
+- Removes preview tokens, pending model callbacks, timer fallbacks, and per-slot `SetItemTransmogInfo()` dressing from the embedded preview.
+- Restores the stable synchronous player-model and `TryOn()` path used before those experiments.
+- Keeps explicit Main Hand and Secondary Hand targets when previewing weapon selections.
+- Treats Blizzard's native `GetCollectionInfoForSlotAndOption()` permission as authoritative for specialization exceptions.
+- Prevents older `appearance.isUsable`, `appearanceIsUsable`, and `isAnySourceValidForPlayer` fields from vetoing a category Blizzard's current Transmog UI explicitly permits for that hand.
+- Still requires a collected preview source and rejects explicit collection or display failures.
+- Preserves strict linked-hand behavior: exact visual first, same exact weapon subtype second, never an unrelated type.
 
-- Preview dressing waits for `OnModelLoaded` before applying any selected appearance.
-- A short timer fallback handles clients that do not emit `OnModelLoaded` when refreshing the same unit.
-- Every preview request receives a token. A newer refresh cancels any older pending pass.
-- Main Hand is applied before Secondary Hand.
-- Secondary Hand is replayed on the next timer frame, after main-hand weapon-option child updates have settled.
-- Weapon slots are no longer cleared while the player actor is loading.
-- `SetItemTransmogInfo()` remains the exact source-aware path. The collected item ID is used only as a compatibility fallback.
-- The preview reports its final applied count through the existing Quest Chronicle callback channel.
+## Expected Fury behavior
 
-## Behavior retained
+With two two-handed weapons physically equipped, One-Hand enabled, Two-Hand disabled, One-Handed Sword selected, and Link weapon hands enabled:
 
-When **Link weapon hands** is enabled, Quest Chronicle still chooses:
-
-1. the exact same visual for both hands when Blizzard permits it;
-2. another appearance from the same exact weapon subtype when the visual cannot be duplicated;
-3. no unrelated weapon family or subtype.
-
-The v1.6.4 change affects only when and how those stored selections are handed to the embedded model.
+- Quest Chronicle selects a one-handed sword for Main Hand.
+- Quest Chronicle selects the same visual, or another one-handed sword, for Secondary Hand.
+- Current Preview lists both generated selections rather than labeling Secondary Hand as equipped.
+- The embedded character remains full-sized and fully dressed.
 
 ## Compatibility
 
 - SavedVariables schema remains 2.
 - Courier format remains 1.
 - Wardrobe cache format remains 6.
-- No collection rescan is required.
-- Existing concepts and linked Custom Sets remain valid.
+- No wardrobe scan or concept migration is required.
+- Existing concepts, Custom Set links, Chronicle records, RP notes, and Courier data are preserved.

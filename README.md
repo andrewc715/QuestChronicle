@@ -1,8 +1,8 @@
-# Quest Chronicle v1.6.4
+# Quest Chronicle v1.6.5
 
-> **Preview sequencing fix:** v1.6.4 waits for the player actor to load, applies the main weapon first, and replays the secondary weapon on the following frame. This repairs Fury one-hand linked previews and prevents rapid refreshes from collapsing the character model.
+> **Emergency preview stabilization:** v1.6.5 restores the last stable character-preview path and fixes Fury secondary one-hand generation by trusting Blizzard's native per-hand transmog permission over stale legacy usability fields.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.6.4 preserves Blizzard-driven weapon permissions, strict linked-hand generation, Custom Set integration, and the complete Chronicle and Courier toolset.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.6.5 stabilizes the embedded model while preserving Blizzard-driven weapon appearance rules.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

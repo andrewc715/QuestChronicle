@@ -1670,32 +1670,48 @@ local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, cont
     end
 
     -- Requery the collapsed visual with the equipped hand's transmog location.
-    -- The scanner intentionally keeps a broad preview catalog; generation is
-    -- stricter and requires Blizzard to mark the visual collected, displayable,
-    -- and usable for the character right now.
+    -- For ordinary weapon rules, the collection row's isUsable flag is useful.
+    -- For Midnight slot-option exceptions (notably Fury using one-hand visuals
+    -- over equipped two-handers), Blizzard's native slot-and-option permission
+    -- is the authoritative answer. The older appearance usability flags can
+    -- remain false even while the native Transmog UI permits the category.
     local appearance = GetGenerationAppearance(source, definition, context)
-    if not appearance or appearance.isCollected ~= true then
+    local nativeSlotRule = permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION"
+
+    if appearance and appearance.isCollected == false then
         return Finish(false, "WoW no longer reports this weapon visual as collected.")
     end
-    if appearance.canDisplayOnPlayer ~= true then
+    if not appearance and not nativeSlotRule then
+        return Finish(false, "WoW no longer reports this weapon visual for the equipped hand.")
+    end
+    if appearance and appearance.canDisplayOnPlayer == false then
         return Finish(false, "This character cannot display that weapon visual.")
     end
-    if appearance.isUsable ~= true then
+    if not nativeSlotRule and appearance and appearance.isUsable ~= true then
         return Finish(false, "WoW does not currently mark that weapon visual as usable.")
     end
 
-    -- Source detail is an additional guard. isAnySourceValidForPlayer avoids
-    -- rejecting an account-unlocked visual merely because the cache's chosen
-    -- preview representative is not the source this character would use.
+    -- Source detail remains a collection/display guard. Under a native
+    -- slot-option exception, do not let legacy appearanceIsUsable or
+    -- isAnySourceValidForPlayer fields overrule the exact API Blizzard uses to
+    -- populate its own weapon-category picker.
     local appearanceInfo = SafeCall(C_TransmogCollection.GetAppearanceInfoBySource, source.sourceID)
     if appearanceInfo then
-        if appearanceInfo.appearanceIsCollected ~= true or appearanceInfo.appearanceIsUsable ~= true then
-            return Finish(false, "The collected appearance is not currently usable for transmogrification.")
+        if appearanceInfo.appearanceIsCollected == false then
+            return Finish(false, "The weapon appearance is no longer collected.")
         end
-        if appearanceInfo.canDisplayOnPlayer ~= true or appearanceInfo.isAnySourceValidForPlayer ~= true then
-            return Finish(false, "No source for this visual is valid for the current character.")
+        if appearanceInfo.canDisplayOnPlayer == false then
+            return Finish(false, "This character cannot display that weapon visual.")
         end
-    elseif type(C_TransmogCollection.GetValidAppearanceSourcesForClass) == "function" then
+        if not nativeSlotRule then
+            if appearanceInfo.appearanceIsCollected ~= true or appearanceInfo.appearanceIsUsable ~= true then
+                return Finish(false, "The collected appearance is not currently usable for transmogrification.")
+            end
+            if appearanceInfo.canDisplayOnPlayer ~= true or appearanceInfo.isAnySourceValidForPlayer ~= true then
+                return Finish(false, "No source for this visual is valid for the current character.")
+            end
+        end
+    elseif not nativeSlotRule and type(C_TransmogCollection.GetValidAppearanceSourcesForClass) == "function" then
         local classID = GetCurrentClassID()
         local location = GetGenerationLocation(definition, context)
         local validSources = classID and SafeCall(
@@ -3523,117 +3539,37 @@ function Wardrobe.ClearAllSelections()
     end
 end
 
-local function ModelTryOnSucceeded(result)
-    local successValue = Enum and Enum.ItemTryOnReason and Enum.ItemTryOnReason.Success
-    return result == nil or successValue == nil or result == successValue
-end
-
-local function VerifyModelSlotAppearance(model, slotID, expectedAppearanceID)
-    if not model or not slotID or type(model.GetItemTransmogInfo) ~= "function" then
-        return nil -- Verification is unavailable on this client.
-    end
-    local info = SafeCall(model.GetItemTransmogInfo, model, slotID)
-    if not info then
-        return false
-    end
-    return tonumber(info.appearanceID) == tonumber(expectedAppearanceID)
-end
-
-local function ApplyWeaponSourceToModel(model, source, definition)
-    local slotID = SafeCall(GetInventorySlotInfo, definition.slotName)
-    if not slotID then
-        return false
+function Wardrobe.ApplyPreview(model)
+    if not model then
+        return false, "Preview model is unavailable."
     end
 
-    -- Do not undress the weapon slot before the player model finishes loading.
-    -- Clearing a Fury weapon slot during the SetUnit transition can leave the
-    -- DressUpModel with a stale child-weapon relationship or an empty actor.
-    if type(model.SetItemTransmogInfo) == "function" then
-        local info = CreateItemTransmogInfo(source.sourceID)
-        local ignoreChildItems = definition.slotName == "SECONDARYHANDSLOT"
-        local ok, result = pcall(model.SetItemTransmogInfo, model, info, slotID, ignoreChildItems)
-        if ok and ModelTryOnSucceeded(result) then
-            return true
-        end
-    end
-
-    -- Compatibility fallback. TryOn expects an item representation rather than
-    -- the source ID on several Retail clients. Prefer the collected source's
-    -- item ID and explicitly target the hand.
-    if type(model.TryOn) == "function" then
-        local itemInfo = source.styleItemLink or source.itemLink or source.itemID or source.sourceID
-        local ok, result = pcall(model.TryOn, model, itemInfo, definition.slotName)
-        if ok and ModelTryOnSucceeded(result) then
-            return true
-        end
-    end
-
-    return false
-end
-
-local function InstallPreviewModelLoadHook(model)
-    if not model or model.qcPreviewLoadHookInstalled then
-        return
-    end
-    model.qcPreviewLoadHookInstalled = true
-
-    local function OnModelLoaded(self)
-        local callback = self.qcPendingPreviewCallback
-        if callback then
-            self.qcPendingPreviewCallback = nil
-            callback("MODEL_LOADED")
-        end
-    end
-
-    if type(model.HookScript) == "function" then
-        pcall(model.HookScript, model, "OnModelLoaded", OnModelLoaded)
-    elseif type(model.GetScript) == "function" and type(model.SetScript) == "function" then
-        local previous = model:GetScript("OnModelLoaded")
-        model:SetScript("OnModelLoaded", function(self, ...)
-            if previous then previous(self, ...) end
-            OnModelLoaded(self)
-        end)
-    end
-end
-
-local function ApplyPreviewToLoadedModel(model, token)
-    if not model or model.qcPreviewToken ~= token then
-        return false, "A newer preview request replaced this one."
-    end
-
-    SafeCall(model.SetAutoDress, model, true)
-    SafeCall(model.SetUseTransmogChoices, model, true)
-    SafeCall(model.SetUseTransmogSkin, model, true)
-
+    -- v1.6.5 deliberately restores the synchronous player-model baseline used
+    -- before the v1.6.3/v1.6.4 preview experiments. SetUnit establishes the
+    -- equipped actor, then TryOn overlays the selected appearances without
+    -- replacing the actor or scheduling competing model-load callbacks.
+    SafeCall(model.SetUnit, model, "player")
     local applied = 0
     local failedSlots = {}
     local state = EnsurePreviewState()
-    local secondaryDefinition
-    local secondarySource
 
-    -- Apply armor and the main weapon only after the player actor exists. The
-    -- secondary weapon is deliberately delayed one additional frame because
-    -- main-hand weapon-option updates can asynchronously rewrite its child slot.
     for _, definition in ipairs(Wardrobe.slotDefinitions) do
         local source = Wardrobe.GetSelectedSource(definition.key)
-        if definition.slotName == "SECONDARYHANDSLOT" then
-            secondaryDefinition = definition
-            secondarySource = source
-        elseif state.hidden[definition.key] and definition.hideable and model.UndressSlot then
+        if state.hidden[definition.key] and definition.hideable and model.UndressSlot then
             local slotID = SafeCall(GetInventorySlotInfo, definition.slotName)
-            if slotID then SafeCall(model.UndressSlot, model, slotID) end
+            if slotID then
+                SafeCall(model.UndressSlot, model, slotID)
+            end
         elseif source then
             local valid = Wardrobe.ValidateSource(source, definition.key)
-            if valid and source.sourceID then
-                local success
-                if definition.weaponRole then
-                    success = ApplyWeaponSourceToModel(model, source, definition)
-                elseif type(model.TryOn) == "function" then
-                    local ok, result = pcall(model.TryOn, model, source.sourceID)
-                    success = ok and ModelTryOnSucceeded(result)
+            if valid and source.sourceID and type(model.TryOn) == "function" then
+                local targetHand
+                if definition.slotName == "MAINHANDSLOT" or definition.slotName == "SECONDARYHANDSLOT" then
+                    targetHand = definition.slotName
                 end
-
-                if success then
+                local ok, result = pcall(model.TryOn, model, source.sourceID, targetHand)
+                local successValue = Enum and Enum.ItemTryOnReason and Enum.ItemTryOnReason.Success
+                if ok and (result == nil or successValue == nil or result == successValue) then
                     applied = applied + 1
                 else
                     table.insert(failedSlots, definition.label)
@@ -3642,69 +3578,20 @@ local function ApplyPreviewToLoadedModel(model, token)
         end
     end
 
-    local function FinishSecondaryHand()
-        if not model or model.qcPreviewToken ~= token then return end
-        if secondarySource and secondaryDefinition then
-            local valid = Wardrobe.ValidateSource(secondarySource, "OFF_HAND")
-            if valid and secondarySource.sourceID then
-                if ApplyWeaponSourceToModel(model, secondarySource, secondaryDefinition) then
-                    applied = applied + 1
-                else
-                    table.insert(failedSlots, secondaryDefinition.label)
-                end
-            end
-        end
-
-        model.qcPreviewLastApplied = applied
-        model.qcPreviewFailedSlots = failedSlots
-        if QC.Notify then
-            QC.Notify("WARDROBE_PREVIEW_APPLIED", applied, failedSlots)
-        end
+    model.qcPreviewLastApplied = applied
+    model.qcPreviewFailedSlots = failedSlots
+    if QC.Notify then
+        QC.Notify("WARDROBE_PREVIEW_APPLIED", applied, failedSlots)
     end
 
-    if secondarySource and C_Timer and C_Timer.After then
-        C_Timer.After(0, FinishSecondaryHand)
-    else
-        FinishSecondaryHand()
+    if #failedSlots > 0 then
+        return false, string.format(
+            "Previewed %d selected appearances; WoW rejected: %s.",
+            applied,
+            table.concat(failedSlots, ", ")
+        )
     end
-
-    return true, string.format("Queued %d selected appearances for preview.", applied + (secondarySource and 1 or 0))
-end
-
-function Wardrobe.ApplyPreview(model)
-    if not model then
-        return false, "Preview model is unavailable."
-    end
-
-    InstallPreviewModelLoadHook(model)
-    model.qcPreviewToken = (tonumber(model.qcPreviewToken) or 0) + 1
-    local token = model.qcPreviewToken
-    local completed = false
-
-    local function ApplyOnce(_reason)
-        if completed or not model or model.qcPreviewToken ~= token then return end
-        completed = true
-        model.qcPendingPreviewCallback = nil
-        ApplyPreviewToLoadedModel(model, token)
-    end
-
-    -- SetUnit restores the equipped baseline, but dressing must wait until the
-    -- asynchronous actor load completes. A short timer is retained as a fallback
-    -- for clients that do not emit OnModelLoaded when refreshing the same unit.
-    model.qcPendingPreviewCallback = ApplyOnce
-    SafeCall(model.SetUnit, model, "player")
-
-    if C_Timer and C_Timer.After then
-        C_Timer.After(0.10, function()
-            if model and model.qcPreviewToken == token and not completed then
-                ApplyOnce("TIMER_FALLBACK")
-            end
-        end)
-    else
-        ApplyOnce("SYNCHRONOUS_FALLBACK")
-    end
-
-    return true, "Character preview refresh queued."
+    return true, string.format("Previewed %d selected appearances.", applied)
 end
 
 local eventFrame = CreateFrame("Frame")
