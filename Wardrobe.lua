@@ -561,26 +561,39 @@ local function ApplyWeaponSelectionRules(state, slotKey)
     end
 end
 
-local function ChooseRandomSource(slotKey, excludeSourceID)
+local function ChooseRandomSource(slotKey, excludeSourceID, styleMode, styleContext)
     local candidates = {}
     for _, source in ipairs(Wardrobe.GetSlotSources(slotKey)) do
         local valid = Wardrobe.ValidateSource(source, slotKey)
-        if valid and source.sourceID ~= excludeSourceID then
+        if valid then
             table.insert(candidates, source)
         end
-    end
-    if #candidates == 0 and excludeSourceID then
-        return GetSourceByID(slotKey, excludeSourceID)
     end
     if #candidates == 0 then
         return nil
     end
-    return candidates[math.random(1, #candidates)]
+
+    local styleEngine = QC.ZoneStyle
+    if styleEngine and styleEngine.ChooseWeightedSource then
+        return styleEngine.ChooseWeightedSource(candidates, slotByKey[slotKey], styleMode, styleContext, excludeSourceID)
+    end
+
+    local available = {}
+    local fallback
+    for _, source in ipairs(candidates) do
+        if source.sourceID == excludeSourceID then
+            fallback = source
+        else
+            table.insert(available, source)
+        end
+    end
+    if #available == 0 then return fallback end
+    return available[math.random(1, #available)]
 end
 
-local function SetRandomSelection(state, slotKey, reroll)
+local function SetRandomSelection(state, slotKey, reroll, styleMode, styleContext)
     local current = reroll and state.selections[slotKey] or nil
-    local source = ChooseRandomSource(slotKey, current)
+    local source = ChooseRandomSource(slotKey, current, styleMode, styleContext)
     if not source then
         state.selections[slotKey] = nil
         return false
@@ -725,7 +738,7 @@ local function Shuffle(values)
     end
 end
 
-local function ChooseGeneratedWeaponSource(slotKeys, equippedItem, context, excludedBySlot, targetSlotKey)
+local function ChooseGeneratedWeaponSource(slotKeys, equippedItem, context, excludedBySlot, targetSlotKey, styleMode, styleContext)
     local candidates = {}
     for _, slotKey in ipairs(slotKeys) do
         for _, source in ipairs(Wardrobe.GetSlotSources(slotKey)) do
@@ -742,7 +755,11 @@ local function ChooseGeneratedWeaponSource(slotKeys, equippedItem, context, excl
             end
         end
     end
-    Shuffle(candidates)
+    if QC.ZoneStyle and QC.ZoneStyle.OrderWeaponCandidates then
+        QC.ZoneStyle.OrderWeaponCandidates(candidates, styleMode, styleContext)
+    else
+        Shuffle(candidates)
+    end
 
     local fallback
     for _, candidate in ipairs(candidates) do
@@ -780,7 +797,7 @@ local function GetLockedWeaponMode(state)
     return lockedMode
 end
 
-local function GenerateWeapons(state, reroll)
+local function GenerateWeapons(state, reroll, styleMode, styleContext)
     local mode, errorMessage = GetLockedWeaponMode(state)
     if errorMessage then
         return false, errorMessage
@@ -828,7 +845,7 @@ local function GenerateWeapons(state, reroll)
                 excluded[slotKey] = state.selections[slotKey]
             end
         end
-        selectedMain, mode = ChooseGeneratedWeaponSource(allowedSlots, context.mainItem, context, excluded)
+        selectedMain, mode = ChooseGeneratedWeaponSource(allowedSlots, context.mainItem, context, excluded, nil, styleMode, styleContext)
         if selectedMain then
             state.selections[mode] = selectedMain.sourceID
         end
@@ -858,7 +875,7 @@ local function GenerateWeapons(state, reroll)
             selectedWeapons = selectedWeapons + 1
         elseif not state.locks.OFF_HAND then
             local excluded = reroll and { OFF_HAND = state.selections.OFF_HAND } or nil
-            local offHand = ChooseGeneratedWeaponSource({ "OFF_HAND", "ONE_HAND" }, context.offItem, context, excluded, "OFF_HAND")
+            local offHand = ChooseGeneratedWeaponSource({ "OFF_HAND", "ONE_HAND" }, context.offItem, context, excluded, "OFF_HAND", styleMode, styleContext)
             state.selections.OFF_HAND = offHand and offHand.sourceID or nil
             if offHand then
                 selectedWeapons = selectedWeapons + 1
@@ -873,14 +890,23 @@ local function GenerateWeapons(state, reroll)
     return true, selectedWeapons, notice
 end
 
-function Wardrobe.GenerateOutfit(reroll)
+function Wardrobe.GenerateOutfit(reroll, requestedStyleMode)
     local cache = EnsureCache()
     if cache.scanState ~= "COMPLETE" and cache.scanState ~= "COMPLETE_WITH_WARNINGS" then
         return false, "Scan the wardrobe collection before generating an outfit."
     end
 
     local state = EnsurePreviewState()
-    local weaponsOK, weaponCount, weaponNotice = GenerateWeapons(state, reroll == true)
+    local styleEngine = QC.ZoneStyle
+    local styleMode = requestedStyleMode or state.styleMode
+    local styleContext
+    if styleEngine then
+        styleMode = styleEngine.NormalizeMode(styleMode)
+        state.styleMode = styleMode
+        styleContext = styleEngine.GetCurrentContext()
+    end
+
+    local weaponsOK, weaponCount, weaponNotice = GenerateWeapons(state, reroll == true, styleMode, styleContext)
     if not weaponsOK then
         return false, weaponCount
     end
@@ -888,7 +914,7 @@ function Wardrobe.GenerateOutfit(reroll)
     local selected = 0
     for _, definition in ipairs(Wardrobe.slotDefinitions) do
         if not definition.weaponRole and not state.locks[definition.key] then
-            if SetRandomSelection(state, definition.key, reroll == true) then
+            if SetRandomSelection(state, definition.key, reroll == true, styleMode, styleContext) then
                 selected = selected + 1
             end
         end
@@ -898,8 +924,20 @@ function Wardrobe.GenerateOutfit(reroll)
     if QC.Notify then
         QC.Notify("WARDROBE_WORKBENCH_CHANGED")
     end
+    local styleLabel = "Random"
+    local profileLabel
+    if styleEngine then
+        local modeInfo = styleEngine.GetModeInfo(styleMode)
+        styleLabel = modeInfo and modeInfo.label or styleLabel
+        profileLabel = styleContext and styleContext.profileLabel
+        if styleMode == styleEngine.MODE_ZONE_NATIVE then
+            styleEngine.ConsumeSuggestion()
+        end
+    end
     local message = string.format(
-        "Generated %d armor slots and %d equipped-weapon-safe appearance%s; locked and hidden choices were preserved.",
+        "Generated a %s outfit%s with %d armor slots and %d equipped-weapon-safe appearance%s; locked and hidden choices were preserved.",
+        styleLabel,
+        profileLabel and (" for " .. profileLabel) or "",
         selected,
         weaponCount or 0,
         weaponCount == 1 and "" or "s"
@@ -920,23 +958,26 @@ function Wardrobe.RerollSlot(slotKey)
     end
 
     local state = EnsurePreviewState()
+    local styleEngine = QC.ZoneStyle
+    local styleMode = styleEngine and styleEngine.NormalizeMode(state.styleMode) or state.styleMode
+    local styleContext = styleEngine and styleEngine.GetCurrentContext() or nil
     if definition.weaponRole then
         local context = CreateWeaponGenerationContext()
         local equippedItem = slotKey == "OFF_HAND" and context.offItem or context.mainItem
         local sourceSlots = slotKey == "OFF_HAND" and { "OFF_HAND", "ONE_HAND" } or { slotKey }
-        local source = ChooseGeneratedWeaponSource(sourceSlots, equippedItem, context, { [slotKey] = state.selections[slotKey] }, slotKey)
+        local source = ChooseGeneratedWeaponSource(sourceSlots, equippedItem, context, { [slotKey] = state.selections[slotKey] }, slotKey, styleMode, styleContext)
         if not source then
             return false, "No cached appearance in this weapon category is valid for the currently equipped item."
         end
         state.selections[slotKey] = source.sourceID
         ApplyWeaponSelectionRules(state, slotKey)
         if slotKey == "OFF_HAND" and not state.selections.ONE_HAND then
-            local mainHand = ChooseGeneratedWeaponSource({ "ONE_HAND" }, context.mainItem, context)
+            local mainHand = ChooseGeneratedWeaponSource({ "ONE_HAND" }, context.mainItem, context, nil, nil, styleMode, styleContext)
             if mainHand then
                 state.selections.ONE_HAND = mainHand.sourceID
             end
         end
-    elseif not SetRandomSelection(state, slotKey, true) then
+    elseif not SetRandomSelection(state, slotKey, true, styleMode, styleContext) then
         return false, "No compatible appearance is cached for this slot."
     end
     state.selectedConceptID = nil
@@ -1006,6 +1047,7 @@ function Wardrobe.SaveConcept(name)
     concept.selections = CopyPrimitiveMap(state.selections)
     concept.locks = CopyPrimitiveMap(state.locks)
     concept.hidden = CopyPrimitiveMap(state.hidden)
+    concept.styleMode = QC.ZoneStyle and QC.ZoneStyle.NormalizeMode(state.styleMode) or state.styleMode
     state.selectedConceptID = concept.id
     if QC.Notify then
         QC.Notify("WARDROBE_CONCEPTS_CHANGED", concept)
@@ -1035,6 +1077,11 @@ function Wardrobe.LoadConcept(conceptID)
     state.selections = selections
     state.locks = CopyPrimitiveMap(concept.locks)
     state.hidden = CopyPrimitiveMap(concept.hidden)
+    if QC.ZoneStyle then
+        state.styleMode = QC.ZoneStyle.NormalizeMode(concept.styleMode or state.styleMode)
+    elseif concept.styleMode then
+        state.styleMode = concept.styleMode
+    end
     state.selectedConceptID = concept.id
     if QC.Notify then
         QC.Notify("WARDROBE_WORKBENCH_CHANGED")

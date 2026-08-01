@@ -1,8 +1,8 @@
-# Quest Chronicle v0.6.2
+# Quest Chronicle v0.7.0
 
-> **Outfit Workbench:** v0.6.2 completes the saved-concept manager and gives locked slots an unmistakable padlock and gold border while retaining equipped-weapon-safe generation and bottom navigation tabs.
+> **Zone Style Engine:** v0.7.0 turns outfit generation into a location-aware creative tool with Zone Native, Traveler, and Class Fantasy modes.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.6.2 finishes the outfit workbench concept workflow without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.7.0 adds curated zone profiles and weighted outfit suggestions without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -130,6 +130,7 @@ Bare `/qc` toggles the main window. `/qc help` displays command help.
 ## Compatibility
 
 - Existing v0.1 through v0.4.0 SavedVariables and historical records are retained.
+- Existing v0.6.x wardrobe caches, outfit selections, locks, hidden slots, and saved concepts are retained.
 - Addon schema remains version 2 because the recorded data model is unchanged.
 - Courier export `formatVersion` remains 1.
 - Warcraft Quest Chronicle Courier v1.0.0 remains compatible.
@@ -141,6 +142,7 @@ QuestChronicle\
 ├── QuestChronicle.toc
 ├── QuestChronicle.lua
 ├── Wardrobe.lua
+├── ZoneStyle.lua
 ├── UI\
 │   ├── Shared.lua
 │   ├── ChronicleTab.lua
@@ -154,11 +156,28 @@ QuestChronicle\
 ├── LIVE_TEST_CHECKLIST.md
 ├── UI_FOUNDATION_TEST_CHECKLIST.md
 ├── POLISH_TEST_CHECKLIST.md
+├── ZONE_STYLE_ENGINE_V070_TEST_CHECKLIST.md
 ├── WARDROBE_SCANNER_RECOVERY_TEST_CHECKLIST.md
 └── COURIER_CONFIG_PATCH.json
 ```
 
 The lifecycle recorder remains in `QuestChronicle.lua`. UI modules use the public addon API and callback bus rather than reaching into the recorder's local tracking state.
+
+## Zone Style Engine
+
+The Outfit Workbench offers three weighted generation modes:
+
+- **Zone Native** favors the culture, climate, magic, materials, and motifs in the current curated zone profile.
+- **Traveler** favors practical, weathered, expedition-ready appearances with a lighter local accent.
+- **Class Fantasy** favors iconic class terms and silhouettes with a smaller accent from the current zone.
+
+Quest Chronicle detects the current map, zone, subzone, and parent-map trail. Profiles cover the Midnight regions—Quel'Thalas, the Amani Highlands, Harandar, and the Voidstorm—plus major cultures and expansion regions across Azeroth. Unknown areas fall back to an Azeroth Adventurer profile.
+
+When the character enters a different zone or profile, Quest Chronicle announces a new Zone Native suggestion and marks the Outfits tab. Opening Outfits acknowledges the notice; generating a Zone Native outfit consumes it. Suggestions never replace the preview automatically.
+
+Scoring uses cached source and item names when available. If WoW has not loaded an item's name yet, Quest Chronicle requests it and uses a stable profile affinity in the meantime. The result remains intentionally varied rather than forcing an exact matching set.
+
+The engine only ranks candidates. Existing equipped-item weapon checks still decide whether a weapon appearance can be used.
 
 
 ## Outfits: Wardrobe Foundation

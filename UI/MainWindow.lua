@@ -16,6 +16,13 @@ local TAB_DEFINITIONS = {
     { key = "outfits", label = "Outfits", width = 102, tooltip = "Generate, refine, preview, save, and load outfit concepts from collected appearances.", constructor = UI.CreateOutfitsTab },
 }
 
+local function UpdateOutfitsTabLabel(frame)
+    local tab = frame and frame.tabs and frame.tabs.outfits
+    if not tab then return end
+    local suggestion = QC.ZoneStyle and QC.ZoneStyle.GetPendingSuggestion and QC.ZoneStyle.GetPendingSuggestion()
+    tab:SetText(suggestion and suggestion.unread and "Outfits *" or "Outfits")
+end
+
 local function Clamp(value, minimum, maximum)
     value = tonumber(value) or minimum
     return math.max(minimum, math.min(maximum, value))
@@ -225,6 +232,10 @@ function QC.InitializeUI()
 
         self.selectedTab = key
         QC.GetUIState().lastTab = key
+        if key == "outfits" and QC.ZoneStyle and QC.ZoneStyle.AcknowledgeSuggestion then
+            QC.ZoneStyle.AcknowledgeSuggestion()
+        end
+        UpdateOutfitsTabLabel(self)
         UpdateHeader(self)
         local pane = self.panes[key]
         if pane and pane.Refresh then
@@ -264,6 +275,16 @@ function QC.InitializeUI()
     end)
     QC.RegisterCallback("PLAYER_READY", frame, function()
         UpdateHeader(frame)
+        UpdateOutfitsTabLabel(frame)
+    end)
+    QC.RegisterCallback("ZONE_STYLE_SUGGESTION", frame, function()
+        UpdateOutfitsTabLabel(frame)
+    end)
+    QC.RegisterCallback("ZONE_STYLE_SUGGESTION_ACKNOWLEDGED", frame, function()
+        UpdateOutfitsTabLabel(frame)
+    end)
+    QC.RegisterCallback("ZONE_STYLE_SUGGESTION_CONSUMED", frame, function()
+        UpdateOutfitsTabLabel(frame)
     end)
 
     return frame

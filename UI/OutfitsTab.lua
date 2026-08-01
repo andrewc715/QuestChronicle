@@ -1,6 +1,7 @@
 local QC = QuestChronicle
 local UI = QC.UI
 local Wardrobe = QC.Wardrobe
+local ZoneStyle = QC.ZoneStyle
 
 local SOURCE_ROWS = 7
 local SOURCE_ROW_HEIGHT = 37
@@ -41,11 +42,13 @@ end
 
 local function ConceptDetail(concept)
     local updated = concept.updatedAt and UI.FormatShortTimestamp(concept.updatedAt) or "Unknown time"
+    local mode = concept.styleMode and ZoneStyle and ZoneStyle.GetModeInfo(concept.styleMode)
     return string.format(
-        "%d appearances • %d locked • %d hidden • %s",
+        "%d appearances • %d locked • %d hidden • %s • %s",
         CountMap(concept.selections),
         CountMap(concept.locks),
         CountMap(concept.hidden),
+        mode and mode.label or "Current mode",
         updated
     )
 end
@@ -217,8 +220,34 @@ function UI.CreateOutfitsTab(parent)
     modelTitle:SetPoint("TOP", modelPanel, "TOP", 0, -10)
     modelTitle:SetText("Character Preview")
 
+    pane.styleButtons = {}
+    local previousStyleButton
+    for _, mode in ipairs(ZoneStyle.modes) do
+        local button = UI.CreateButton(modelPanel, mode.shortLabel, 88, 22)
+        if previousStyleButton then
+            button:SetPoint("LEFT", previousStyleButton, "RIGHT", 3, 0)
+        else
+            button:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -29)
+        end
+        button.modeKey = mode.key
+        button:SetScript("OnClick", function(self)
+            ZoneStyle.SetMode(self.modeKey)
+            pane:Refresh("Generation mode changed to " .. ZoneStyle.GetModeInfo(self.modeKey).label .. ".")
+        end)
+        UI.SetTooltip(button, mode.label, mode.description)
+        pane.styleButtons[mode.key] = button
+        previousStyleButton = button
+    end
+
+    local styleInfo = modelPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    styleInfo:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -54)
+    styleInfo:SetPoint("RIGHT", modelPanel, "RIGHT", -8, 0)
+    styleInfo:SetJustifyH("CENTER")
+    styleInfo:SetWordWrap(false)
+    pane.styleInfo = styleInfo
+
     local model = CreateFrame("DressUpModel", nil, modelPanel)
-    model:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -32)
+    model:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -72)
     model:SetPoint("BOTTOMRIGHT", modelPanel, "BOTTOMRIGHT", -8, 112)
     model:SetUnit("player")
     if model.SetFacing then model:SetFacing(0) end
@@ -254,19 +283,19 @@ function UI.CreateOutfitsTab(parent)
     local clearAll = UI.CreateButton(modelPanel, "Reset Outfit", 100, 24)
     clearAll:SetPoint("LEFT", loadConcept, "RIGHT", 4, 0)
 
-    UI.SetTooltip(generateButton, "Generate Outfit", "Build a random outfit from cached appearances. Weapon choices are limited by your currently equipped main- and off-hand items plus Blizzard's current category and usability rules. Locked and hidden choices are preserved.")
-    UI.SetTooltip(rerollUnlocked, "Reroll Unlocked", "Replace every unlocked armor choice and only weapon appearances Blizzard allows on the currently equipped items.")
+    UI.SetTooltip(generateButton, "Generate Outfit", "Build a weighted outfit in the selected style. Weapon choices remain limited by your currently equipped main- and off-hand items plus Blizzard's current category and usability rules. Locked and hidden choices are preserved.")
+    UI.SetTooltip(rerollUnlocked, "Reroll Unlocked", "Replace every unlocked choice using the selected style while preserving Blizzard-safe weapon compatibility.")
     UI.SetTooltip(saveConcept, "Save Concept", "Open the Outfit Concepts manager to name and save the current selections, locks, hidden slots, and weapon configuration.")
     UI.SetTooltip(loadConcept, "Outfit Concepts", "Open the Outfit Concepts manager to inspect, load, overwrite, or delete this character's saved concepts.")
     UI.SetTooltip(clearAll, "Reset Outfit", "Clear selections, locks, and hidden-slot choices, returning the preview to currently equipped gear.")
 
     generateButton:SetScript("OnClick", function()
-        local ok, message = Wardrobe.GenerateOutfit(false)
+        local ok, message = Wardrobe.GenerateOutfit(false, ZoneStyle.GetMode())
         if ok then Wardrobe.ApplyPreview(model) end
         pane:Refresh(message)
     end)
     rerollUnlocked:SetScript("OnClick", function()
-        local ok, message = Wardrobe.GenerateOutfit(true)
+        local ok, message = Wardrobe.GenerateOutfit(true, ZoneStyle.GetMode())
         if ok then Wardrobe.ApplyPreview(model) end
         pane:Refresh(message)
     end)
@@ -670,6 +699,10 @@ function UI.CreateOutfitsTab(parent)
                 end
                 local valid, reason = Wardrobe.ValidateSource(self.source, GetCurrentSlot())
                 GameTooltip:AddLine(valid and "Compatible" or reason, valid and 0.2 or 1, valid and 1 or 0.25, valid and 0.2 or 0.25, true)
+                if valid and ZoneStyle then
+                    local definition = Wardrobe.GetSlotDefinition(GetCurrentSlot())
+                    GameTooltip:AddLine(ZoneStyle.GetScoreSummary(self.source, definition, ZoneStyle.GetMode(), ZoneStyle.GetCurrentContext()), 1, 0.82, 0, true)
+                end
                 GameTooltip:Show()
             end
         end)
@@ -772,6 +805,23 @@ function UI.CreateOutfitsTab(parent)
         local page = math.min(GetPage(slotKey), pageCount)
         SetPage(slotKey, page)
 
+        local styleMode = ZoneStyle.GetMode()
+        local styleContext = ZoneStyle.GetCurrentContext()
+        local pendingSuggestion = ZoneStyle.GetPendingSuggestion()
+        for modeKey, button in pairs(self.styleButtons) do
+            local mode = ZoneStyle.GetModeInfo(modeKey)
+            local marker = modeKey == ZoneStyle.MODE_ZONE_NATIVE and pendingSuggestion and " *" or ""
+            button:SetText(mode.shortLabel .. marker)
+            button:SetEnabled(modeKey ~= styleMode)
+        end
+        local location = styleContext.subzone ~= "" and (styleContext.subzone .. ", " .. styleContext.zone) or styleContext.zone
+        styleInfo:SetText(string.format(
+            "%s • %s%s",
+            styleContext.profileLabel or "Azeroth Adventurer",
+            location or "Unknown Zone",
+            pendingSuggestion and " • Suggestion ready" or ""
+        ))
+
         for key, button in pairs(self.slotButtons) do
             button:SetEnabled(key ~= slotKey)
             local count = #(Wardrobe.GetSlotSources(key) or {})
@@ -832,7 +882,8 @@ function UI.CreateOutfitsTab(parent)
         nextPage:SetEnabled(page < pageCount)
         local concept = Wardrobe.GetCurrentConcept()
         local conceptText = concept and (" • Concept: " .. tostring(concept.name or "Unnamed")) or ""
-        subtitle:SetText(string.format("%s collected appearances cached for %s%s. Preview only; no outfit is applied.", UI.FormatNumber(#sources), definition and definition.label or slotKey, conceptText))
+        local modeInfo = ZoneStyle.GetModeInfo(styleMode)
+        subtitle:SetText(string.format("%s appearances for %s • %s • %s%s. Preview only; no outfit is applied.", UI.FormatNumber(#sources), definition and definition.label or slotKey, modeInfo.label, styleContext.profileLabel or "Azeroth Adventurer", conceptText))
     end
 
     QC.RegisterCallback("WARDROBE_SCAN_PROGRESS", pane, function(index, total, slotKey, count, diagnostics)
@@ -859,6 +910,18 @@ function UI.CreateOutfitsTab(parent)
     QC.RegisterCallback("WARDROBE_CONCEPTS_CHANGED", pane, function()
         if pane:IsShown() then pane:Refresh() end
     end)
+    QC.RegisterCallback("ZONE_STYLE_MODE_CHANGED", pane, function()
+        if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("ZONE_STYLE_SUGGESTION", pane, function()
+        if pane:IsShown() then pane:Refresh("A new Zone Native outfit suggestion is ready.") end
+    end)
+    QC.RegisterCallback("ZONE_STYLE_CONTEXT_CHANGED", pane, function()
+        if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("ZONE_STYLE_SUGGESTION_CONSUMED", pane, function()
+        if pane:IsShown() then pane:Refresh() end
+    end)
     QC.RegisterCallback("PLAYER_READY", pane, function()
         if model.SetUnit then model:SetUnit("player") end
         Wardrobe.ApplyPreview(model)
@@ -866,6 +929,7 @@ function UI.CreateOutfitsTab(parent)
     end)
 
     pane:SetScript("OnShow", function()
+        ZoneStyle.AcknowledgeSuggestion()
         Wardrobe.ApplyPreview(model)
         pane:Refresh()
     end)

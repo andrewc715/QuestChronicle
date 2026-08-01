@@ -1,34 +1,42 @@
-# Quest Chronicle v0.6.2: Concept Manager and Visible Locks
+# Quest Chronicle v0.7.0: Zone Style Engine
 
-Version 0.6.2 completes two Outfit Workbench pieces that were functionally present but not ready for live use: saved concepts and locked-slot visibility.
+Version 0.7.0 makes the Outfit Workbench location-aware while keeping its output varied, preview-only, and subject to Blizzard's transmog rules.
 
-## Complete Outfit Concepts manager
+## Three generation modes
 
-The fragile name popup and load context menu have been replaced by a self-contained **Outfit Concepts** manager inside Quest Chronicle. It provides:
+- **Zone Native** gives the strongest weight to the current area's culture, climate, magic, materials, creatures, and visual motifs.
+- **Traveler** favors weathered, rugged, expedition-ready appearances and uses the current zone as a lighter accent.
+- **Class Fantasy** gives the strongest weight to iconic class themes and uses the current zone as a smaller accent.
 
-- a visible concept-name field;
-- **Save / Update** for the current preview;
-- case-insensitive overwrite when an existing name is saved again;
-- a paged list showing appearance, lock, and hidden-slot counts plus update time;
-- explicit selection and **Load Selected**;
-- two-step confirmed deletion;
-- a live concept count on the main **Concepts** button.
+The selected mode appears above the character preview and is remembered per character. Saved outfit concepts now include their selected style mode. Concepts saved by v0.6.0 through v0.6.2 have no style field, so they load normally and retain the workbench's current mode.
 
-Saved concepts remain character-specific and include selected appearance source IDs, locked slots, hidden helm/cloak/shirt/tabard state, and weapon configuration. Existing concepts written by v0.6.0 or v0.6.1 remain readable. Concept identifiers now avoid collisions even after older concepts are deleted and another is saved during the same second.
+## Zone and subzone context
 
-## Visible lock state
+Quest Chronicle reads Blizzard's current map, zone, subzone, and parent-map names. The first curated Midnight profiles cover:
 
-Locked equipment-slot buttons now show both a gold padlock and a persistent two-pixel gold border. The lock remains visible when another slot is selected and when the locked button itself is the disabled active slot. The previous tiny trailing `L` marker has been removed.
+- Quel'Thalas, including Silvermoon, Eversong, the Ghostlands, and Sunwell areas;
+- the Amani Highlands and Zul'Aman;
+- Harandar and its rootways;
+- the Voidstorm and its void-touched regions.
 
-The active appearance header still says **Locked**, and its action changes to **Unlock Slot**, providing confirmation in both the slot list and detail panel.
+Additional profiles cover Hallowfall, Khaz Algar, the Dragon Isles, kaldorei regions, Zandalar, Kul Tiras, Pandaria, Northrend, Outland, the Shadowlands, human kingdoms, orcish frontiers, and Forsaken marches. Unknown areas use the broad **Azeroth Adventurer** profile.
 
-## Preserved behavior
+## Weighted appearance scoring
 
-- Equipped main- and off-hand weapon validation from v0.6.1.
-- Dual-wield, two-hand, ranged, empty-hand, and incompatible-lock handling.
-- Native bottom navigation tabs.
+Generation is intentionally weighted rather than deterministic. Quest Chronicle scores names and item metadata already available from WoW, adds mode-specific and class-specific affinities, and retains a stable identity-based affinity for appearances whose item data has not loaded. Missing item data is requested for later generations.
+
+Weapon scoring only orders candidates. Every generated or rerolled weapon must still pass the v0.6.1 equipped-item category, usability, character-display, valid-source, and hand-slot checks before it can enter the preview.
+
+## Automatic suggestions
+
+Entering a different zone or curated profile creates a Zone Native suggestion, posts a concise chat notice, and marks the **Outfits** tab with an asterisk. Opening Outfits acknowledges the notice. Generating in Zone Native mode consumes the suggestion.
+
+Suggestions are non-destructive: they never overwrite the current preview, unlock a slot, change a hidden slot, apply transmog, spend gold, or modify a Blizzard outfit.
+
+## Compatibility
+
 - Wardrobe cache format 5; no collection rescan is required.
-- SavedVariables schema 2.
-- Courier format 1 and Courier v1.0.0 compatibility.
-- Quest history, active quests, notes, drafts, settings, wardrobe cache, and existing concepts.
-- Preview only; Quest Chronicle never applies transmog or changes Blizzard outfit slots.
+- Existing preview selections, locks, hidden slots, and outfit concepts remain compatible.
+- SavedVariables schema 2 is preserved.
+- Courier format 1 and Courier v1.0.0 compatibility are preserved.
+- Quest history, active quests, notes, drafts, settings, and Courier snapshots are unchanged.

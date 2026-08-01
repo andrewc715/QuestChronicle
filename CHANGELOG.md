@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.7.0 - 2026-07-31
+
+### Added
+
+- Detects the player's current map, zone, subzone, and parent-map trail through Blizzard's map API and zone-change events.
+- Adds curated profiles for Quel'Thalas, the Amani Highlands, Harandar, the Voidstorm, and major cultures and expansion regions across Azeroth.
+- Adds Zone Native, Traveler, and Class Fantasy generation modes directly above the character preview.
+- Scores cached appearances using loaded item/source names, mode-specific terms, profile affinities, class themes, and slot accents.
+- Requests missing item data and uses a stable affinity fallback so generic cached appearance names still produce varied weighted results.
+- Announces a non-destructive Zone Native suggestion when entering a new zone or profile and marks the Outfits tab until it is opened.
+- Displays the active profile and detected location in the Outfit Workbench.
+- Shows an appearance's current style score and matching reasons in its hover tooltip.
+- Saves and restores the selected style mode with outfit concepts; legacy concepts remain loadable.
+
+### Preserved
+
+- Equipped-item, category, usability, class, display, and valid-source checks for generated and rerolled weapons.
+- Locked-slot, hidden-slot, concept-manager, embedded-preview, and native bottom-tab behavior.
+- Wardrobe cache format 5; no collection rescan is required from v0.6.2.
+- SavedVariables schema 2 and Courier format 1.
+- Preview-only behavior; no transmog is applied and no Blizzard outfit slot is changed.
+
 ## 0.6.2 - 2026-07-31
 
 ### Fixed
