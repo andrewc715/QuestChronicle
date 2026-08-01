@@ -1,8 +1,8 @@
-# Quest Chronicle v0.7.1
+# Quest Chronicle v0.7.2
 
-> **Chronological Zone Pools:** v0.7.1 limits generated outfits by both the current zone's expansion era and its curated source family, then makes the exact preview layers visible at a glance.
+> **Cohesive, Promo-Free Generation:** v0.7.2 excludes promotional appearances and coordinates generated pieces through Blizzard set membership and shared visual motifs.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.7.1 tightens the Zone Style Engine without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.7.2 tightens outfit generation without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -158,6 +158,7 @@ QuestChronicle\
 ├── POLISH_TEST_CHECKLIST.md
 ├── ZONE_STYLE_ENGINE_V070_TEST_CHECKLIST.md
 ├── ZONE_POOL_CURRENT_LOOK_V071_TEST_CHECKLIST.md
+├── PROMO_COHERENCE_V072_TEST_CHECKLIST.md
 ├── WARDROBE_SCANNER_RECOVERY_TEST_CHECKLIST.md
 └── COURIER_CONFIG_PATCH.json
 ```
@@ -176,7 +177,7 @@ Quest Chronicle detects the current map, zone, subzone, and parent-map trail. Pr
 
 When the character enters a different zone or profile, Quest Chronicle announces a new Zone Native suggestion and marks the Outfits tab. Opening Outfits acknowledges the notice; generating a Zone Native outfit consumes it. Suggestions never replace the preview automatically.
 
-Scoring uses cached source and item names when available. If WoW has not loaded an item's name yet, Quest Chronicle requests it and uses a stable profile affinity in the meantime. The result remains intentionally varied rather than forcing an exact matching set.
+Scoring uses cached source and item names when available. If WoW has not loaded an item's name yet, Quest Chronicle requests it and uses a stable profile affinity in the meantime. The result remains varied while favoring pieces from the same native transmog set or a compatible material and magic motif.
 
 The engine only ranks candidates. Existing equipped-item weapon checks still decide whether a weapon appearance can be used.
 
@@ -190,6 +191,14 @@ Generated outfits and rerolls now pass two eligibility gates before weighted sco
 Explicit item/source names associated with another curated zone are also rejected. When Blizzard exposes no usable location for a non-boss source, Quest Chronicle admits it only after the era gate and only when its metadata contains no conflicting zone marker.
 
 The full collected appearance browser remains available for deliberate manual previews. Rows outside the generated pool say **Not generated**, and their tooltip explains the era or zone exclusion.
+
+### Promotional exclusion and outfit coherence
+
+Generated outfits and rerolls always reject Blizzard's Trading Post source type. Legacy promotion families that WoW reports without an acquisition type—such as Renowned Explorer, Wooly Wendigo, Sprite Darter, Celestial Observer, the original store helms, Eternal Traveler, and Fireplume—are recognized through stable item and native-set metadata. Future native sets whose description identifies a shop, subscription, promotion, or Recruit-a-Friend origin are also excluded.
+
+Manual browsing remains unrestricted. Promotional rows say **Promo excluded**, and their tooltip explains that the restriction applies only to generation.
+
+For visual coherence, the generator establishes the outfit from major armor silhouettes first. It strongly favors pieces belonging to the same Blizzard transmog set, rewards shared motifs such as fire, frost, shadow, radiant, nature, arcane, storm, fel, necrotic, mechanical, rustic, or regal, and rejects isolated dramatic accents that conflict with the established outfit. Weapons are chosen afterward so they reinforce the armor while still passing every equipped-item transmog rule. Individual rerolls build their profile from the rest of the visible preview.
 
 ### Current Look
 

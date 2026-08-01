@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.7.2 - 2026-07-31
+
+### Fixed
+
+- Hard-excludes Blizzard's Trading Post source type from Generate Outfit, Reroll Unlocked, and individual slot rerolls.
+- Excludes legacy subscription, shop, Recruit-a-Friend, preorder, and promotional families that WoW reports without a source type, including every Renowned Explorer and Wooly Wendigo piece.
+- Checks native transmog-set names, labels, and descriptions for promotional origin metadata.
+- Labels affected browser rows **Promo excluded** while keeping deliberate manual preview selection available.
+
+### Improved
+
+- Generates the major armor silhouette before smaller layers and weapons.
+- Strongly favors appearances belonging to the same Blizzard native transmog set.
+- Builds a shared motif across fire, frost, shadow, radiant, nature, arcane, storm, fel, necrotic, mechanical, rustic, and regal themes.
+- Rejects isolated dramatic pieces when they would conflict with or overpower the established outfit.
+- Makes Reroll Slot coordinate with the rest of the visible preview instead of choosing in isolation.
+- Chooses weapons after armor so they reinforce the outfit while retaining every equipped-item compatibility rule.
+- Restores the previous selections if an invalid locked weapon blocks generation, preventing a partial reroll.
+
+### Preserved
+
+- Full collected wardrobe browsing and manual previews, including promotional appearances.
+- Era ceilings, local source provenance, three Zone Style modes, locks, hidden slots, concepts, and Current Look.
+- Wardrobe cache format 5, SavedVariables schema 2, and Courier format 1; no collection rescan is required.
+
 ## 0.7.1 - 2026-07-31
 
 ### Fixed

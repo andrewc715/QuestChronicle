@@ -1,49 +1,37 @@
-# Quest Chronicle v0.7.1: Chronological Zone Pools and Current Look
+# Quest Chronicle v0.7.2: Promo-Free, Cohesive Outfits
 
-Version 0.7.1 prevents the Zone Style Engine from recommending appearances that are chronologically or geographically wrong for the character's current adventure.
+Version 0.7.2 keeps generated outfits grounded in the current adventure while coordinating the pieces as a complete look.
 
-## Era ceilings
+## Promotional appearances never generate
 
-Every armor and weapon candidate now has to pass the current zone's expansion ceiling before style scoring begins.
+Generate Outfit, Reroll Unlocked, and individual slot rerolls now apply a hard promotional gate before any style scoring or weapon validation.
 
-- Classic zones use Classic items.
-- Outland uses Classic and The Burning Crusade items.
-- Northrend adds Wrath of the Lich King.
-- Cataclysm, Pandaria, Draenor, Legion, Battle for Azeroth, Shadowlands, Dragonflight, The War Within, and Midnight regions add their respective eras in order.
+- Blizzard's native Trading Post source type is always excluded.
+- Legacy reward families that WoW stores without an acquisition source type are recognized by stable item and set metadata.
+- The initial legacy catalog covers Renowned Explorer, Wooly Wendigo, Sprite Darter, Celestial Observer, Eternal Traveler, Fireplume, and the original store helms.
+- Native transmog-set names, labels, and descriptions are checked for shop, subscription, promotion, or Recruit-a-Friend origins.
 
-Quest Chronicle reads Blizzard's `expansionID` from the representative item's current item data. Missing item data is requested and the candidate remains outside generation until WoW supplies its era. The value is added lazily to the existing source record, so wardrobe cache format 5 remains valid and no rescan is required.
+The full wardrobe browser remains intact. Promotional appearances can still be selected deliberately for a manual preview; their rows now say **Promo excluded** and their tooltip explains the generation-only restriction.
 
-## Local source provenance
+## Outfit coherence
 
-Era alone is not enough. Blade's Edge and Sunwell both belong to The Burning Crusade, but they are not the same source family.
+Quest Chronicle now builds a style profile while it generates:
 
-For boss drops, Quest Chronicle reads Blizzard's instance and encounter provenance. A Gruul's Lair appearance can enter the Blade's Edge pool; a Sunwell Plateau appearance cannot. Curated provenance families cover the major questing regions and their associated dungeons or raids from Outland through Midnight.
+1. Locked visible selections establish the starting constraints.
+2. Chest, shoulders, legs, and waist establish the major silhouette.
+3. Head and smaller armor layers reinforce that foundation.
+4. Weapons are chosen last and still must pass Blizzard's equipped-item, category, usability, class, display, source, and hand-slot rules.
 
-For sources without exact Blizzard location data, explicit foreign-zone terms in the loaded item/source metadata are rejected. A source with no reported location and no conflicting marker remains eligible after passing the era ceiling. This conservative fallback avoids claiming more provenance precision than WoW exposes.
+Pieces from the same Blizzard transmog set receive the strongest match. When no native set relationship exists, shared material and magic motifs are favored. A dramatic fire, frost, shadow, radiant, arcane, storm, fel, or necrotic accent is rejected when it would become an isolated visual outlier or directly conflict with the established outfit.
 
-The rule applies to Generate Outfit, Reroll Unlocked, individual armor rerolls, and individual weapon rerolls in all three style modes. Locked slots remain deliberately preserved even when the character changes zones.
+Individual slot rerolls build their profile from the rest of the visible Character Preview. This keeps a rerolled helm, cloak, armor piece, or weapon aligned with the existing concept instead of treating the slot as an isolated random choice.
 
-## Browser transparency
+## Safety and compatibility
 
-The appearance browser still shows the complete collected wardrobe and permits deliberate manual previews. A row outside the automatic pool says **Not generated** or **Loading era**. Its tooltip explains whether it is too new, comes from another zone family, or is waiting for Blizzard item data.
-
-## Current Look
-
-Equipment-slot buttons now contain a thumbnail for the layer represented on the embedded model. Selected appearances use their cached icon; unmodified layers use the equipped item's icon. Hidden layers are desaturated, and locked layers retain their gold padlock and border.
-
-The new **Current Look** button opens a compact manifest containing:
-
-- every armor layer;
-- the active main-hand mode and applicable off-hand only;
-- exact selected appearance or equipped-item names;
-- Selected, Equipped, Hidden, and Locked states;
-- appearance source and item IDs on hover.
-
-## Compatibility
-
-- Wardrobe cache format 5; no collection rescan is required.
+- A locked weapon incompatibility restores the previous preview instead of leaving a partially regenerated outfit.
+- Wardrobe cache format 5 remains valid; no collection rescan is required.
 - SavedVariables schema 2 is preserved.
 - Courier format 1 and Courier v1.0.0 compatibility are preserved.
-- Existing concepts and their saved style modes remain compatible.
+- Existing outfit concepts, selections, locks, hidden slots, style modes, and Current Look data remain compatible.
 - Quest history, active quests, notes, drafts, settings, and Courier snapshots are unchanged.
-- Preview only; no transmog is applied, no gold is spent, and no Blizzard outfit slot is changed.
+- Preview only: no transmog is applied, no gold is spent, and no Blizzard outfit slot is changed.

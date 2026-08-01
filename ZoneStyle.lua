@@ -222,6 +222,72 @@ local classKeywords = {
     [13] = { evoker = 10, dragon = 9, draconic = 9, scale = 7, obsidian = 7, bronze = 6, azure = 6, emerald = 6, ruby = 6 },
 }
 
+-- Trading Post is source type 7 in Blizzard's Wardrobe filters. Older
+-- subscription, shop, Recruit-a-Friend, and preorder rewards predate that
+-- dedicated source type, so their stable collection names are also guarded.
+-- These restrictions apply only to generated outfits; manual browsing and
+-- preview remain untouched.
+local TRADING_POST_SOURCE_TYPE = 7
+local promotionalItemIDs = {
+    [171324] = true, -- Renowned Explorer's Akubra
+    [171340] = true, -- Wooly Wendigo Hood
+}
+local promotionalNameFragments = {
+    "renowned explorers",
+    "wooly wendigo",
+    "sprite darters",
+    "celestial observers",
+    "vestments of the eternal traveler",
+    "crown of the eternal winter",
+    "hood of hungering darkness",
+    "jewel of the firelord",
+    "fireplume regalia",
+}
+local promotionalSourceFragments = {
+    "trading post",
+    "promotion",
+    "promotional",
+    "recruit a friend",
+    "subscription",
+    "blizzard shop",
+    "in game shop",
+    "battle net shop",
+    "shop",
+    "store",
+    "game time promotion",
+}
+
+-- WoW does not expose a palette for an appearance texture. Native transmog-set
+-- membership and strong semantic motifs are therefore the most reliable safe
+-- signals available to an addon for keeping a generated outfit coordinated.
+local styleFamilies = {
+    fire = { fire = 3, flame = 3, flaming = 4, fiery = 3, molten = 5, magma = 5, lava = 5, inferno = 4, infernal = 3, ember = 3, cinder = 3, burning = 4, firelord = 5, sulfuras = 5 },
+    frost = { frost = 4, frosted = 4, ice = 3, icy = 3, glacial = 5, rime = 4, snow = 2, winter = 3, frozen = 4, icicle = 4 },
+    shadow = { shadow = 4, dark = 2, darkness = 3, black = 2, ebon = 3, ebony = 3, night = 2, midnight = 3, void = 4, abyss = 4, twilight = 2 },
+    radiant = { holy = 4, light = 3, radiant = 5, luminous = 4, dawn = 3, sun = 3, solar = 4, golden = 2, celestial = 4, sacred = 3 },
+    nature = { nature = 4, natural = 3, leaf = 3, leafy = 3, grove = 4, vine = 3, verdant = 4, emerald = 2, wild = 2, bark = 3, bloom = 3, floral = 3 },
+    arcane = { arcane = 5, mana = 4, spell = 2, runic = 3, mage = 3, sorcerer = 3, cosmic = 4, astral = 4, prismatic = 4, crystal = 3 },
+    storm = { storm = 4, thunder = 4, lightning = 5, tempest = 4, static = 3, cyclone = 4 },
+    fel = { fel = 5, demon = 3, demonic = 4, legion = 2, chaos = 4, corrupt = 3, diabolic = 4 },
+    necrotic = { death = 3, dead = 2, necrotic = 5, plague = 4, bone = 3, skeletal = 4, skull = 3, grave = 3, crypt = 3, scourge = 4 },
+    mechanical = { mechanical = 4, machine = 4, mechanized = 4, gear = 2, cog = 3, clockwork = 5, industrial = 4, engine = 3 },
+    rustic = { weathered = 4, worn = 3, battered = 3, rugged = 4, explorer = 3, traveler = 3, scout = 3, leather = 2, hide = 2, fur = 2, wool = 2 },
+    regal = { royal = 4, regal = 4, imperial = 4, jeweled = 3, crown = 3, throne = 3, ceremonial = 3, noble = 3 },
+}
+local dramaticFamilies = { fire = true, frost = true, shadow = true, radiant = true, arcane = true, storm = true, fel = true, necrotic = true }
+local conflictingFamilies = {
+    fire = { frost = true, shadow = true },
+    frost = { fire = true },
+    shadow = { fire = true, radiant = true, nature = true },
+    radiant = { shadow = true, necrotic = true, fel = true },
+    nature = { shadow = true, necrotic = true, mechanical = true, fel = true },
+    fel = { radiant = true, nature = true },
+    necrotic = { radiant = true, nature = true },
+    mechanical = { nature = true, rustic = true },
+    rustic = { mechanical = true, arcane = true, regal = true },
+    regal = { rustic = true },
+}
+
 ZoneStyle.profiles = {
     quelthalas = {
         label = "Quel'Thalas",
@@ -595,6 +661,190 @@ local function SourceMetadata(source)
     return Normalize(table.concat(parts, " "))
 end
 
+local function GetSourceTypeLabel(source)
+    local sourceType = tonumber(source and source.sourceType)
+    local label = sourceType and _G and _G["TRANSMOG_SOURCE_" .. tostring(sourceType)]
+    return Normalize(label)
+end
+
+local promotionalSetCache = {}
+
+local function GetPromotionReason(source)
+    if not source then return nil end
+    if tonumber(source.sourceType) == TRADING_POST_SOURCE_TYPE then
+        return "Trading Post appearances are excluded from generated outfits."
+    end
+
+    local sourceLabel = GetSourceTypeLabel(source)
+    if sourceLabel ~= "" and TextMatchesAny(sourceLabel, promotionalSourceFragments) then
+        return "Promotional and shop appearances are excluded from generated outfits."
+    end
+    if promotionalItemIDs[tonumber(source.itemID)] then
+        return "This known promotional reward is excluded from generated outfits."
+    end
+
+    local metadata = SourceMetadata(source)
+    if TextMatchesAny(metadata, promotionalNameFragments) then
+        return "This known subscription, shop, or Recruit-a-Friend appearance is excluded from generated outfits."
+    end
+    return nil
+end
+
+local styleSignalCache = setmetatable({}, { __mode = "k" })
+local function GetSourceStyleSignals(source)
+    if not source then return { families = {}, intensity = 0 } end
+    local text = SourceMetadata(source)
+    local cached = styleSignalCache[source]
+    if cached and cached.text == text then return cached end
+
+    local families = {}
+    local intensity = 0
+    for family, keywords in pairs(styleFamilies) do
+        local score = 0
+        local padded = " " .. text .. " "
+        for token, value in pairs(keywords) do
+            local normalizedToken = Normalize(token)
+            if normalizedToken ~= "" and padded:find(" " .. normalizedToken .. " ", 1, true) then
+                score = score + value
+            end
+        end
+        if score > 0 then
+            families[family] = score
+            if dramaticFamilies[family] then intensity = math.max(intensity, score) end
+        end
+    end
+
+    cached = { text = text, families = families, intensity = intensity }
+    styleSignalCache[source] = cached
+    return cached
+end
+
+local sourceSetCache = {}
+local function GetSourceSetIDs(source)
+    local sourceID = tonumber(source and source.sourceID)
+    if not sourceID or not C_TransmogSets or type(C_TransmogSets.GetSetsContainingSourceID) ~= "function" then
+        return {}
+    end
+    if sourceSetCache[sourceID] then return sourceSetCache[sourceID] end
+    local setIDs = SafeCall(C_TransmogSets.GetSetsContainingSourceID, sourceID)
+    if type(setIDs) ~= "table" then return {} end
+    sourceSetCache[sourceID] = setIDs
+    return setIDs
+end
+
+local function GetPromotionalSetReason(source)
+    if not C_TransmogSets or type(C_TransmogSets.GetSetInfo) ~= "function" then return nil end
+    for _, setID in ipairs(GetSourceSetIDs(source)) do
+        local cached = promotionalSetCache[setID]
+        if cached == nil then
+            local setInfo = SafeCall(C_TransmogSets.GetSetInfo, setID)
+            if type(setInfo) == "table" then
+                local setText = table.concat({ setInfo.name or "", setInfo.label or "", setInfo.description or "" }, " ")
+                local namedPromotion = TextMatchesAny(setText, promotionalNameFragments)
+                local sourcedPromotion = TextMatchesAny(setText, promotionalSourceFragments)
+                cached = (namedPromotion or sourcedPromotion) and (setInfo.name or "Promotional set") or false
+                promotionalSetCache[setID] = cached
+            end
+        end
+        if cached then
+            return string.format("%s is a promotional set and is excluded from generated outfits.", cached)
+        end
+    end
+    return nil
+end
+
+function ZoneStyle.GetSourcePromotionReason(source)
+    return GetPromotionReason(source) or GetPromotionalSetReason(source)
+end
+
+function ZoneStyle.GetPromotionReason(source)
+    return ZoneStyle.GetSourcePromotionReason(source)
+end
+
+function ZoneStyle.CreateGenerationContext(baseContext)
+    local context = {}
+    for key, value in pairs(baseContext or ZoneStyle.GetCurrentContext()) do
+        context[key] = value
+    end
+    context.outfitProfile = {
+        sourceIDs = {},
+        setIDs = {},
+        families = {},
+        sourceCount = 0,
+        themedSources = 0,
+    }
+    return context
+end
+
+function ZoneStyle.AddSourceToGenerationContext(context, source)
+    local profile = context and context.outfitProfile
+    if not profile or not source then return end
+    local identity = tonumber(source.sourceID) or tonumber(source.itemID)
+    if identity and profile.sourceIDs[identity] then return end
+    if identity then profile.sourceIDs[identity] = true end
+
+    profile.sourceCount = profile.sourceCount + 1
+    local signals = GetSourceStyleSignals(source)
+    local hasTheme = false
+    for family, score in pairs(signals.families) do
+        profile.families[family] = (profile.families[family] or 0) + score
+        hasTheme = true
+    end
+    if hasTheme then profile.themedSources = profile.themedSources + 1 end
+    for _, setID in ipairs(GetSourceSetIDs(source)) do
+        profile.setIDs[setID] = (profile.setIDs[setID] or 0) + 1
+    end
+end
+
+local function GetDominantFamily(families)
+    local dominant, dominantScore
+    for family, score in pairs(families or {}) do
+        if not dominantScore or score > dominantScore then
+            dominant, dominantScore = family, score
+        end
+    end
+    return dominant, dominantScore or 0
+end
+
+function ZoneStyle.GetSourceCoherence(source, context)
+    local profile = context and context.outfitProfile
+    if not profile or profile.sourceCount == 0 then return 0, true, nil end
+
+    for _, setID in ipairs(GetSourceSetIDs(source)) do
+        if profile.setIDs[setID] then
+            return 24, true, "same Blizzard transmog set"
+        end
+    end
+
+    local signals = GetSourceStyleSignals(source)
+    local overlap = 0
+    local conflictingFamily
+    for family, score in pairs(signals.families) do
+        if profile.families[family] then
+            overlap = overlap + math.min(score, profile.families[family])
+        end
+        for profileFamily, profileScore in pairs(profile.families) do
+            if profileScore >= 2 and conflictingFamilies[family] and conflictingFamilies[family][profileFamily] then
+                conflictingFamily = profileFamily
+            end
+        end
+    end
+
+    local dominantFamily = GetDominantFamily(profile.families)
+    if overlap > 0 then
+        return math.min(16, 3 + overlap * 1.5), true, "matching " .. tostring(dominantFamily or "outfit") .. " motif"
+    end
+    if conflictingFamily and signals.intensity >= 3 then
+        return -20, false, string.format("dramatic %s conflicts with the outfit's %s motif", GetDominantFamily(signals.families) or "accent", conflictingFamily)
+    end
+    if profile.sourceCount >= 2 and signals.intensity >= 4 then
+        return -18, false, profile.themedSources > 0
+            and "dramatic accent does not match the established outfit motif"
+            or "dramatic accent would overpower the established neutral outfit"
+    end
+    return 0, true, nil
+end
+
 local dropOriginCache = {}
 
 local function GetDropOrigin(source)
@@ -626,6 +876,10 @@ end
 
 function ZoneStyle.GetSourceEligibility(source, modeKey, context)
     context = context or ZoneStyle.GetCurrentContext()
+    local promotionReason = GetPromotionReason(source) or GetPromotionalSetReason(source)
+    if promotionReason then
+        return false, "promotional", promotionReason
+    end
     if context.eraMax == nil then
         context.eraMax, context.eraLabel, context.eraShortLabel = ZoneStyle.ResolveEra(context)
     end
@@ -752,6 +1006,14 @@ function ZoneStyle.ScoreSource(source, definition, modeKey, context)
         score = score + math.min(2.0, tonumber(source.quality or 0) * 0.35)
     end
 
+    if context.outfitProfile then
+        local coherenceScore, coherent, coherenceReason = ZoneStyle.GetSourceCoherence(source, context)
+        score = score + coherenceScore
+        if #reasons < 4 and coherenceReason and (coherenceScore > 0 or not coherent) then
+            table.insert(reasons, (coherent and "Match: " or "Clash: ") .. coherenceReason)
+        end
+    end
+
     score = score + StableAffinity(source, profile, modeKey, classID)
     return score, reasons
 end
@@ -767,7 +1029,8 @@ function ZoneStyle.ChooseWeightedSource(candidates, definition, modeKey, context
     local fallback
     for _, source in ipairs(candidates or {}) do
         local eligible = ZoneStyle.GetSourceEligibility(source, modeKey, context)
-        if eligible then
+        local _, coherent = ZoneStyle.GetSourceCoherence(source, context)
+        if eligible and coherent then
             local weight, score = ZoneStyle.WeightForSource(source, definition, modeKey, context)
             local entry = { source = source, weight = weight, score = score }
             if source.sourceID == excludeSourceID then
@@ -794,7 +1057,8 @@ function ZoneStyle.OrderWeaponCandidates(candidates, modeKey, context)
     for index = #(candidates or {}), 1, -1 do
         local candidate = candidates[index]
         local eligible = ZoneStyle.GetSourceEligibility(candidate.source, modeKey, context)
-        if not eligible then table.remove(candidates, index) end
+        local _, coherent = ZoneStyle.GetSourceCoherence(candidate.source, context)
+        if not eligible or not coherent then table.remove(candidates, index) end
     end
     for _, candidate in ipairs(candidates or {}) do
         local definition = QC.Wardrobe and QC.Wardrobe.GetSlotDefinition and QC.Wardrobe.GetSlotDefinition(candidate.slotKey)
