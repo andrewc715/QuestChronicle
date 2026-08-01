@@ -1179,6 +1179,86 @@ function Wardrobe.GetWeaponTopology()
     return topology
 end
 
+local function GetTransmogOutfitSlotForInventorySlotName(slotName)
+    if not slotName or not GetInventorySlotInfo then return nil end
+    if not C_TransmogOutfitInfo or type(C_TransmogOutfitInfo.GetTransmogOutfitSlotFromInventorySlot) ~= "function" then
+        return nil
+    end
+    local inventorySlotID = SafeCall(GetInventorySlotInfo, slotName)
+    if inventorySlotID == nil then return nil end
+    return SafeCall(C_TransmogOutfitInfo.GetTransmogOutfitSlotFromInventorySlot, inventorySlotID)
+end
+
+local function GetEquippedWeaponOptionForOutfitSlot(outfitSlot)
+    if outfitSlot == nil or not C_TransmogOutfitInfo then return nil end
+
+    if type(C_TransmogOutfitInfo.GetEquippedSlotOptionFromTransmogSlot) == "function" then
+        local option = SafeCall(C_TransmogOutfitInfo.GetEquippedSlotOptionFromTransmogSlot, outfitSlot)
+        if option ~= nil then return option end
+    end
+
+    -- The equipped-option API can briefly return nil while the transmog system
+    -- initializes. Prefer the first enabled standard option before falling back
+    -- to None, mirroring Blizzard's slot-option model without changing it.
+    if type(C_TransmogOutfitInfo.GetWeaponOptionsForSlot) == "function" then
+        local options = SafeCall(C_TransmogOutfitInfo.GetWeaponOptionsForSlot, outfitSlot)
+        for _, optionInfo in ipairs(options or {}) do
+            if optionInfo and optionInfo.enabled and optionInfo.weaponOption ~= nil then
+                return optionInfo.weaponOption
+            end
+        end
+    end
+
+    return Enum and Enum.TransmogOutfitSlotOption and Enum.TransmogOutfitSlotOption.None or 0
+end
+
+local function GetBlizzardWeaponCategoryPermission(slotName, categoryID)
+    if not categoryID or not C_TransmogOutfitInfo
+        or type(C_TransmogOutfitInfo.GetCollectionInfoForSlotAndOption) ~= "function"
+    then
+        return nil, nil
+    end
+
+    local outfitSlot = GetTransmogOutfitSlotForInventorySlotName(slotName)
+    if outfitSlot == nil then return nil, nil end
+
+    local weaponOption = GetEquippedWeaponOptionForOutfitSlot(outfitSlot)
+    if weaponOption == nil then return nil, nil end
+
+    local collectionInfo = SafeCall(
+        C_TransmogOutfitInfo.GetCollectionInfoForSlotAndOption,
+        outfitSlot,
+        weaponOption,
+        categoryID
+    )
+
+    -- Blizzard's native weapon-category dropdown uses this exact test.
+    -- A nil result means the category is not available for the slot/option.
+    return collectionInfo ~= nil and collectionInfo.isWeapon == true, {
+        outfitSlot = outfitSlot,
+        weaponOption = weaponOption,
+        collectionName = collectionInfo and collectionInfo.name or nil,
+        method = "OUTFIT_SLOT_OPTION",
+    }
+end
+
+local function IsWeaponCategoryPermitted(slotName, categoryID, itemInfo)
+    local nativeAllowed, details = GetBlizzardWeaponCategoryPermission(slotName, categoryID)
+    if nativeAllowed ~= nil then
+        return nativeAllowed, details
+    end
+
+    -- Compatibility fallback for clients that do not expose the Midnight
+    -- outfit-slot API. This older check does not understand every specialization
+    -- exception, so it is intentionally secondary.
+    if itemInfo and C_TransmogCollection and type(C_TransmogCollection.IsCategoryValidForItem) == "function" then
+        local allowed = SafeCall(C_TransmogCollection.IsCategoryValidForItem, categoryID, itemInfo) == true
+        return allowed, { method = "ITEM_CATEGORY_FALLBACK" }
+    end
+
+    return nil, { method = "UNAVAILABLE" }
+end
+
 local function BuildWeaponHandCapability(handKey, itemInfo, slotName, allowWithoutItem)
     local capability = {
         handKey = handKey,
@@ -1193,10 +1273,14 @@ local function BuildWeaponHandCapability(handKey, itemInfo, slotName, allowWitho
         local categoryID = ResolveWeaponSubtypeCategoryID(subtype)
         local count = CountCachedWeaponSubtype(subtypeKey)
         local blizzardAllowed = false
+        local permissionDetails
         if itemInfo then
-            blizzardAllowed = categoryID and SafeCall(C_TransmogCollection and C_TransmogCollection.IsCategoryValidForItem, categoryID, itemInfo) == true
+            local permitted
+            permitted, permissionDetails = IsWeaponCategoryPermitted(slotName, categoryID, itemInfo)
+            blizzardAllowed = permitted == true
         elseif allowWithoutItem then
             blizzardAllowed = true
+            permissionDetails = { method = "UNARMED_PREVIEW" }
         end
         local available = blizzardAllowed and count > 0
         capability.subtypes[subtypeKey] = {
@@ -1208,7 +1292,12 @@ local function BuildWeaponHandCapability(handKey, itemInfo, slotName, allowWitho
             count = count,
             blizzardAllowed = blizzardAllowed,
             available = available,
-            reason = available and "Blizzard permits this appearance category for the equipped hand."
+            permissionMethod = permissionDetails and permissionDetails.method or nil,
+            outfitSlot = permissionDetails and permissionDetails.outfitSlot or nil,
+            weaponOption = permissionDetails and permissionDetails.weaponOption or nil,
+            reason = available and (permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION"
+                    and "Blizzard's native outfit-slot rules permit this appearance category for the equipped hand."
+                    or "Blizzard permits this appearance category for the equipped hand.")
                 or (count == 0 and "No collected previewable appearances are cached for this type."
                 or (itemInfo and "Blizzard does not permit this appearance category for the equipped hand."
                 or "No equipped item is available for Blizzard compatibility validation.")),
@@ -1568,11 +1657,16 @@ local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, cont
     if not source.categoryID then
         return Finish(false, "This cached weapon appearance has no collection category. Rescan the collection.")
     end
-    if not C_TransmogCollection or type(C_TransmogCollection.IsCategoryValidForItem) ~= "function" then
-        return Finish(false, "WoW's equipped-item transmog compatibility check is unavailable.")
-    end
-    if equippedItem and SafeCall(C_TransmogCollection.IsCategoryValidForItem, source.categoryID, equippedItem) ~= true then
-        return Finish(false, "That appearance category cannot transmogrify the currently equipped item.")
+    local permitted = true
+    local permissionDetails
+    if equippedItem then
+        permitted, permissionDetails = IsWeaponCategoryPermitted(definition and definition.slotName, source.categoryID, equippedItem)
+        if permitted == nil then
+            return Finish(false, "WoW's equipped-slot transmog compatibility check is unavailable.")
+        end
+        if permitted ~= true then
+            return Finish(false, "That appearance category is not permitted for the equipped weapon slot and option.")
+        end
     end
 
     -- Requery the collapsed visual with the equipped hand's transmog location.
@@ -1616,7 +1710,9 @@ local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, cont
         end
     end
 
-    return Finish(true, "Compatible with the equipped item")
+    return Finish(true, permissionDetails and permissionDetails.method == "OUTFIT_SLOT_OPTION"
+        and "Compatible with Blizzard's equipped slot and weapon option"
+        or "Compatible with the equipped item")
 end
 
 local function Shuffle(values)

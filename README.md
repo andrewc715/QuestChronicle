@@ -1,8 +1,8 @@
-# Quest Chronicle v1.6.0
+# Quest Chronicle v1.6.1
 
-> **Weapon Appearance Rules:** v1.6.0 separates physical weapon topology from Blizzard's live appearance permissions, moves weapon controls into the Equipment Slot panel, and adds exact weapon-type filters with per-hand validation.
+> **Fury appearance permission fix:** v1.6.1 now mirrors Blizzard's native outfit-slot weapon-category rules, allowing Fury one-handed appearances over equipped two-handed weapons when the game permits them.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.6.0 adds Blizzard-driven weapon appearance rules while preserving the complete lifecycle, journal, Courier, Custom Set, and outfit-design toolset.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.6.1 repairs Fury's Single-Minded Fury appearance permissions while preserving the complete lifecycle, journal, Courier, Custom Set, and outfit-design toolset.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

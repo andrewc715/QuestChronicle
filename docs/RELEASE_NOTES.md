@@ -1,116 +1,63 @@
-# Quest Chronicle v1.6.0: Weapon Appearance Rules
+# Quest Chronicle v1.6.1: Fury Appearance Permission Fix
 
-Version 1.6.0 separates the physical weapon layout from the appearance categories Blizzard currently permits for each equipped hand.
+Version 1.6.1 fixes the Fury Warrior exception introduced with Midnight's Single-Minded Fury transmog rule.
 
-## Why this release exists
+## The problem
 
-The v1.5 family controls correctly detected whether a weapon was physically one-handed, two-handed, ranged, or an off-hand item. Physical topology alone is not enough to model modern transmog rules. Class, specialization, talents, artifacts, and Blizzard exceptions can allow an equipped item to use appearance categories that do not match its inventory type.
+Quest Chronicle v1.6.0 correctly detected a Fury Warrior's physical layout as dual two-handed weapons, but it used `C_TransmogCollection.IsCategoryValidForItem()` as the final appearance-family permission check. That older item-category query did not expose Fury's new ability to place ordinary one-handed appearances over equipped two-handed weapons.
 
-Quest Chronicle now uses two independent layers:
+The result was a contradictory interface:
 
-1. **Physical topology** from the equipped items' inventory locations.
-2. **Appearance capability** from Blizzard's live category validation for each equipped hand.
+- physical layout: **Dual two-handed weapons equipped**;
+- Two-Hand types: correctly available;
+- ordinary One-Hand types: incorrectly unavailable;
+- Paired Artifact: sometimes the only surviving One-Hand category.
 
-A Fury warrior can therefore remain physically dual-two-hand while One-Hand and Two-Hand appearance families are both available when Blizzard permits them.
+## The fix
 
-## Equipment Slot UI
+Quest Chronicle now mirrors Blizzard's native Transmog weapon-category dropdown.
 
-Weapon controls move out of the character-preview panel and into a dedicated **Weapon Appearances** section beneath the armor slots.
+For each equipped hand and each weapon category it resolves:
 
-Each family row contains:
+1. the native `TransmogOutfitSlot` for the inventory hand;
+2. the currently equipped `TransmogOutfitSlotOption`;
+3. `C_TransmogOutfitInfo.GetCollectionInfoForSlotAndOption(slot, option, category)`.
 
-- a generation checkbox;
-- a row that opens the corresponding appearance browser;
-- a `>` type-configuration control;
-- selected/available type counts;
-- current preview and lock indicators.
+Blizzard's own Transmog UI treats a returned `collectionInfo.isWeapon` as the authoritative answer for whether a category belongs in that hand's weapon dropdown. This is the rule layer that includes Fury's Single-Minded Fury exception and other current slot/option-specific behavior.
 
-The character-preview panel now uses a compact weapon summary instead of four detached checkboxes.
+`IsCategoryValidForItem()` remains only as a compatibility fallback on clients where the newer outfit-slot API is unavailable.
 
-## Exact weapon-type filters
+## Generation and validation
 
-### One-Hand
+The same native slot/option permission check now governs:
 
-- Wand
-- One-Handed Axe
-- One-Handed Sword
-- One-Handed Mace
-- Dagger
-- Fist Weapon
-- Warglaive
-- Paired Artifact
+- family checkbox availability;
+- exact subtype flyouts;
+- weapon appearance browsing;
+- Generate Outfit;
+- Reroll Unlocked;
+- Reroll Slot;
+- locked-weapon validation.
 
-### Two-Hand
+This prevents the UI from enabling a Fury one-handed category and then rejecting it later during generation.
 
-- Two-Handed Axe
-- Two-Handed Sword
-- Two-Handed Mace
-- Staff
-- Polearm
+## Expected Fury result
 
-### Ranged
+With dual two-handed weapons equipped, Blizzard should now determine the exact allowed categories. A typical Fury result is:
 
-- Bow
-- Gun
-- Crossbow
+- One-Hand enabled for the one-handed categories Blizzard exposes;
+- Two-Hand enabled;
+- Ranged disabled;
+- Off-Hand shield/focus disabled;
+- each weapon hand validated independently.
 
-### Off-Hand
-
-- Shield
-- Holdable / Focus
-
-The type flyout offers **All Compatible**, **Equipped Type**, **Clear**, and **Done**. Types with no collected previewable appearances or which Blizzard rejects for the equipped hand remain visible but dimmed with an explanatory tooltip.
-
-## Per-hand capability matrix
-
-Quest Chronicle evaluates the main hand and off hand separately. This supports:
-
-- single two-handed weapons;
-- dual one-handed weapons;
-- dual two-handed weapons;
-- mixed weapon hands;
-- weapon plus shield/focus;
-- ranged weapons;
-- unarmed preview generation.
-
-`IsCategoryValidForItem()` is used only for appearance permission. The equipped item's inventory location remains authoritative for physical topology.
-
-Permissions refresh when equipment, specialization, active talent group, or trait configuration changes. No wardrobe rescan is required.
-
-## Linked weapon hands
-
-**Link weapon hands** is enabled by default when two weapon hands are present. Linked generation prefers the same broad family and exact type in both hands. If Blizzard cannot provide the linked type for the second hand, Quest Chronicle falls back to another selected and permitted type with a notice.
-
-Disabling the option allows each hand to generate independently.
-
-## Browser and generation integration
-
-The appearance browser and all generation operations use the same effective filters:
-
-- Generate Outfit
-- Reroll Unlocked
-- Reroll Slot
-- weapon-family browsing
-
-Quest Chronicle chooses an enabled exact type first, then chooses an eligible appearance inside that type. This gives selected weapon types a fair initial chance even when their collection sizes differ greatly.
-
-## Saved concepts and Custom Sets
-
-Outfit concepts now preserve:
-
-- broad weapon-family choices;
-- exact subtype choices;
-- linked-hands preference.
-
-Existing concepts migrate with every subtype enabled, preserving previous behavior. Loading a concept restores dormant preferences and intersects them with current Blizzard permissions.
-
-Custom Set slot mapping, collected-source rebinding, and readback verification remain unchanged. The secondary weapon slot now accepts collected one-hand, two-hand, or ranged sources when Blizzard's rules permit them.
+Quest Chronicle does not hardcode a Fury category list. Blizzard remains the authority, so future class, specialization, or weapon-option exceptions can flow through the same API.
 
 ## Compatibility
 
-- Addon version: `1.6.0`
+- Addon version: `1.6.1`
 - SavedVariables schema: `2`
 - Courier format: `1`
 - Wardrobe cache format: `6`
 
-No wardrobe rescan is required solely for this update.
+No collection rescan or concept migration is required.

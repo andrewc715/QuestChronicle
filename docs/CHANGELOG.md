@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.1 - 2026-08-01
+
+### Fixed
+
+- Replaced `IsCategoryValidForItem()` as the primary weapon-appearance permission source.
+- Mirrored Blizzard's native `GetCollectionInfoForSlotAndOption()` weapon-category rules per equipped hand.
+- Restored Fury Warrior one-handed appearance categories over equipped two-handed weapons when Blizzard permits them.
+- Applied the same slot/option permission check to browsing, generation, rerolls, and locked-weapon validation.
+- Retained the older item-category query only as a compatibility fallback.
+
 ## 1.6.0 - 2026-07-31
 
 ### Added
