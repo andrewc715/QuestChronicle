@@ -1,53 +1,36 @@
-# Quest Chronicle v0.5.2: Wardrobe Scanner Recovery
+# Quest Chronicle v0.5.3: Wardrobe UI Cleanup
 
-Version 0.5.2 fixes the live-client regression where v0.5.1 reported zero collected and zero compatible appearances in every equipment category.
+Version 0.5.3 keeps the recovered account wardrobe scanner from v0.5.2 and cleans up the Outfits appearance browser around real-world collection sizes.
 
-## What happened
+## What the live test revealed
 
-The v0.5.1 scanner changed several pieces at once:
+The scanner successfully found the account collection, but the right-hand browser still used the foundation layout designed around tiny test collections:
 
-- it established a temporary collected-only filter context;
-- it cleared the Wardrobe search;
-- it changed the current class filter;
-- it immediately queried every category;
-- it supplied only one representation of the slot's transmog location.
+- a variable-height diagnostic message pushed into eight fixed appearance rows;
+- the eighth row collided with the footer;
+- Previous, Next, page text, and Clear Slot competed for the same narrow horizontal strip;
+- collected source counts and unique previewable visual counts were presented as though they should match;
+- the healthy difference between those totals triggered an alarming red warning.
 
-Retail's transmog search database and filter rebuild can be asynchronous. During that short rebuilding period, filtered counts and category queries can legitimately return empty results. The generated API documentation also describes `GetCategoryAppearances` and `GetAppearanceSources` as accepting a `TransmogLocationMixin`, while Blizzard's current Wardrobe implementation passes the object's `GetData()` representation in one of those paths.
+## Changes
 
-The result was an exquisitely organized wardrobe containing absolutely nothing.
-
-## Fixes
-
-- Waits until `IsSearchDBLoading()` and `IsSearchInProgress()` both report ready.
-- Uses `GetCategoryCollectedCount()` as the diagnostic baseline instead of the transient filtered count.
-- Requests a broad collection view and filters collected appearances locally.
-- Queries category appearances with:
-  1. the documented `TransmogLocationMixin`;
-  2. Blizzard's `transmogLocation:GetData()` representation;
-  3. a category-only fallback.
-- Keeps whichever valid query returns the richest collected result.
-- Resolves appearance sources using both transmog-location forms.
-- Removes `SetSearchAndFilterCategory()` from the tight scan loop.
-- Retries a slot twice when WoW reports collected appearances but briefly returns no rows.
-- Builds the new collection in a staging cache.
-- Refuses to replace an existing healthy cache with an impossible all-zero result.
-- Adds explicit Preparing and Failed scanner states with clearer status text.
-- Advances the wardrobe cache format to version 3, forcing a clean rescan.
+- Reduces the fixed page from eight to seven appearance rows so the minimum window height remains safe.
+- Uses a compact, fixed two-line browser header.
+- Separates the selected appearance from scan-summary text.
+- Moves Clear Slot into the header rather than the pagination footer.
+- Anchors Previous and Next to opposite sides with centered page text.
+- Adds mouse-wheel page navigation over the appearance browser.
+- Adds row hover highlighting.
+- Keeps source names and details to single lines so rows cannot unexpectedly grow.
+- Replaces the misleading red count warning with neutral diagnostics.
+- Explains in a hover tooltip that WoW's collected count is a source count, while Quest Chronicle caches unique character-previewable visuals.
+- Preserves detailed returned-appearance, returned-source, compatible-visual, error, and scan-state information in that tooltip.
 
 ## Preserved
 
-- Quest Chronicle SavedVariables schema 2.
-- Courier export format 1.
-- All Chronicle events, quest snapshots, RP notes, drafts, and settings.
-- Manual preview-only behavior.
-- No transmog is applied and no Blizzard outfit slot is modified.
-
-## Installation
-
-1. Exit World of Warcraft completely.
-2. Replace the existing `QuestChronicle` addon folder with the folder from this archive.
-3. Log in and allow the character and collection data to settle for a few seconds.
-4. Close Blizzard's Transmogrify and Collections Wardrobe windows.
-5. Open `/qc`, select **Outfits**, and click **Scan Collection**.
-
-If the native search database is still initializing, Quest Chronicle will display **Preparing** and wait up to twelve seconds rather than caching an empty response.
+- Wardrobe cache format 3.
+- SavedVariables schema 2.
+- Courier format 1.
+- The v0.5.2 account collection scanner and staging-cache recovery behavior.
+- All Chronicle events, active quest state, RP notes, settings, drafts, and manual preview selections.
+- Preview-only behavior. Quest Chronicle does not apply transmog or alter Blizzard outfit slots.

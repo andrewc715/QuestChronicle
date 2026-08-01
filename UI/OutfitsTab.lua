@@ -2,7 +2,9 @@ local QC = QuestChronicle
 local UI = QC.UI
 local Wardrobe = QC.Wardrobe
 
-local SOURCE_ROWS = Wardrobe.PAGE_SIZE or 8
+local SOURCE_ROWS = 7
+local SOURCE_ROW_HEIGHT = 40
+local SOURCE_ROW_SPACING = 2
 
 local function GetState()
     return Wardrobe.GetPreviewState()
@@ -26,6 +28,74 @@ local function SourceLabel(source)
     return string.format("%s%s|r", color, source.name or ("Appearance " .. tostring(source.sourceID or 0)))
 end
 
+local function CacheSummary(cache, diagnostics, sourceCount)
+    if cache.scanState == "NEVER" or cache.scanState == "STALE" then
+        return "Collection scan required."
+    elseif cache.scanState == "PREPARING" then
+        return "Preparing WoW's wardrobe collection..."
+    elseif cache.scanState == "SCANNING" then
+        return "Scanning collected appearances..."
+    elseif cache.scanState == "FAILED" then
+        return UI.red .. "Last scan failed. Previous cache preserved.|r"
+    end
+
+    local scanned = cache.scanCompletedAt and UI.FormatShortTimestamp(cache.scanCompletedAt) or "unknown"
+    local expected = diagnostics and tonumber(diagnostics.expectedCollected) or 0
+    if expected > 0 then
+        return string.format(
+            "%s previewable visuals • %s collected sources • Scanned %s%s",
+            UI.FormatNumber(sourceCount),
+            UI.FormatNumber(expected),
+            scanned,
+            cache.dirty and " • Refresh recommended" or ""
+        )
+    end
+
+    return string.format(
+        "%s previewable visuals • Scanned %s%s",
+        UI.FormatNumber(sourceCount),
+        scanned,
+        cache.dirty and " • Refresh recommended" or ""
+    )
+end
+
+local function BuildDiagnosticsTooltip(cache, diagnostics, sourceCount, selected)
+    local lines = {}
+    if selected then
+        table.insert(lines, "Selected appearance: " .. tostring(selected.name or selected.sourceID or "Unknown"))
+    else
+        table.insert(lines, "Selected appearance: currently equipped gear")
+    end
+
+    table.insert(lines, "Cached previewable visuals: " .. UI.FormatNumber(sourceCount))
+
+    if diagnostics then
+        if diagnostics.expectedCollected ~= nil then
+            table.insert(lines, "WoW collected source count: " .. UI.FormatNumber(diagnostics.expectedCollected))
+        end
+        if diagnostics.returnedAppearances ~= nil then
+            table.insert(lines, "Appearance rows returned: " .. UI.FormatNumber(diagnostics.returnedAppearances))
+        end
+        if diagnostics.returnedSources ~= nil then
+            table.insert(lines, "Source rows examined: " .. UI.FormatNumber(diagnostics.returnedSources))
+        end
+        if diagnostics.compatibleVisuals ~= nil then
+            table.insert(lines, "Validated unique visuals: " .. UI.FormatNumber(diagnostics.compatibleVisuals))
+        end
+        if diagnostics.error then
+            table.insert(lines, "Scan error: " .. tostring(diagnostics.error))
+        end
+    end
+
+    if cache.scanError then
+        table.insert(lines, "Last scan error: " .. tostring(cache.scanError))
+    end
+
+    table.insert(lines, "")
+    table.insert(lines, "These counts are not expected to match exactly. Multiple item sources can share one visual, and unusable appearances are excluded from the preview cache.")
+    return table.concat(lines, "\n")
+end
+
 function UI.CreateOutfitsTab(parent)
     local pane = CreateFrame("Frame", nil, parent)
     pane:SetAllPoints(parent)
@@ -33,7 +103,7 @@ function UI.CreateOutfitsTab(parent)
     local _, subtitle = UI.CreatePaneTitle(
         pane,
         "Outfits",
-        "Scan collected appearances, build a manual look, and preview it on your character. Dynamic generation arrives in later releases."
+        "Browse collected appearances and assemble a manual character preview. Nothing is applied to your equipped transmog."
     )
     pane.subtitle = subtitle
 
@@ -110,34 +180,66 @@ function UI.CreateOutfitsTab(parent)
         pane:Refresh()
     end)
 
-    local sourceTitle = sourcePanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    sourceTitle:SetPoint("TOPLEFT", sourcePanel, "TOPLEFT", 10, -10)
-    sourceTitle:SetPoint("RIGHT", sourcePanel, "RIGHT", -10, 0)
-    sourceTitle:SetJustifyH("LEFT")
-    pane.sourceTitle = sourceTitle
-
     local scanButton = UI.CreateButton(sourcePanel, "Scan Collection", 125, 24)
     scanButton:SetPoint("TOPRIGHT", sourcePanel, "TOPRIGHT", -10, -8)
     pane.scanButton = scanButton
+    UI.SetTooltip(scanButton, "Scan Collection", "Refresh the local cache of collected, previewable appearances. Keep Blizzard's Wardrobe and Transmogrify windows closed during the scan.", "ANCHOR_LEFT")
 
-    local statusText = sourcePanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    statusText:SetPoint("TOPLEFT", sourceTitle, "BOTTOMLEFT", 0, -8)
+    local sourceTitle = sourcePanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    sourceTitle:SetPoint("TOPLEFT", sourcePanel, "TOPLEFT", 10, -10)
+    sourceTitle:SetPoint("RIGHT", scanButton, "LEFT", -8, 0)
+    sourceTitle:SetJustifyH("LEFT")
+    pane.sourceTitle = sourceTitle
+
+    local clearSlot = UI.CreateButton(sourcePanel, "Clear Slot", 82, 22)
+    clearSlot:SetPoint("TOPRIGHT", sourcePanel, "TOPRIGHT", -10, -37)
+    pane.clearSlot = clearSlot
+
+    local selectedText = sourcePanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    selectedText:SetPoint("TOPLEFT", sourcePanel, "TOPLEFT", 10, -40)
+    selectedText:SetPoint("RIGHT", clearSlot, "LEFT", -8, 0)
+    selectedText:SetJustifyH("LEFT")
+    selectedText:SetWordWrap(false)
+    pane.selectedText = selectedText
+
+    local statusText = sourcePanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    statusText:SetPoint("TOPLEFT", sourcePanel, "TOPLEFT", 10, -62)
     statusText:SetPoint("RIGHT", sourcePanel, "RIGHT", -10, 0)
+    statusText:SetHeight(28)
     statusText:SetJustifyH("LEFT")
-    statusText:SetTextColor(0.7, 0.7, 0.7)
+    statusText:SetJustifyV("TOP")
+    statusText:SetWordWrap(true)
+    if statusText.SetMaxLines then statusText:SetMaxLines(2) end
     pane.statusText = statusText
 
+    local statusHitbox = CreateFrame("Button", nil, sourcePanel)
+    statusHitbox:SetPoint("TOPLEFT", statusText, "TOPLEFT", -2, 2)
+    statusHitbox:SetPoint("BOTTOMRIGHT", statusText, "BOTTOMRIGHT", 2, -2)
+    statusHitbox:RegisterForClicks()
+    statusHitbox:SetScript("OnEnter", function(self)
+        local cache = Wardrobe.GetCache()
+        local slotKey = GetCurrentSlot()
+        local diagnostics = Wardrobe.GetSlotDiagnostics(slotKey)
+        local sources = Wardrobe.GetSlotSources(slotKey)
+        local selected = Wardrobe.GetSelectedSource(slotKey)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:SetText("Wardrobe Scan Details", 1, 0.82, 0)
+        GameTooltip:AddLine(BuildDiagnosticsTooltip(cache, diagnostics, #sources, selected), 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    statusHitbox:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    pane.statusHitbox = statusHitbox
+
     pane.sourceRows = {}
-    local rowAnchor = statusText
     for index = 1, SOURCE_ROWS do
         local row = CreateFrame("Button", nil, sourcePanel)
-        row:SetHeight(42)
+        row:SetHeight(SOURCE_ROW_HEIGHT)
         row:SetPoint("LEFT", sourcePanel, "LEFT", 10, 0)
         row:SetPoint("RIGHT", sourcePanel, "RIGHT", -10, 0)
         if index == 1 then
-            row:SetPoint("TOP", rowAnchor, "BOTTOM", 0, -8)
+            row:SetPoint("TOP", sourcePanel, "TOP", 0, -96)
         else
-            row:SetPoint("TOP", pane.sourceRows[index - 1], "BOTTOM", 0, -3)
+            row:SetPoint("TOP", pane.sourceRows[index - 1], "BOTTOM", 0, -SOURCE_ROW_SPACING)
         end
 
         local background = row:CreateTexture(nil, "BACKGROUND")
@@ -146,7 +248,7 @@ function UI.CreateOutfitsTab(parent)
         row.background = background
 
         local icon = row:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(32, 32)
+        icon:SetSize(30, 30)
         icon:SetPoint("LEFT", row, "LEFT", 5, 0)
         icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
         row.icon = icon
@@ -155,12 +257,14 @@ function UI.CreateOutfitsTab(parent)
         name:SetPoint("TOPLEFT", icon, "TOPRIGHT", 7, -1)
         name:SetPoint("RIGHT", row, "RIGHT", -5, 0)
         name:SetJustifyH("LEFT")
+        name:SetWordWrap(false)
         row.name = name
 
         local detail = row:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
         detail:SetPoint("BOTTOMLEFT", icon, "BOTTOMRIGHT", 7, 1)
         detail:SetPoint("RIGHT", row, "RIGHT", -5, 0)
         detail:SetJustifyH("LEFT")
+        detail:SetWordWrap(false)
         row.detail = detail
 
         row:SetScript("OnClick", function(self)
@@ -176,6 +280,7 @@ function UI.CreateOutfitsTab(parent)
         end)
         row:SetScript("OnEnter", function(self)
             if self.source then
+                self.background:SetColorTexture(0.13, 0.13, 0.13, 0.9)
                 GameTooltip:SetOwner(self, "ANCHOR_LEFT")
                 GameTooltip:SetText(self.source.name or "Appearance", 1, 0.82, 0)
                 GameTooltip:AddLine("Click to preview this collected appearance.", 1, 1, 1, true)
@@ -188,22 +293,24 @@ function UI.CreateOutfitsTab(parent)
                 GameTooltip:Show()
             end
         end)
-        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        row:SetScript("OnLeave", function(self)
+            local selected = Wardrobe.GetSelectedSource(GetCurrentSlot())
+            local isSelected = self.source and selected and selected.sourceID == self.source.sourceID
+            self.background:SetColorTexture(isSelected and 0.12 or 0.08, isSelected and 0.18 or 0.08, isSelected and 0.10 or 0.08, 0.78)
+            GameTooltip:Hide()
+        end)
         pane.sourceRows[index] = row
     end
 
-    local previousPage = UI.CreateButton(sourcePanel, "Previous", 88, 23)
+    local previousPage = UI.CreateButton(sourcePanel, "Previous", 78, 23)
     previousPage:SetPoint("BOTTOMLEFT", sourcePanel, "BOTTOMLEFT", 10, 10)
     local pageText = sourcePanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    pageText:SetPoint("LEFT", previousPage, "RIGHT", 8, 0)
-    pageText:SetWidth(110)
+    pageText:SetPoint("BOTTOM", sourcePanel, "BOTTOM", 0, 16)
+    pageText:SetWidth(120)
     pageText:SetJustifyH("CENTER")
     pane.pageText = pageText
-    local nextPage = UI.CreateButton(sourcePanel, "Next", 88, 23)
-    nextPage:SetPoint("LEFT", pageText, "RIGHT", 8, 0)
-
-    local clearSlot = UI.CreateButton(sourcePanel, "Clear Slot", 95, 23)
-    clearSlot:SetPoint("BOTTOMRIGHT", sourcePanel, "BOTTOMRIGHT", -10, 10)
+    local nextPage = UI.CreateButton(sourcePanel, "Next", 78, 23)
+    nextPage:SetPoint("BOTTOMRIGHT", sourcePanel, "BOTTOMRIGHT", -10, 10)
 
     previousPage:SetScript("OnClick", function()
         local slotKey = GetCurrentSlot()
@@ -221,9 +328,30 @@ function UI.CreateOutfitsTab(parent)
         pane:Refresh()
     end)
 
+    sourcePanel:EnableMouseWheel(true)
+    sourcePanel:SetScript("OnMouseWheel", function(_, delta)
+        local slotKey = GetCurrentSlot()
+        local sources = Wardrobe.GetSlotSources(slotKey)
+        local pageCount = math.max(1, math.ceil(#sources / SOURCE_ROWS))
+        local page = GetPage(slotKey)
+        if delta > 0 and page > 1 then
+            SetPage(slotKey, page - 1)
+            pane:Refresh()
+        elseif delta < 0 and page < pageCount then
+            SetPage(slotKey, page + 1)
+            pane:Refresh()
+        end
+    end)
+
     scanButton:SetScript("OnClick", function()
         local started, message = Wardrobe.Scan(true)
-        statusText:SetText(message or (started and "Wardrobe scan started." or "Unable to scan."))
+        if message then
+            statusText:SetText(message)
+        elseif started then
+            statusText:SetText("Wardrobe scan started.")
+        else
+            statusText:SetText("Unable to scan.")
+        end
         pane:Refresh()
     end)
 
@@ -247,31 +375,12 @@ function UI.CreateOutfitsTab(parent)
         scanButton:SetText(Wardrobe.IsScanning() and "Scanning..." or (cache.dirty and "Rescan Collection" or "Scan Collection"))
 
         local selected = Wardrobe.GetSelectedSource(slotKey)
-        local selectedText = selected and ("Selected: " .. selected.name) or "Selected: current equipped appearance"
-        local cacheText
-        if cache.scanState == "NEVER" or cache.scanState == "STALE" then
-            cacheText = "Collection needs a full account wardrobe scan."
-        elseif cache.scanState == "PREPARING" then
-            cacheText = "Waiting for WoW's wardrobe search database to become ready..."
-        elseif cache.scanState == "SCANNING" then
-            cacheText = "Scanning WoW's collected appearances in small batches..."
-        elseif cache.scanState == "FAILED" then
-            cacheText = "The last collection scan failed. Any previous healthy cache was preserved."
-        else
-            cacheText = string.format("%s cached visuals • Last scan %s%s", UI.FormatNumber(cache.totalVisuals or 0), cache.scanCompletedAt and UI.FormatShortTimestamp(cache.scanCompletedAt) or "unknown", cache.dirty and " • Collection changed" or "")
-        end
+        selectedText:SetText(selected and ("Selected: " .. tostring(selected.name or selected.sourceID)) or "Selected: currently equipped appearance")
+        clearSlot:SetEnabled(selected ~= nil)
+        clearSlot:SetText(selected and "Clear Slot" or "No Selection")
+
         local diagnostics = Wardrobe.GetSlotDiagnostics(slotKey)
-        if diagnostics and diagnostics.expectedCollected then
-            cacheText = cacheText .. string.format("\nWoW reports %s collected for these categories • %s compatible visuals cached", UI.FormatNumber(diagnostics.expectedCollected or 0), UI.FormatNumber(diagnostics.compatibleVisuals or #sources))
-        elseif diagnostics and diagnostics.error then
-            cacheText = cacheText .. "\n" .. UI.red .. tostring(diagnostics.error) .. "|r"
-        end
-        if cache.scanError then
-            cacheText = cacheText .. "\n" .. UI.red .. cache.scanError .. "|r"
-        elseif cache.scanWarning then
-            cacheText = cacheText .. "\n" .. UI.red .. cache.scanWarning .. "|r"
-        end
-        statusText:SetText(message or (selectedText .. "\n" .. cacheText))
+        statusText:SetText(message or CacheSummary(cache, diagnostics, #sources))
 
         local startIndex = ((page - 1) * SOURCE_ROWS) + 1
         for rowIndex, row in ipairs(self.sourceRows) do
@@ -282,30 +391,30 @@ function UI.CreateOutfitsTab(parent)
                 row.icon:SetTexture(source.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
                 row.name:SetText(SourceLabel(source))
                 local valid, reason = Wardrobe.ValidateSource(source, slotKey)
-                local marker = selected and selected.sourceID == source.sourceID and (UI.green .. "Selected|r") or (valid and "Collected" or (UI.red .. "Unavailable|r"))
+                local isSelected = selected and selected.sourceID == source.sourceID
+                local marker = isSelected and (UI.green .. "Selected|r") or (valid and "Collected" or (UI.red .. "Unavailable|r"))
                 row.detail:SetText(string.format("%s • Source %d%s", marker, source.sourceID or 0, valid and "" or (" • " .. tostring(reason))))
                 row:SetEnabled(valid)
-                row.background:SetColorTexture(selected and selected.sourceID == source.sourceID and 0.12 or 0.08, selected and selected.sourceID == source.sourceID and 0.18 or 0.08, selected and selected.sourceID == source.sourceID and 0.10 or 0.08, 0.78)
+                row.background:SetColorTexture(isSelected and 0.12 or 0.08, isSelected and 0.18 or 0.08, isSelected and 0.10 or 0.08, 0.78)
             end
         end
 
         pageText:SetText(string.format("Page %d of %d", page, pageCount))
         previousPage:SetEnabled(page > 1)
         nextPage:SetEnabled(page < pageCount)
-        clearSlot:SetEnabled(selected ~= nil)
         subtitle:SetText(string.format("%s collected appearances cached for %s. Manual preview only; no outfit is applied to the character.", UI.FormatNumber(#sources), definition and definition.label or slotKey))
     end
 
     QC.RegisterCallback("WARDROBE_SCAN_PROGRESS", pane, function(index, total, slotKey, count, diagnostics)
         if pane:IsShown() then
             local expected = diagnostics and diagnostics.expectedCollected or 0
-            pane:Refresh(string.format("Scanning %d of %d: %s (%d compatible of %d collected)", index or 0, total or 0, Wardrobe.GetSlotDefinition(slotKey) and Wardrobe.GetSlotDefinition(slotKey).label or slotKey, count or 0, expected or 0))
+            pane:Refresh(string.format("Scanning %d of %d: %s • %s visuals from %s collected sources", index or 0, total or 0, Wardrobe.GetSlotDefinition(slotKey) and Wardrobe.GetSlotDefinition(slotKey).label or slotKey, UI.FormatNumber(count or 0), UI.FormatNumber(expected or 0)))
         end
     end)
     QC.RegisterCallback("WARDROBE_SCAN_COMPLETE", pane, function(cache)
         Wardrobe.ApplyPreview(model)
         if pane:IsShown() then
-            pane:Refresh(cache and cache.scanWarning or cache and cache.scanError or "Wardrobe collection scan complete.")
+            pane:Refresh(cache and cache.scanError or "Wardrobe collection scan complete.")
         end
     end)
     QC.RegisterCallback("WARDROBE_CACHE_DIRTY", pane, function()

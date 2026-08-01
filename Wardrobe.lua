@@ -715,10 +715,11 @@ function Wardrobe.Scan(force)
         cache.dirtyReason = nil
         cache.characterKey = QC.GetCurrentCharacter().key
 
-        if cache.expectedCollectedVisuals > 25 and cache.totalVisuals < math.max(5, math.floor(cache.expectedCollectedVisuals * 0.10)) then
-            cache.scanWarning = "WoW reported many more collected visuals than Quest Chronicle could validate. Check the slot diagnostics and report the counts."
-            cache.scanState = "COMPLETE_WITH_WARNINGS"
-        end
+        -- Collected source counts and cached visual counts describe different things.
+        -- Multiple item sources may share one visual, and character-incompatible
+        -- sources are intentionally excluded. Do not flag a healthy non-empty
+        -- cache merely because those totals differ.
+        cache.scanWarning = nil
 
         if QC.Notify then
             QC.Notify("WARDROBE_SCAN_COMPLETE", cache)

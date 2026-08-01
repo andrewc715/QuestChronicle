@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.3 - 2026-07-31
+
+### Polished
+
+- Reworked the Outfits source browser for real collection sizes.
+- Replaced the variable-height diagnostic block with a compact two-line header.
+- Reduced pages to seven stable rows to prevent row/footer overlap at minimum window size.
+- Moved Clear Slot out of the pagination footer.
+- Separated Previous, centered page text, and Next into a collision-free footer.
+- Added mouse-wheel paging and row hover feedback.
+- Added detailed scan diagnostics through a hover tooltip.
+- Removed the false warning that treated collected source counts and unique compatible visual counts as directly comparable.
+- Preserved wardrobe cache format 3 and the v0.5.2 scanner.
+
 ## 0.5.2 - 2026-07-31
 
 ### Fixed
