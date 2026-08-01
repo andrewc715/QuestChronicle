@@ -1,34 +1,22 @@
-# Quest Chronicle v0.5.0: Wardrobe Foundation
+# Quest Chronicle v0.5.1: Wardrobe Collection Hotfix
 
-Quest Chronicle now includes the first piece of its road to a zone-aware outfit designer: a fifth **Outfits** tab that indexes the player's collected appearances and provides a safe manual fitting room.
+Version 0.5.1 corrects the first live-client defect discovered in the Wardrobe Foundation scanner.
 
-## Included
+## Fixed
 
-- A fifth Outfits tab in the standalone Quest Chronicle window.
-- A collected-appearance scanner using WoW's transmog collection APIs.
-- Account-wide cache grouped into practical equipment slots.
-- One representative collected source per visual appearance to reduce duplicates.
-- Batched scanning to reduce visible client stalls.
-- Automatic dirty marking when the transmog collection changes.
-- Embedded `DressUpModel` character preview.
-- Manual appearance selection with eight-item pagination.
-- Persistent selected appearances and page positions.
-- Per-slot clearing and complete preview reset.
-- Model rotation controls.
-- Compatibility validation using collection, display, player-condition, and source-validity fields supplied by WoW.
+- The scanner now queries Blizzard's account transmog collection with the equipment-slot-specific `TransmogLocation` expected by the current Retail wardrobe APIs.
+- Armor collection category fallback IDs are corrected: Shoulder 2, Back 3, Chest 4, Shirt 5, and Tabard 6.
+- Category enum values are resolved at scan time instead of addon load time, preventing early-loading enum gaps from silently swapping equipment categories.
+- The scan temporarily uses a clean collected-only, all-source-types collection view and restores the player's prior collection filters and search afterward.
+- The scanner refuses to start while Blizzard's Transmogrify or Wardrobe frame is open, preventing the temporary scan context from repainting or disturbing the live Blizzard interface.
+- Collected source detection now has fallbacks through `PlayerKnowsSource`, appearance-source information, valid-class sources, and the full source list for a visual.
+- The wardrobe cache advances to version 2, automatically invalidating the incomplete v0.5.0 cache.
+- Per-slot diagnostics now compare compatible cached visuals with the collected count reported by WoW.
+- A cache built for another character is invalidated because display compatibility can differ by class and character.
 
-## Deliberately not included yet
+## Preserved
 
-v0.5.0 does not generate outfits, score appearances by zone, save outfit concepts, apply transmogrification, or modify official WoW outfit slots. Those systems build on this scanner and preview foundation in later releases.
-
-## Data compatibility
-
-- Addon version: 0.5.0
-- SavedVariables schema: 2
-- Courier format: 1
-
-Existing Chronicle events, quest snapshots, RP notes, settings, and Courier exports remain compatible. The wardrobe cache is stored under `QuestChronicleDB.wardrobe` and can be rebuilt at any time.
-
-## First-run note
-
-The initial collection scan may take several seconds on a large wardrobe. Quest Chronicle scans one practical equipment group at a time and yields between groups. Once complete, browsing uses the SavedVariables cache instead of rescanning the full collection whenever the tab opens.
+- SavedVariables schema remains 2.
+- Courier format remains 1.
+- Chronicle history, active quest tracking, RP notes, drafts, UI settings, and Courier compatibility are unchanged.
+- v0.5.1 still designs and previews only. It does not apply transmogrification or modify WoW outfit slots.

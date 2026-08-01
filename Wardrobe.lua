@@ -3,75 +3,48 @@ local QC = QuestChronicle
 QC.Wardrobe = QC.Wardrobe or {}
 local Wardrobe = QC.Wardrobe
 
-Wardrobe.CACHE_VERSION = 1
+Wardrobe.CACHE_VERSION = 2
 Wardrobe.PAGE_SIZE = 8
 
-local function EnumValue(name, fallback)
-    return Enum and Enum.TransmogCollectionType and Enum.TransmogCollectionType[name] or fallback
-end
-
--- Several weapon collection categories are combined into practical preview slots.
--- Fallback values preserve compatibility with clients where enum tables load late.
+-- Resolve collection enum values when the scan runs instead of when this file loads.
+-- Some Blizzard enum tables are not ready during early addon loading.
 Wardrobe.slotDefinitions = {
-    { key = "HEAD", label = "Head", categoryIDs = { EnumValue("Head", 1) } },
-    { key = "SHOULDER", label = "Shoulders", categoryIDs = { EnumValue("Shoulder", 3) } },
-    { key = "BACK", label = "Back", categoryIDs = { EnumValue("Back", 2) } },
-    { key = "CHEST", label = "Chest", categoryIDs = { EnumValue("Chest", 6) } },
-    { key = "SHIRT", label = "Shirt", categoryIDs = { EnumValue("Shirt", 4) } },
-    { key = "TABARD", label = "Tabard", categoryIDs = { EnumValue("Tabard", 5) } },
-    { key = "WRIST", label = "Wrists", categoryIDs = { EnumValue("Wrist", 7) } },
-    { key = "HANDS", label = "Hands", categoryIDs = { EnumValue("Hands", 8) } },
-    { key = "WAIST", label = "Waist", categoryIDs = { EnumValue("Waist", 9) } },
-    { key = "LEGS", label = "Legs", categoryIDs = { EnumValue("Legs", 10) } },
-    { key = "FEET", label = "Feet", categoryIDs = { EnumValue("Feet", 11) } },
+    { key = "HEAD", label = "Head", slotName = "HEADSLOT", categoryNames = { "Head" }, fallbackCategoryIDs = { 1 } },
+    { key = "SHOULDER", label = "Shoulders", slotName = "SHOULDERSLOT", categoryNames = { "Shoulder" }, fallbackCategoryIDs = { 2 } },
+    { key = "BACK", label = "Back", slotName = "BACKSLOT", categoryNames = { "Back" }, fallbackCategoryIDs = { 3 } },
+    { key = "CHEST", label = "Chest", slotName = "CHESTSLOT", categoryNames = { "Chest" }, fallbackCategoryIDs = { 4 } },
+    { key = "SHIRT", label = "Shirt", slotName = "SHIRTSLOT", categoryNames = { "Shirt" }, fallbackCategoryIDs = { 5 } },
+    { key = "TABARD", label = "Tabard", slotName = "TABARDSLOT", categoryNames = { "Tabard" }, fallbackCategoryIDs = { 6 } },
+    { key = "WRIST", label = "Wrists", slotName = "WRISTSLOT", categoryNames = { "Wrist" }, fallbackCategoryIDs = { 7 } },
+    { key = "HANDS", label = "Hands", slotName = "HANDSSLOT", categoryNames = { "Hands" }, fallbackCategoryIDs = { 8 } },
+    { key = "WAIST", label = "Waist", slotName = "WAISTSLOT", categoryNames = { "Waist" }, fallbackCategoryIDs = { 9 } },
+    { key = "LEGS", label = "Legs", slotName = "LEGSSLOT", categoryNames = { "Legs" }, fallbackCategoryIDs = { 10 } },
+    { key = "FEET", label = "Feet", slotName = "FEETSLOT", categoryNames = { "Feet" }, fallbackCategoryIDs = { 11 } },
     {
-        key = "ONE_HAND", label = "One-Hand",
-        categoryIDs = {
-            EnumValue("OneHAxe", 13), EnumValue("OneHSword", 14), EnumValue("OneHMace", 15),
-            EnumValue("Dagger", 16), EnumValue("Fist", 17), EnumValue("Warglaives", 28), EnumValue("Wand", 12),
-        },
+        key = "ONE_HAND", label = "One-Hand", slotName = "MAINHANDSLOT",
+        categoryNames = { "Wand", "OneHAxe", "OneHSword", "OneHMace", "Dagger", "Fist", "Warglaives", "Paired" },
+        fallbackCategoryIDs = { 12, 13, 14, 15, 16, 17, 28, 29 },
     },
     {
-        key = "TWO_HAND", label = "Two-Hand",
-        categoryIDs = {
-            EnumValue("TwoHAxe", 20), EnumValue("TwoHSword", 21), EnumValue("TwoHMace", 22),
-            EnumValue("Staff", 23), EnumValue("Polearm", 24),
-        },
+        key = "TWO_HAND", label = "Two-Hand", slotName = "MAINHANDSLOT",
+        categoryNames = { "TwoHAxe", "TwoHSword", "TwoHMace", "Staff", "Polearm" },
+        fallbackCategoryIDs = { 20, 21, 22, 23, 24 },
     },
     {
-        key = "RANGED", label = "Ranged",
-        categoryIDs = { EnumValue("Bow", 25), EnumValue("Gun", 26), EnumValue("Crossbow", 27) },
+        key = "RANGED", label = "Ranged", slotName = "MAINHANDSLOT",
+        categoryNames = { "Bow", "Gun", "Crossbow" },
+        fallbackCategoryIDs = { 25, 26, 27 },
     },
     {
-        key = "OFF_HAND", label = "Off-Hand",
-        categoryIDs = { EnumValue("Shield", 18), EnumValue("Holdable", 19) },
+        key = "OFF_HAND", label = "Off-Hand", slotName = "SECONDARYHANDSLOT",
+        categoryNames = { "Shield", "Holdable" },
+        fallbackCategoryIDs = { 18, 19 },
     },
 }
 
 local slotByKey = {}
 for _, definition in ipairs(Wardrobe.slotDefinitions) do
     slotByKey[definition.key] = definition
-end
-
-local function EnsureCache()
-    local database = QC.GetDatabase()
-    database.wardrobe = database.wardrobe or {}
-    local cache = database.wardrobe
-    cache.cacheVersion = cache.cacheVersion or Wardrobe.CACHE_VERSION
-    cache.bySlot = cache.bySlot or {}
-    cache.scanState = cache.scanState or "NEVER"
-    cache.totalSources = cache.totalSources or 0
-    cache.totalVisuals = cache.totalVisuals or 0
-    return cache
-end
-
-local function EnsurePreviewState()
-    local state = QC.GetUIState()
-    state.outfits = state.outfits or {}
-    state.outfits.selections = state.outfits.selections or {}
-    state.outfits.selectedSlot = state.outfits.selectedSlot or "HEAD"
-    state.outfits.pages = state.outfits.pages or {}
-    return state.outfits
 end
 
 local function SafeCall(func, ...)
@@ -85,11 +58,96 @@ local function SafeCall(func, ...)
     return nil
 end
 
+local function ResetCache(cache, state)
+    cache.cacheVersion = Wardrobe.CACHE_VERSION
+    cache.bySlot = {}
+    cache.slotDiagnostics = {}
+    cache.scanState = state or "NEVER"
+    cache.totalSources = 0
+    cache.totalVisuals = 0
+    cache.expectedCollectedVisuals = 0
+    cache.scanError = nil
+    cache.scanWarning = nil
+    cache.dirty = true
+    cache.dirtyReason = "CACHE_UPGRADE"
+end
+
+local function EnsureCache()
+    local database = QC.GetDatabase()
+    database.wardrobe = database.wardrobe or {}
+    local cache = database.wardrobe
+    if cache.cacheVersion ~= Wardrobe.CACHE_VERSION then
+        ResetCache(cache, "STALE")
+    end
+    cache.bySlot = cache.bySlot or {}
+    cache.slotDiagnostics = cache.slotDiagnostics or {}
+    cache.scanState = cache.scanState or "NEVER"
+    cache.totalSources = cache.totalSources or 0
+    cache.totalVisuals = cache.totalVisuals or 0
+    cache.expectedCollectedVisuals = cache.expectedCollectedVisuals or 0
+    return cache
+end
+
+local function EnsurePreviewState()
+    local state = QC.GetUIState()
+    state.outfits = state.outfits or {}
+    state.outfits.selections = state.outfits.selections or {}
+    state.outfits.selectedSlot = state.outfits.selectedSlot or "HEAD"
+    state.outfits.pages = state.outfits.pages or {}
+    return state.outfits
+end
+
+local function LoadTransmogSupport()
+    if TransmogUtil and type(TransmogUtil.GetTransmogLocation) == "function" then
+        return true
+    end
+
+    local loader = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
+    if type(loader) == "function" then
+        pcall(loader, "Blizzard_TransmogShared")
+        pcall(loader, "Blizzard_Collections")
+        pcall(loader, "Blizzard_Transmog")
+    end
+
+    return TransmogUtil and type(TransmogUtil.GetTransmogLocation) == "function"
+end
+
+local function ResolveCategoryIDs(definition)
+    local categoryIDs = {}
+    for index, categoryName in ipairs(definition.categoryNames or {}) do
+        local categoryID
+        if Enum and Enum.TransmogCollectionType then
+            categoryID = Enum.TransmogCollectionType[categoryName]
+        end
+        categoryID = categoryID or (definition.fallbackCategoryIDs and definition.fallbackCategoryIDs[index])
+        if categoryID then
+            table.insert(categoryIDs, categoryID)
+        end
+    end
+    definition.categoryIDs = categoryIDs
+    return categoryIDs
+end
+
+local function GetTransmogLocation(definition)
+    if not LoadTransmogSupport() then
+        return nil
+    end
+    local appearanceType = Enum and Enum.TransmogType and Enum.TransmogType.Appearance or 0
+    return SafeCall(TransmogUtil.GetTransmogLocation, definition.slotName, appearanceType, false)
+end
+
+local function GetLocationData(transmogLocation)
+    if transmogLocation and type(transmogLocation.GetData) == "function" then
+        return SafeCall(transmogLocation.GetData, transmogLocation)
+    end
+    return nil
+end
+
 local function GetItemIcon(itemID)
     if C_Item and C_Item.GetItemIconByID then
         return SafeCall(C_Item.GetItemIconByID, itemID)
-    elseif GetItemIcon then
-        return SafeCall(GetItemIcon, itemID)
+    elseif _G and type(_G.GetItemIcon) == "function" then
+        return SafeCall(_G.GetItemIcon, itemID)
     end
 end
 
@@ -100,6 +158,184 @@ local function GetSourceItemID(sourceID, source)
     if C_Transmog and C_Transmog.GetItemIDForSource then
         return SafeCall(C_Transmog.GetItemIDForSource, sourceID)
     end
+end
+
+local function GetCurrentClassID()
+    if UnitClass then
+        local _, _, classID = UnitClass("player")
+        return classID
+    end
+end
+
+local function IsBlizzardWardrobeVisible()
+    if TransmogFrame and TransmogFrame.IsShown and TransmogFrame:IsShown() then
+        return true
+    end
+    if WardrobeCollectionFrame and WardrobeCollectionFrame.IsShown and WardrobeCollectionFrame:IsShown() then
+        return true
+    end
+    return false
+end
+
+local function GetSearchType()
+    return Enum and Enum.TransmogSearchType and Enum.TransmogSearchType.Items or 1
+end
+
+local function GetSearchBoxText()
+    local boxes = {}
+    if WardrobeCollectionFrame and WardrobeCollectionFrame.SearchBox then
+        table.insert(boxes, WardrobeCollectionFrame.SearchBox)
+    end
+    if TransmogFrame and TransmogFrame.WardrobeCollection and TransmogFrame.WardrobeCollection.TabContent then
+        local itemsFrame = TransmogFrame.WardrobeCollection.TabContent.ItemsFrame
+        if itemsFrame and itemsFrame.SearchBox then
+            table.insert(boxes, itemsFrame.SearchBox)
+        end
+    end
+    for _, box in ipairs(boxes) do
+        if box.GetText then
+            local text = SafeCall(box.GetText, box)
+            if text and text ~= "" then
+                return text
+            end
+        end
+    end
+    return ""
+end
+
+local function CaptureCollectionState()
+    local state = {
+        collectedShown = SafeCall(C_TransmogCollection.GetCollectedShown),
+        uncollectedShown = SafeCall(C_TransmogCollection.GetUncollectedShown),
+        allFactionsShown = SafeCall(C_TransmogCollection.GetAllFactionsShown),
+        allRacesShown = SafeCall(C_TransmogCollection.GetAllRacesShown),
+        classFilter = SafeCall(C_TransmogCollection.GetClassFilter),
+        searchText = GetSearchBoxText(),
+        sourceTypes = {},
+    }
+
+    local sourceCount = tonumber(SafeCall(C_TransmogCollection.GetNumTransmogSources)) or 0
+    for index = 1, sourceCount do
+        state.sourceTypes[index] = SafeCall(C_TransmogCollection.IsSourceTypeFilterChecked, index)
+    end
+    return state
+end
+
+local function ApplyScanCollectionState()
+    SafeCall(C_TransmogCollection.SetCollectedShown, true)
+    SafeCall(C_TransmogCollection.SetUncollectedShown, false)
+    SafeCall(C_TransmogCollection.SetAllFactionsShown, true)
+    SafeCall(C_TransmogCollection.SetAllRacesShown, true)
+    local classID = GetCurrentClassID()
+    if classID then
+        SafeCall(C_TransmogCollection.SetClassFilter, classID)
+    end
+    SafeCall(C_TransmogCollection.SetAllSourceTypeFilters, true)
+    SafeCall(C_TransmogCollection.ClearSearch, GetSearchType())
+end
+
+local function RestoreCollectionState(state)
+    if not state then
+        return
+    end
+    if state.collectedShown ~= nil then
+        SafeCall(C_TransmogCollection.SetCollectedShown, state.collectedShown)
+    end
+    if state.uncollectedShown ~= nil then
+        SafeCall(C_TransmogCollection.SetUncollectedShown, state.uncollectedShown)
+    end
+    if state.allFactionsShown ~= nil then
+        SafeCall(C_TransmogCollection.SetAllFactionsShown, state.allFactionsShown)
+    end
+    if state.allRacesShown ~= nil then
+        SafeCall(C_TransmogCollection.SetAllRacesShown, state.allRacesShown)
+    end
+    if state.classFilter ~= nil then
+        SafeCall(C_TransmogCollection.SetClassFilter, state.classFilter)
+    end
+    for index, checked in pairs(state.sourceTypes or {}) do
+        if checked ~= nil then
+            SafeCall(C_TransmogCollection.SetSourceTypeFilter, index, checked)
+        end
+    end
+    if state.searchText and state.searchText ~= "" then
+        SafeCall(C_TransmogCollection.SetSearch, GetSearchType(), state.searchText)
+    else
+        SafeCall(C_TransmogCollection.ClearSearch, GetSearchType())
+    end
+end
+
+local function IsSourceCollected(sourceID, source, appearance)
+    if source and source.isCollected == true then
+        return true
+    end
+    if C_TransmogCollection and C_TransmogCollection.PlayerKnowsSource then
+        local known = SafeCall(C_TransmogCollection.PlayerKnowsSource, sourceID)
+        if known == true then
+            return true
+        end
+    end
+    if C_TransmogCollection and C_TransmogCollection.GetAppearanceInfoBySource then
+        local info = SafeCall(C_TransmogCollection.GetAppearanceInfoBySource, sourceID)
+        if info and (info.sourceIsCollected or info.sourceIsKnown) then
+            return true
+        end
+    end
+    -- GetAppearanceSources returns known sources. This fallback handles clients
+    -- that omit the per-source collected flag while the visual is collected.
+    return appearance and appearance.isCollected == true and source and source.isCollected ~= false
+end
+
+local function GetSourceInfo(sourceID)
+    if C_TransmogCollection and C_TransmogCollection.GetSourceInfo then
+        return SafeCall(C_TransmogCollection.GetSourceInfo, sourceID)
+    end
+end
+
+local function GetKnownSources(appearance, categoryID, transmogLocation)
+    local visualID = appearance and appearance.visualID
+    if not visualID then
+        return {}
+    end
+
+    local locationData = GetLocationData(transmogLocation)
+    local sources
+
+    -- Follow Blizzard's own wardrobe helper first when it is available. The
+    -- direct API path below preserves compatibility when the helper is absent.
+    if CollectionWardrobeUtil and type(CollectionWardrobeUtil.GetSortedAppearanceSources) == "function" then
+        sources = SafeCall(CollectionWardrobeUtil.GetSortedAppearanceSources, visualID, categoryID, transmogLocation)
+    end
+    if not sources or #sources == 0 then
+        sources = SafeCall(C_TransmogCollection.GetAppearanceSources, visualID, categoryID, locationData)
+    end
+
+    if (not sources or #sources == 0) and C_TransmogCollection.GetValidAppearanceSourcesForClass then
+        local classID = GetCurrentClassID()
+        if classID then
+            sources = SafeCall(C_TransmogCollection.GetValidAppearanceSourcesForClass, visualID, classID, categoryID, locationData)
+        end
+    end
+
+    if (not sources or #sources == 0) and C_TransmogCollection.GetAllAppearanceSources then
+        sources = {}
+        local sourceIDs = SafeCall(C_TransmogCollection.GetAllAppearanceSources, visualID) or {}
+        for _, sourceID in ipairs(sourceIDs) do
+            local source = GetSourceInfo(sourceID)
+            if source then
+                table.insert(sources, source)
+            end
+        end
+    end
+
+    if (not sources or #sources == 0) and appearance.sourceID then
+        local source = GetSourceInfo(appearance.sourceID)
+        if source then
+            sources = { source }
+        end
+    end
+
+    return sources or {}
 end
 
 function Wardrobe.GetCache()
@@ -117,6 +353,11 @@ end
 function Wardrobe.GetSlotSources(slotKey)
     local cache = EnsureCache()
     return cache.bySlot[slotKey] or {}
+end
+
+function Wardrobe.GetSlotDiagnostics(slotKey)
+    local cache = EnsureCache()
+    return cache.slotDiagnostics[slotKey]
 end
 
 function Wardrobe.GetSelectedSource(slotKey)
@@ -140,6 +381,9 @@ function Wardrobe.ValidateSource(source, slotKey)
     if not source.isCollected then
         return false, "This appearance is not collected."
     end
+    if source.isUsable == false then
+        return false, "This appearance is not usable by this character."
+    end
     if source.canDisplayOnPlayer == false then
         return false, "This character cannot display the appearance."
     end
@@ -148,6 +392,9 @@ function Wardrobe.ValidateSource(source, slotKey)
     end
     if source.meetsTransmogPlayerCondition == false then
         return false, source.useError or "A player condition is not met."
+    end
+    if source.useError then
+        return false, source.useError
     end
     if source.isHideVisual then
         return false, "Hidden-slot visuals are not included in the foundation preview."
@@ -162,30 +409,43 @@ function Wardrobe.ValidateSource(source, slotKey)
 end
 
 local function NormalizeSource(source, appearance, slotKey, categoryID)
-    local sourceID = source and source.sourceID
+    local sourceID = source and source.sourceID or appearance and appearance.sourceID
     if not sourceID then
         return nil
     end
+
     local itemID = GetSourceItemID(sourceID, source)
     local normalized = {
         sourceID = sourceID,
-        visualID = source.visualID or source.appearanceID or (appearance and appearance.visualID),
+        visualID = source and (source.visualID or source.appearanceID or source.itemAppearanceID) or nil,
         itemID = itemID,
-        name = source.name,
-        quality = source.quality,
-        sourceType = source.sourceType,
-        inventoryType = source.invType,
-        categoryID = source.categoryID or categoryID,
+        name = source and source.name or nil,
+        quality = source and source.quality or nil,
+        sourceType = source and source.sourceType or nil,
+        inventoryType = source and source.invType or nil,
+        categoryID = source and source.categoryID or categoryID,
         slotKey = slotKey,
-        isCollected = source.isCollected == true,
-        isHideVisual = source.isHideVisual == true,
-        playerCanCollect = source.playerCanCollect,
-        isValidSourceForPlayer = source.isValidSourceForPlayer,
-        canDisplayOnPlayer = source.canDisplayOnPlayer,
-        meetsTransmogPlayerCondition = source.meetsTransmogPlayerCondition,
-        useError = source.useError,
-        icon = GetItemIcon(itemID),
+        isCollected = IsSourceCollected(sourceID, source, appearance),
+        isHideVisual = source and source.isHideVisual == true or appearance and appearance.isHideVisual == true,
+        isUsable = appearance and appearance.isUsable,
+        playerCanCollect = source and source.playerCanCollect,
+        isValidSourceForPlayer = source and source.isValidSourceForPlayer,
+        canDisplayOnPlayer = source and source.canDisplayOnPlayer,
+        meetsTransmogPlayerCondition = source and source.meetsTransmogPlayerCondition,
+        useError = source and source.useError,
+        icon = GetItemIcon(itemID) or appearance and appearance.icon,
     }
+
+    normalized.visualID = normalized.visualID or (appearance and appearance.visualID) or sourceID
+    if normalized.canDisplayOnPlayer == nil and appearance then
+        normalized.canDisplayOnPlayer = appearance.canDisplayOnPlayer
+    end
+    if normalized.isUsable == nil and appearance then
+        normalized.isUsable = appearance.isUsable
+    end
+    if not normalized.name and appearance then
+        normalized.name = appearance.name
+    end
     if not normalized.name and itemID and C_Item and C_Item.GetItemNameByID then
         normalized.name = SafeCall(C_Item.GetItemNameByID, itemID)
     end
@@ -196,6 +456,12 @@ end
 local function BetterSource(candidate, current)
     if not current then
         return true
+    end
+    if candidate.isCollected ~= current.isCollected then
+        return candidate.isCollected
+    end
+    if (candidate.useError == nil) ~= (current.useError == nil) then
+        return candidate.useError == nil
     end
     if candidate.canDisplayOnPlayer ~= current.canDisplayOnPlayer then
         return candidate.canDisplayOnPlayer ~= false
@@ -214,32 +480,73 @@ end
 
 local function ScanSlot(definition)
     local visuals = {}
-    local rawCount = 0
+    local diagnostics = {
+        expectedCollected = 0,
+        returnedAppearances = 0,
+        collectedAppearances = 0,
+        returnedSources = 0,
+        compatibleVisuals = 0,
+        excludedVisuals = 0,
+        categories = {},
+    }
 
-    for _, categoryID in ipairs(definition.categoryIDs or {}) do
-        if categoryID and C_TransmogCollection and C_TransmogCollection.GetCategoryAppearances then
-            local appearances = SafeCall(C_TransmogCollection.GetCategoryAppearances, categoryID) or {}
-            for _, appearance in ipairs(appearances) do
-                if appearance.isCollected then
-                    local sources = SafeCall(C_TransmogCollection.GetAppearanceSources, appearance.visualID, categoryID) or {}
-                    for _, source in ipairs(sources) do
-                        rawCount = rawCount + 1
-                        if source.isCollected then
-                            local normalized = NormalizeSource(source, appearance, definition.key, categoryID)
-                            if normalized then
-                                local valid = Wardrobe.ValidateSource(normalized, definition.key)
-                                if valid then
-                                    local visualKey = normalized.visualID or normalized.sourceID
-                                    if BetterSource(normalized, visuals[visualKey]) then
-                                        visuals[visualKey] = normalized
-                                    end
-                                end
+    local transmogLocation = GetTransmogLocation(definition)
+    local locationData = GetLocationData(transmogLocation)
+    if not transmogLocation or not locationData then
+        error("WoW did not provide a transmog location for " .. tostring(definition.slotName))
+    end
+
+    for _, categoryID in ipairs(ResolveCategoryIDs(definition)) do
+        if C_TransmogCollection.SetSearchAndFilterCategory then
+            SafeCall(C_TransmogCollection.SetSearchAndFilterCategory, categoryID)
+        end
+
+        local expected = tonumber(SafeCall(C_TransmogCollection.GetFilteredCategoryCollectedCount, categoryID)) or 0
+        local appearances = SafeCall(C_TransmogCollection.GetCategoryAppearances, categoryID, locationData) or {}
+        local categoryDiagnostic = {
+            categoryID = categoryID,
+            expectedCollected = expected,
+            returnedAppearances = #appearances,
+            collectedAppearances = 0,
+            returnedSources = 0,
+            compatibleVisuals = 0,
+        }
+        diagnostics.expectedCollected = diagnostics.expectedCollected + expected
+        diagnostics.returnedAppearances = diagnostics.returnedAppearances + #appearances
+
+        for _, appearance in ipairs(appearances) do
+            if appearance.isCollected == true and appearance.isHideVisual ~= true then
+                categoryDiagnostic.collectedAppearances = categoryDiagnostic.collectedAppearances + 1
+                diagnostics.collectedAppearances = diagnostics.collectedAppearances + 1
+
+                local acceptedForAppearance = false
+                local sources = GetKnownSources(appearance, categoryID, transmogLocation)
+                categoryDiagnostic.returnedSources = categoryDiagnostic.returnedSources + #sources
+                diagnostics.returnedSources = diagnostics.returnedSources + #sources
+
+                for _, source in ipairs(sources) do
+                    local normalized = NormalizeSource(source, appearance, definition.key, categoryID)
+                    if normalized then
+                        local valid = Wardrobe.ValidateSource(normalized, definition.key)
+                        if valid then
+                            acceptedForAppearance = true
+                            local visualKey = normalized.visualID or normalized.sourceID
+                            if BetterSource(normalized, visuals[visualKey]) then
+                                visuals[visualKey] = normalized
                             end
                         end
                     end
                 end
+
+                if acceptedForAppearance then
+                    categoryDiagnostic.compatibleVisuals = categoryDiagnostic.compatibleVisuals + 1
+                else
+                    diagnostics.excludedVisuals = diagnostics.excludedVisuals + 1
+                end
             end
         end
+
+        table.insert(diagnostics.categories, categoryDiagnostic)
     end
 
     local results = {}
@@ -254,7 +561,9 @@ local function ScanSlot(definition)
         end
         return leftName < rightName
     end)
-    return results, rawCount
+
+    diagnostics.compatibleVisuals = #results
+    return results, diagnostics
 end
 
 function Wardrobe.IsScanning()
@@ -277,6 +586,12 @@ function Wardrobe.Scan(force)
     if not C_TransmogCollection or not C_TransmogCollection.GetCategoryAppearances then
         return false, "The transmog collection API is unavailable."
     end
+    if IsBlizzardWardrobeVisible() then
+        return false, "Close Blizzard's Transmogrify or Wardrobe window before scanning. Quest Chronicle temporarily uses the collection filters and then restores them."
+    end
+    if not LoadTransmogSupport() then
+        return false, "Blizzard's transmog location helpers are unavailable. Try /reload and scan again."
+    end
 
     local cache = EnsureCache()
     if not force and cache.scanState == "COMPLETE" and not cache.dirty then
@@ -284,42 +599,74 @@ function Wardrobe.Scan(force)
     end
 
     Wardrobe.scanning = true
+    Wardrobe.scanCollectionState = CaptureCollectionState()
+    ApplyScanCollectionState()
+    SafeCall(C_TransmogCollection.UpdateUsableAppearances)
+
     cache.scanState = "SCANNING"
     cache.scanStartedAt = time()
+    cache.scanCompletedAt = nil
     cache.scanError = nil
+    cache.scanWarning = nil
     cache.bySlot = {}
+    cache.slotDiagnostics = {}
     cache.totalSources = 0
     cache.totalVisuals = 0
+    cache.expectedCollectedVisuals = 0
 
     local index = 1
+
+    local function FinishScan()
+        RestoreCollectionState(Wardrobe.scanCollectionState)
+        Wardrobe.scanCollectionState = nil
+        Wardrobe.scanning = false
+        cache.scanState = cache.scanError and "COMPLETE_WITH_WARNINGS" or "COMPLETE"
+        cache.scanCompletedAt = time()
+        cache.dirty = false
+        cache.dirtyReason = nil
+        cache.characterKey = QC.GetCurrentCharacter().key
+
+        if cache.expectedCollectedVisuals > 25 and cache.totalVisuals < math.max(5, math.floor(cache.expectedCollectedVisuals * 0.10)) then
+            cache.scanWarning = "WoW reported many more collected visuals than Quest Chronicle could validate. Check the slot diagnostics and report the counts."
+            cache.scanState = "COMPLETE_WITH_WARNINGS"
+        end
+
+        if QC.Notify then
+            QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
+        end
+    end
+
     local function Step()
         local definition = Wardrobe.slotDefinitions[index]
         if not definition then
-            Wardrobe.scanning = false
-            cache.scanState = "COMPLETE"
-            cache.scanCompletedAt = time()
-            cache.dirty = false
-            cache.dirtyReason = nil
-            cache.characterKey = QC.GetCurrentCharacter().key
-            if QC.Notify then
-                QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
-            end
+            FinishScan()
             return
         end
 
-        local ok, sources, rawCount = pcall(ScanSlot, definition)
+        local ok, sources, diagnostics = pcall(ScanSlot, definition)
         if ok then
             cache.bySlot[definition.key] = sources or {}
-            cache.totalSources = cache.totalSources + (rawCount or 0)
+            cache.slotDiagnostics[definition.key] = diagnostics or {}
+            cache.totalSources = cache.totalSources + ((diagnostics and diagnostics.returnedSources) or 0)
             cache.totalVisuals = cache.totalVisuals + #(sources or {})
+            cache.expectedCollectedVisuals = cache.expectedCollectedVisuals + ((diagnostics and diagnostics.expectedCollected) or 0)
         else
             cache.bySlot[definition.key] = {}
+            cache.slotDiagnostics[definition.key] = { error = tostring(sources) }
             cache.scanError = tostring(sources)
         end
 
         if QC.Notify then
-            QC.Notify("WARDROBE_SCAN_PROGRESS", index, #Wardrobe.slotDefinitions, definition.key, #(cache.bySlot[definition.key] or {}))
+            QC.Notify(
+                "WARDROBE_SCAN_PROGRESS",
+                index,
+                #Wardrobe.slotDefinitions,
+                definition.key,
+                #(cache.bySlot[definition.key] or {}),
+                cache.slotDiagnostics[definition.key]
+            )
         end
+
         index = index + 1
         if C_Timer and C_Timer.After then
             C_Timer.After(0, Step)
@@ -328,8 +675,12 @@ function Wardrobe.Scan(force)
         end
     end
 
-    Step()
-    return true, "Wardrobe scan started."
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, Step)
+    else
+        Step()
+    end
+    return true, "Wardrobe collection scan started."
 end
 
 function Wardrobe.SelectSource(slotKey, sourceID)
@@ -395,8 +746,13 @@ eventFrame:RegisterEvent("TRANSMOG_COSMETIC_COLLECTION_SOURCE_ADDED")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_ENTERING_WORLD" then
-        EnsureCache()
+        local cache = EnsureCache()
         EnsurePreviewState()
+        local character = QC.GetCurrentCharacter and QC.GetCurrentCharacter()
+        if character and cache.characterKey and cache.characterKey ~= character.key then
+            ResetCache(cache, "STALE")
+            cache.dirtyReason = "CHARACTER_CHANGED"
+        end
     else
         Wardrobe.MarkDirty(event)
     end

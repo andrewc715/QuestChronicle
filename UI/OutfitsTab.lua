@@ -249,12 +249,21 @@ function UI.CreateOutfitsTab(parent)
         local selected = Wardrobe.GetSelectedSource(slotKey)
         local selectedText = selected and ("Selected: " .. selected.name) or "Selected: current equipped appearance"
         local cacheText
-        if cache.scanState == "NEVER" then
-            cacheText = "Collection has not been scanned yet."
+        if cache.scanState == "NEVER" or cache.scanState == "STALE" then
+            cacheText = "Collection needs a full account wardrobe scan."
         elseif cache.scanState == "SCANNING" then
-            cacheText = "Scanning collected appearances in small batches..."
+            cacheText = "Scanning WoW's collected appearances in small batches..."
         else
             cacheText = string.format("%s cached visuals • Last scan %s%s", UI.FormatNumber(cache.totalVisuals or 0), cache.scanCompletedAt and UI.FormatShortTimestamp(cache.scanCompletedAt) or "unknown", cache.dirty and " • Collection changed" or "")
+        end
+        local diagnostics = Wardrobe.GetSlotDiagnostics(slotKey)
+        if diagnostics and diagnostics.expectedCollected then
+            cacheText = cacheText .. string.format("\nWoW reports %s collected for these categories • %s compatible visuals cached", UI.FormatNumber(diagnostics.expectedCollected or 0), UI.FormatNumber(diagnostics.compatibleVisuals or #sources))
+        elseif diagnostics and diagnostics.error then
+            cacheText = cacheText .. "\n" .. UI.red .. tostring(diagnostics.error) .. "|r"
+        end
+        if cache.scanWarning then
+            cacheText = cacheText .. "\n" .. UI.red .. cache.scanWarning .. "|r"
         end
         statusText:SetText(message or (selectedText .. "\n" .. cacheText))
 
@@ -281,14 +290,17 @@ function UI.CreateOutfitsTab(parent)
         subtitle:SetText(string.format("%s collected appearances cached for %s. Manual preview only; no outfit is applied to the character.", UI.FormatNumber(#sources), definition and definition.label or slotKey))
     end
 
-    QC.RegisterCallback("WARDROBE_SCAN_PROGRESS", pane, function(index, total, slotKey, count)
+    QC.RegisterCallback("WARDROBE_SCAN_PROGRESS", pane, function(index, total, slotKey, count, diagnostics)
         if pane:IsShown() then
-            pane:Refresh(string.format("Scanning %d of %d: %s (%d appearances)", index or 0, total or 0, Wardrobe.GetSlotDefinition(slotKey) and Wardrobe.GetSlotDefinition(slotKey).label or slotKey, count or 0))
+            local expected = diagnostics and diagnostics.expectedCollected or 0
+            pane:Refresh(string.format("Scanning %d of %d: %s (%d compatible of %d collected)", index or 0, total or 0, Wardrobe.GetSlotDefinition(slotKey) and Wardrobe.GetSlotDefinition(slotKey).label or slotKey, count or 0, expected or 0))
         end
     end)
-    QC.RegisterCallback("WARDROBE_SCAN_COMPLETE", pane, function()
+    QC.RegisterCallback("WARDROBE_SCAN_COMPLETE", pane, function(cache)
         Wardrobe.ApplyPreview(model)
-        if pane:IsShown() then pane:Refresh("Wardrobe scan complete.") end
+        if pane:IsShown() then
+            pane:Refresh(cache and cache.scanWarning or cache and cache.scanError or "Wardrobe collection scan complete.")
+        end
     end)
     QC.RegisterCallback("WARDROBE_CACHE_DIRTY", pane, function()
         if pane:IsShown() then pane:Refresh() end

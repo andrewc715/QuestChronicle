@@ -1,6 +1,8 @@
-# Quest Chronicle v0.5.0
+# Quest Chronicle v0.5.1
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.4.1 polishes the standalone Blizzard-styled interface introduced in v0.4.0 while preserving the tested lifecycle recorder and Courier export.
+> **Wardrobe scanner hotfix:** v0.5.1 replaces the incomplete v0.5.0 scan with slot-aware account transmog collection queries. The first v0.5.1 scan rebuilds the wardrobe cache automatically.
+
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.5.1 preserves the polished standalone interface and tested lifecycle recorder while repairing the first live-client Wardrobe Foundation scan.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -138,12 +140,14 @@ Bare `/qc` toggles the main window. `/qc help` displays command help.
 QuestChronicle\
 ├── QuestChronicle.toc
 ├── QuestChronicle.lua
+├── Wardrobe.lua
 ├── UI\
 │   ├── Shared.lua
 │   ├── ChronicleTab.lua
 │   ├── ActiveQuestsTab.lua
 │   ├── NoteTab.lua
 │   ├── StatusTab.lua
+│   ├── OutfitsTab.lua
 │   ├── Settings.lua
 │   └── MainWindow.lua
 ├── CHANGELOG.md

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1 - 2026-07-31
+
+### Fixed
+
+- Replaced the incomplete wardrobe query with slot-aware account collection scanning.
+- Corrected armor category fallback IDs and delayed enum resolution until scan time.
+- Isolated and restored Blizzard collection filters and search state.
+- Added robust collected-source fallbacks and per-slot scan diagnostics.
+- Invalidated the v0.5.0 wardrobe cache through cache schema 2.
+
 ## 0.5.0 - 2026-07-31
 
 ### Added
