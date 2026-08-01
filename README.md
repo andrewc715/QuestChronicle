@@ -1,8 +1,8 @@
-# Quest Chronicle v0.9.1
+# Quest Chronicle v0.9.2
 
-> **Zone Preference Toggle Hotfix:** v0.9.1 restores both directions of Favor/Unfavor and Exclude/Allow and keeps their tooltips synchronized with the current action.
+> **Internal Collection Event Hotfix:** v0.9.2 stops Generate Outfit and rerolls from starting an unnecessary wardrobe rescan while preserving Blizzard-safe weapon validation and genuine collection-change refreshes.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.9.1 includes the complete Era and Collection Polish release plus the zone-preference toggle repair, without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.9.2 includes the complete Era and Collection Polish release plus the zone-preference and internal-refresh hotfixes, without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -169,6 +169,7 @@ QuestChronicle\
 ├── CURRENT_LOOK_TOOLTIPS_V081_TEST_CHECKLIST.md
 ├── ERA_COLLECTION_POLISH_V090_TEST_CHECKLIST.md
 ├── ZONE_PREFERENCE_TOGGLE_V091_TEST_CHECKLIST.md
+├── INTERNAL_COLLECTION_EVENT_V092_TEST_CHECKLIST.md
 ├── WARDROBE_SCANNER_RECOVERY_TEST_CHECKLIST.md
 └── COURIER_CONFIG_PATCH.json
 ```

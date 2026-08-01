@@ -1,33 +1,34 @@
-# Quest Chronicle v0.9.1: Zone Preference Toggle Hotfix
+# Quest Chronicle v0.9.2: Internal Collection Event Hotfix
 
-Version 0.9.1 fixes the two-way controls for per-zone appearance preferences introduced before v0.9.0.
+Version 0.9.2 stops outfit generation from causing an unnecessary automatic wardrobe rescan.
 
 ## Fixed
 
-- **Favor in Zone** still marks the selected collapsed visual as a zone favorite.
-- **Unfavor** now actually clears that favorite.
-- **Exclude in Zone** still removes the selected visual from automatic generation in the current zone.
-- **Allow in Zone** now actually clears that exclusion and returns the visual to the eligible pool when it passes the remaining era, provenance, promotional, coherence, and weapon rules.
-- The button tooltip now changes with its action: Favorite/Remove Favorite and Exclude/Allow.
+Quest Chronicle refreshes Blizzard's current-character usable-appearance state before choosing weapons. That check is still required so generated weapons obey the equipped weapon and Blizzard's transmog rules. Blizzard also emits the broad `TRANSMOG_COLLECTION_UPDATED` event for that internal refresh, which v0.9.0 interpreted as a real collection mutation.
 
-The cause was a Lua pseudo-ternary that attempted to return `nil`. Because Lua's `and/or` expression falls through whenever the middle result is `nil`, the clearing path reapplied the original preference. v0.9.1 uses explicit branches and tests both directions of both controls.
+v0.9.2 marks the brief usability update as internal and ignores only its matching generic notification. As a result:
 
-## Preserved from v0.9.0
+- **Generate Outfit** no longer starts a wardrobe scan;
+- **Reroll Unlocked** no longer starts a wardrobe scan;
+- weapon-slot rerolls no longer start a wardrobe scan;
+- Blizzard-safe equipped-weapon validation is preserved;
+- genuine source-added, source-removed, and cosmetic-added events still queue an automatic refresh;
+- a later external generic collection update still queues an automatic refresh.
 
-- expansion progression restriction;
-- debounced automatic collection updates;
-- stable-visual missing-appearance recovery;
-- scan timing and performance diagnostics;
-- extensive Classic-through-Midnight zone coverage;
-- settings and high-contrast outfit states.
+The regression harness now simulates both the internal event and a later external event so the guard cannot silence real collection maintenance.
+
+## Also included
+
+- The v0.9.1 two-way Favor/Unfavor and Exclude/Allow repair.
+- All v0.9.0 era restriction, collection recovery, performance, zone coverage, settings, and accessibility improvements.
 
 ## Compatibility
 
 - SavedVariables schema 2 is preserved.
 - Courier format 1 is preserved.
 - Wardrobe cache format 5 is preserved.
-- Existing favorites and exclusions remain intact.
-- No collection rescan is required.
+- Existing concepts, favorites, exclusions, selections, and locks remain compatible.
+- No collection rescan is required after updating.
 - Preview only: no transmog is applied and no Blizzard outfit slot is changed.
 
-See `ZONE_PREFERENCE_TOGGLE_V091_TEST_CHECKLIST.md` for the live verification pass.
+See `INTERNAL_COLLECTION_EVENT_V092_TEST_CHECKLIST.md` for the live verification pass.

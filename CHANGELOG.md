@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.2 - 2026-07-31
+
+### Fixed
+
+- Stops **Generate Outfit**, **Reroll Unlocked**, and weapon-slot rerolls from scheduling a full wardrobe rescan after their own Blizzard usability refresh.
+- Distinguishes the short-lived internal `TRANSMOG_COLLECTION_UPDATED` notification from genuine collection mutations.
+- Continues to react normally to source-added, source-removed, cosmetic-added, and later external collection-update events.
+
+### Compatibility
+
+- Preserves wardrobe cache format 5, SavedVariables schema 2, and Courier format 1.
+- Requires no collection rescan.
+
 ## 0.9.1 - 2026-07-31
 
 ### Fixed

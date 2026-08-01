@@ -10,6 +10,7 @@ local AUTO_REFRESH_DELAY = 3.0
 local AUTO_REFRESH_RETRY_DELAY = 2.0
 local AUTO_REFRESH_MAX_ATTEMPTS = 15
 local autoRefreshToken = 0
+local internalUsabilityUpdateUntil
 
 -- Resolve collection enum values when the scan runs instead of when this file loads.
 -- Some Blizzard enum tables are not ready during early addon loading.
@@ -881,6 +882,8 @@ local function GetEquippedItemInfo(slotName)
 end
 
 local function CreateWeaponGenerationContext()
+    local now = GetTime and GetTime()
+    internalUsabilityUpdateUntil = now and (now + 1.0) or nil
     SafeCall(C_TransmogCollection and C_TransmogCollection.UpdateUsableAppearances)
     return {
         mainItem = GetEquippedItemInfo("MAINHANDSLOT"),
@@ -2059,6 +2062,18 @@ eventFrame:SetScript("OnEvent", function(_, event)
         if cache.dirty then
             ScheduleAutomaticRefresh(cache.dirtyReason or "COLLECTION_CHANGED")
         end
+    elseif event == "TRANSMOG_COLLECTION_UPDATED"
+        and internalUsabilityUpdateUntil
+        and GetTime
+        and GetTime() <= internalUsabilityUpdateUntil
+    then
+        -- Weapon generation asks Blizzard to refresh current-character
+        -- usability before validating the equipped hands. Blizzard reports
+        -- that calculation through the generic collection-updated event even
+        -- though no appearance was learned or removed. Do not turn our own
+        -- validation refresh into a full wardrobe rescan.
+        local cache = EnsureCache()
+        cache.lastInternalUsabilityUpdateAt = time and time() or 0
     else
         Wardrobe.MarkDirty(event)
     end
