@@ -1,8 +1,8 @@
-# Quest Chronicle v1.0.1
+# Quest Chronicle v1.0.2
 
-> **Quest Chronicle:** v1.0.1 keeps Quest Chronicle concepts authoritative and exports them safely into Blizzard's Custom Sets library. The protected native Outfit-slot pipeline has been removed.
+> **Quest Chronicle:** v1.0.2 repairs Blizzard Custom Set export with exact inventory-slot mapping, collected-source rebinding, hidden-slot encoding, and slot-by-slot verification.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.0.0 is the stable first release, combining the complete quest lifecycle, journal, Courier, and outfit-design systems without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.0.2 combines the complete quest lifecycle, journal, Courier, and outfit-design systems with a fail-safe Custom Set handoff that reproduces the Quest Chronicle preview instead of creating partial native recipes.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -137,10 +137,11 @@ Bare `/qc` toggles the main window. `/qc help` displays command help.
 - Existing v0.1 through v0.4.0 SavedVariables and historical records are retained.
 - Existing v0.6.x through v0.9.x wardrobe caches, outfit selections, locks, hidden slots, style modes, generated names, zone preferences, and saved concepts are retained.
 - Existing concepts remain **Quest Chronicle only** until you deliberately choose **Save to Custom Sets**. No native Outfit slots are touched.
-- A linked concept remembers its Blizzard outfit ID so later saves update the same native slot instead of creating duplicates.
+- A linked concept remembers its Blizzard Custom Set ID so later saves update the same native recipe instead of creating duplicates.
 - Addon schema remains version 2 because the recorded data model is unchanged.
 - Courier export `formatVersion` remains 1.
 - Warcraft Quest Chronicle Courier v1.0.0 remains compatible.
+- Wardrobe cache format 6 rebuilds preview representatives around sources WoW confirms are actually collected; saved concepts and visual identities are preserved.
 
 ## File layout
 

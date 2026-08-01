@@ -3,7 +3,7 @@ local QC = QuestChronicle
 QC.Wardrobe = QC.Wardrobe or {}
 local Wardrobe = QC.Wardrobe
 
-Wardrobe.CACHE_VERSION = 5
+Wardrobe.CACHE_VERSION = 6
 Wardrobe.PAGE_SIZE = 7
 
 local AUTO_REFRESH_DELAY = 3.0
@@ -68,11 +68,11 @@ end
 
 local function TryCall(func, ...)
     if type(func) ~= "function" then
-        return false, "That Blizzard outfit function is unavailable."
+        return false, "That Blizzard Custom Set function is unavailable."
     end
     local ok, a, b, c = pcall(func, ...)
     if not ok then
-        return false, tostring(a or "Blizzard rejected the outfit request.")
+        return false, tostring(a or "Blizzard rejected the Custom Set request.")
     end
     return true, a, b, c
 end
@@ -374,9 +374,18 @@ local function RestoreCollectionState(state)
     end
 end
 
-local function IsSourceCollected(sourceID, source, appearance)
+local function IsSourceCollected(sourceID, source)
+    -- A collected visual can contain several sibling item sources. Custom Sets
+    -- require an actually owned source, not merely a source whose visual is
+    -- unlocked through another item. Keep this test deliberately source-strict.
     if source and source.isCollected == true then
         return true
+    end
+    if C_TransmogCollection and C_TransmogCollection.GetAppearanceInfoBySource then
+        local info = SafeCall(C_TransmogCollection.GetAppearanceInfoBySource, sourceID)
+        if info and info.sourceIsCollected == true then
+            return true
+        end
     end
     if C_TransmogCollection and C_TransmogCollection.PlayerKnowsSource then
         local known = SafeCall(C_TransmogCollection.PlayerKnowsSource, sourceID)
@@ -384,15 +393,7 @@ local function IsSourceCollected(sourceID, source, appearance)
             return true
         end
     end
-    if C_TransmogCollection and C_TransmogCollection.GetAppearanceInfoBySource then
-        local info = SafeCall(C_TransmogCollection.GetAppearanceInfoBySource, sourceID)
-        if info and (info.sourceIsCollected or info.sourceIsKnown) then
-            return true
-        end
-    end
-    -- GetAppearanceSources returns known sources. This fallback handles clients
-    -- that omit the per-source collected flag while the visual is collected.
-    return appearance and appearance.isCollected == true and source and source.isCollected ~= false
+    return false
 end
 
 local function GetSourceInfo(sourceID)
@@ -1437,25 +1438,25 @@ function Wardrobe.DeleteConcept(conceptID)
     return true, "Deleted outfit concept: " .. tostring(concept.name or "Unnamed")
 end
 
-local CUSTOM_SET_SLOT_INDEX = {
+local CUSTOM_SET_SLOT_FALLBACK = {
     HEAD = 1,
-    SHOULDER = 2,
-    BACK = 4,
+    SHOULDER = 3,
+    BACK = 15,
     CHEST = 5,
-    SHIRT = 6,
-    TABARD = 7,
-    WRIST = 8,
-    HANDS = 9,
-    WAIST = 10,
-    LEGS = 11,
-    FEET = 12,
-    ONE_HAND = 13,
-    TWO_HAND = 13,
-    RANGED = 13,
-    OFF_HAND = 16,
+    SHIRT = 4,
+    TABARD = 19,
+    WRIST = 9,
+    HANDS = 10,
+    WAIST = 6,
+    LEGS = 7,
+    FEET = 8,
+    ONE_HAND = 16,
+    TWO_HAND = 16,
+    RANGED = 16,
+    OFF_HAND = 17,
 }
 
-local CUSTOM_SET_LIST_SIZE = 17
+local CUSTOM_SET_LIST_SIZE = tonumber(INVSLOT_LAST_EQUIPPED) or 19
 
 local function GetConceptSource(concept, slotKey)
     return concept and GetSourceByID(slotKey, concept.selections and concept.selections[slotKey]) or nil
@@ -1485,31 +1486,211 @@ local function CreateItemTransmogInfo(sourceID)
 end
 
 local function CreateEmptyCustomSetList()
+    local list
     if TransmogUtil and type(TransmogUtil.GetEmptyItemTransmogInfoList) == "function" then
-        local list = SafeCall(TransmogUtil.GetEmptyItemTransmogInfoList)
-        if type(list) == "table" then return list end
+        list = SafeCall(TransmogUtil.GetEmptyItemTransmogInfoList)
     end
-    local list = {}
-    for index = 1, CUSTOM_SET_LIST_SIZE do
-        list[index] = EmptyItemTransmogInfo()
+    if type(list) ~= "table" then
+        list = {}
+    end
+    -- Blizzard indexes Custom Set data by the actual inventory slot ID. Keep a
+    -- complete array through INVSLOT_LAST_EQUIPPED, including non-transmog slots,
+    -- so the native API receives the same structure its own UI creates.
+    for slotID = 1, CUSTOM_SET_LIST_SIZE do
+        if type(list[slotID]) ~= "table" then
+            list[slotID] = EmptyItemTransmogInfo()
+        end
     end
     return list
 end
 
-local function BuildConceptCustomSetList(concept)
-    local list = CreateEmptyCustomSetList()
-    local populated = 0
-    for _, definition in ipairs(Wardrobe.slotDefinitions) do
-        local index = CUSTOM_SET_SLOT_INDEX[definition.key]
-        if index and not (concept.hidden and concept.hidden[definition.key]) then
-            local sourceID = concept.selections and tonumber(concept.selections[definition.key])
-            if sourceID then
-                list[index] = CreateItemTransmogInfo(sourceID)
-                populated = populated + 1
+local function GetCustomSetSlotID(definition)
+    if not definition then return nil end
+    local slotID = SafeCall(GetInventorySlotInfo, definition.slotName)
+    return tonumber(slotID) or CUSTOM_SET_SLOT_FALLBACK[definition.key]
+end
+
+local function CategoryAllowedForDefinition(definition, categoryID)
+    if not definition or not categoryID then return true end
+    local allowed = {}
+    for _, value in ipairs(ResolveCategoryIDs(definition)) do allowed[tonumber(value)] = true end
+    -- A dual-wield off hand may use the same one-hand categories as MAINHANDSLOT.
+    if definition.key == "OFF_HAND" then
+        local oneHand = slotByKey.ONE_HAND
+        for _, value in ipairs(ResolveCategoryIDs(oneHand)) do allowed[tonumber(value)] = true end
+    end
+    return allowed[tonumber(categoryID)] == true
+end
+
+local function GetActualSourceFacts(sourceID, source)
+    sourceID = tonumber(sourceID)
+    if not sourceID then return nil end
+    source = source or GetSourceInfo(sourceID) or { sourceID = sourceID }
+    local appearanceInfo = C_TransmogCollection and C_TransmogCollection.GetAppearanceInfoBySource
+        and SafeCall(C_TransmogCollection.GetAppearanceInfoBySource, sourceID) or nil
+    return {
+        sourceID = sourceID,
+        source = source,
+        appearanceInfo = appearanceInfo,
+        visualID = appearanceInfo and (appearanceInfo.appearanceID or appearanceInfo.visualID)
+            or source.visualID or source.appearanceID or source.itemAppearanceID,
+        categoryID = source.categoryID,
+        collected = IsSourceCollected(sourceID, source),
+        hideVisual = source.isHideVisual == true,
+        displayable = not (source.canDisplayOnPlayer == false
+            or source.isValidSourceForPlayer == false
+            or source.meetsTransmogPlayerCondition == false
+            or source.useError
+            or (appearanceInfo and appearanceInfo.canDisplayOnPlayer == false)
+            or (appearanceInfo and appearanceInfo.meetsTransmogPlayerCondition == false)),
+    }
+end
+
+local function SourceCanEnterCustomSet(sourceID, definition, allowHide, source)
+    local facts = GetActualSourceFacts(sourceID, source)
+    if not facts then return false, nil end
+    if not CategoryAllowedForDefinition(definition, facts.categoryID) then return false, facts end
+    if allowHide and facts.hideVisual then return true, facts end
+    return facts.collected == true and facts.displayable == true and not facts.hideVisual, facts
+end
+
+local function AddCandidateID(candidates, seen, sourceID)
+    sourceID = tonumber(sourceID)
+    if sourceID and sourceID > 0 and not seen[sourceID] then
+        seen[sourceID] = true
+        table.insert(candidates, sourceID)
+    end
+end
+
+local function ResolveCollectedConceptSource(concept, definition)
+    local selectedSourceID = concept.selections and tonumber(concept.selections[definition.key])
+    local selectedSource = selectedSourceID and GetSourceByID(definition.key, selectedSourceID) or nil
+    local visualID = concept.visuals and concept.visuals[definition.key]
+        or selectedSource and selectedSource.visualID
+
+    local candidates, seen = {}, {}
+    AddCandidateID(candidates, seen, selectedSourceID)
+
+    if visualID and C_TransmogCollection and C_TransmogCollection.GetAllAppearanceSources then
+        for _, sourceID in ipairs(SafeCall(C_TransmogCollection.GetAllAppearanceSources, visualID) or {}) do
+            AddCandidateID(candidates, seen, sourceID)
+        end
+    end
+
+    if visualID then
+        local transmogLocation = GetTransmogLocation(definition)
+        local categories = {}
+        for _, categoryID in ipairs(ResolveCategoryIDs(definition)) do table.insert(categories, categoryID) end
+        if definition.key == "OFF_HAND" then
+            for _, categoryID in ipairs(ResolveCategoryIDs(slotByKey.ONE_HAND)) do table.insert(categories, categoryID) end
+        end
+        for _, categoryID in ipairs(categories) do
+            local appearance = { visualID = visualID, isCollected = true }
+            for _, source in ipairs(GetKnownSources(appearance, categoryID, transmogLocation)) do
+                AddCandidateID(candidates, seen, type(source) == "table" and source.sourceID or source)
             end
         end
     end
-    return list, populated
+
+    local bestFacts
+    for _, sourceID in ipairs(candidates) do
+        local valid, facts = SourceCanEnterCustomSet(sourceID, definition, false)
+        if valid then
+            if not bestFacts
+                or sourceID == selectedSourceID
+                or (facts.visualID == visualID and bestFacts.visualID ~= visualID)
+                or sourceID < bestFacts.sourceID then
+                bestFacts = facts
+            end
+            if sourceID == selectedSourceID and facts.collected then break end
+        end
+    end
+    return bestFacts, visualID
+end
+
+local function ResolveHiddenConceptSource(definition)
+    local transmogLocation = GetTransmogLocation(definition)
+    for _, categoryID in ipairs(ResolveCategoryIDs(definition)) do
+        local appearances = GetCategoryAppearancesRobust(categoryID, transmogLocation)
+        for _, appearance in ipairs(appearances or {}) do
+            if appearance.isHideVisual == true then
+                local candidates = GetKnownSources(appearance, categoryID, transmogLocation)
+                if appearance.sourceID then table.insert(candidates, 1, appearance.sourceID) end
+                for _, candidate in ipairs(candidates) do
+                    local sourceID = type(candidate) == "table" and candidate.sourceID or candidate
+                    local valid, facts = SourceCanEnterCustomSet(sourceID, definition, true, type(candidate) == "table" and candidate or nil)
+                    if valid and facts.hideVisual then return facts end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function BuildConceptCustomSetList(concept)
+    local list = CreateEmptyCustomSetList()
+    local expectedSlots = {}
+    local resolvedSources = {}
+    local unresolved = {}
+    local populated = 0
+
+    for _, definition in ipairs(Wardrobe.slotDefinitions) do
+        local selectedSourceID = concept.selections and tonumber(concept.selections[definition.key])
+        local hidden = concept.hidden and concept.hidden[definition.key] == true
+        if selectedSourceID or hidden then
+            local slotID = GetCustomSetSlotID(definition)
+            if not slotID then
+                table.insert(unresolved, tostring(definition.label or definition.key) .. " (inventory slot unavailable)")
+            else
+                local facts, visualID
+                if hidden then
+                    facts = ResolveHiddenConceptSource(definition)
+                else
+                    facts, visualID = ResolveCollectedConceptSource(concept, definition)
+                end
+
+                if not facts then
+                    table.insert(unresolved, tostring(definition.label or definition.key))
+                else
+                    local previous = expectedSlots[slotID]
+                    if previous and previous.sourceID ~= facts.sourceID then
+                        return nil, 0, nil, nil, string.format(
+                            "The concept contains conflicting %s and %s appearances for inventory slot %d. Load the concept, reset the weapon selections, and save it again.",
+                            tostring(previous.label or previous.slotKey),
+                            tostring(definition.label or definition.key),
+                            slotID
+                        )
+                    end
+
+                    list[slotID] = CreateItemTransmogInfo(facts.sourceID)
+                    expectedSlots[slotID] = {
+                        slotID = slotID,
+                        slotKey = definition.key,
+                        slotName = definition.slotName,
+                        label = definition.label or definition.key,
+                        sourceID = facts.sourceID,
+                        visualID = facts.visualID or visualID,
+                        hidden = hidden,
+                    }
+                    resolvedSources[definition.key] = {
+                        requestedSourceID = selectedSourceID,
+                        resolvedSourceID = facts.sourceID,
+                        visualID = facts.visualID or visualID,
+                        hidden = hidden,
+                        resolvedAt = time(),
+                    }
+                    if not previous then populated = populated + 1 end
+                end
+            end
+        end
+    end
+
+    if #unresolved > 0 then
+        return nil, 0, nil, nil,
+            "Quest Chronicle could not resolve collected Custom Set sources for: " .. table.concat(unresolved, ", ") .. ". Rescan the wardrobe and save the concept again. Nothing was sent to WoW."
+    end
+
+    return list, populated, expectedSlots, resolvedSources
 end
 
 local function GetCustomSetInfo(customSetID)
@@ -1546,34 +1727,153 @@ end
 
 local function GetAppearanceID(info)
     if type(info) ~= "table" then return 0 end
-    return tonumber(info.appearanceID) or 0
+    return tonumber(info.appearanceID or info.sourceID) or 0
 end
 
-local function CustomSetListsMatch(left, right)
-    left, right = left or {}, right or {}
-    for index = 1, CUSTOM_SET_LIST_SIZE do
-        if GetAppearanceID(left[index]) ~= GetAppearanceID(right[index]) then return false end
+local function GetVisualIDForSource(sourceID)
+    sourceID = tonumber(sourceID)
+    if not sourceID or sourceID == 0 then return nil end
+    if C_TransmogCollection and C_TransmogCollection.GetAppearanceInfoBySource then
+        local info = SafeCall(C_TransmogCollection.GetAppearanceInfoBySource, sourceID)
+        if info then return tonumber(info.appearanceID or info.visualID) end
     end
-    return true
+    local source = GetSourceInfo(sourceID)
+    return source and tonumber(source.visualID or source.appearanceID or source.itemAppearanceID) or nil
 end
 
-local function VerifyCustomSet(customSetID, expectedList)
-    if not customSetID or not C_TransmogCollection then return false end
-    local actual = SafeCall(C_TransmogCollection.GetCustomSetItemTransmogInfoList, tonumber(customSetID))
-    return type(actual) == "table" and CustomSetListsMatch(actual, expectedList)
+local function SortVerificationEntries(entries)
+    table.sort(entries, function(left, right)
+        if (left.slotID or 0) == (right.slotID or 0) then
+            return tostring(left.label or "") < tostring(right.label or "")
+        end
+        return (left.slotID or 0) < (right.slotID or 0)
+    end)
 end
 
-local function FinishCustomSetSync(success, message, customSetID)
+local function CompareCustomSetSlots(actualList, expectedSlots)
+    local report = {
+        expected = 0,
+        matched = 0,
+        missing = {},
+        altered = {},
+        verifiedAt = time(),
+    }
+
+    for slotID, expected in pairs(expectedSlots or {}) do
+        report.expected = report.expected + 1
+        local actualSourceID = GetAppearanceID(actualList and actualList[slotID])
+        local actualVisualID = GetVisualIDForSource(actualSourceID)
+        local sameVisual = expected.visualID and actualVisualID and tonumber(expected.visualID) == tonumber(actualVisualID)
+        if actualSourceID == expected.sourceID or sameVisual then
+            report.matched = report.matched + 1
+        elseif actualSourceID == 0 then
+            table.insert(report.missing, {
+                slotID = slotID,
+                slotKey = expected.slotKey,
+                label = expected.label,
+                expectedSourceID = expected.sourceID,
+                actualSourceID = 0,
+            })
+        else
+            table.insert(report.altered, {
+                slotID = slotID,
+                slotKey = expected.slotKey,
+                label = expected.label,
+                expectedSourceID = expected.sourceID,
+                actualSourceID = actualSourceID,
+                expectedVisualID = expected.visualID,
+                actualVisualID = actualVisualID,
+            })
+        end
+    end
+
+    SortVerificationEntries(report.missing)
+    SortVerificationEntries(report.altered)
+    report.success = report.expected > 0 and report.matched == report.expected
+    return report
+end
+
+local function JoinVerificationLabels(entries, includeIDs)
+    local labels = {}
+    for _, entry in ipairs(entries or {}) do
+        if includeIDs then
+            table.insert(labels, string.format(
+                "%s (expected %d, received %d)",
+                tostring(entry.label or entry.slotKey or entry.slotID),
+                tonumber(entry.expectedSourceID) or 0,
+                tonumber(entry.actualSourceID) or 0
+            ))
+        else
+            table.insert(labels, tostring(entry.label or entry.slotKey or entry.slotID))
+        end
+    end
+    return table.concat(labels, ", ")
+end
+
+local function FormatVerificationMessage(report)
+    if not report then
+        return "World of Warcraft did not return Custom Set data for verification."
+    end
+    if report.success then
+        return string.format("Custom Set saved and verified: %d/%d selected slots matched.", report.matched or 0, report.expected or 0)
+    end
+
+    local details = {
+        string.format("Custom Set verification failed: %d/%d selected slots matched.", report.matched or 0, report.expected or 0),
+    }
+    if #(report.missing or {}) > 0 then
+        table.insert(details, "Missing: " .. JoinVerificationLabels(report.missing, false) .. ".")
+    end
+    if #(report.altered or {}) > 0 then
+        table.insert(details, "Altered: " .. JoinVerificationLabels(report.altered, true) .. ".")
+    end
+    return table.concat(details, " ")
+end
+
+local function PrintVerificationReport(report)
+    if not report or report.success then return end
+    if QC.Print then
+        QC.Print(string.format("Custom Set verification: %d/%d selected slots matched.", report.matched or 0, report.expected or 0))
+    end
+    if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+        for _, entry in ipairs(report.missing or {}) do
+            DEFAULT_CHAT_FRAME:AddMessage(string.format(
+                "  |cffff5555Missing|r %s: expected source %d, received an empty slot.",
+                tostring(entry.label or entry.slotKey or entry.slotID),
+                tonumber(entry.expectedSourceID) or 0
+            ))
+        end
+        for _, entry in ipairs(report.altered or {}) do
+            DEFAULT_CHAT_FRAME:AddMessage(string.format(
+                "  |cffffaa33Altered|r %s: expected source %d, received source %d.",
+                tostring(entry.label or entry.slotKey or entry.slotID),
+                tonumber(entry.expectedSourceID) or 0,
+                tonumber(entry.actualSourceID) or 0
+            ))
+        end
+    end
+end
+
+local function FinishCustomSetSync(success, message, customSetID, report)
     local request = pendingCustomSetSync
     if not request then return end
     local store = EnsureConceptStore()
     local concept = store[request.conceptID]
     if concept then
         concept.customSetSyncPendingAt = nil
-        if success and customSetID then
+        if customSetID then
+            -- Keep the link even when verification finds missing slots. The set
+            -- exists and the Update Custom Set action is the repair path.
             concept.blizzardCustomSetID = tonumber(customSetID)
             concept.blizzardCustomSetName = request.name
             concept.blizzardCustomSetIcon = request.icon
+        end
+        concept.customSetVerification = report
+        concept.customSetVerifiedAt = report and report.verifiedAt or time()
+        if request.resolvedSources then
+            concept.customSetResolvedSources = request.resolvedSources
+        end
+        if success and customSetID then
             concept.customSetSyncedAt = time()
             concept.customSetSyncError = nil
         else
@@ -1581,25 +1881,40 @@ local function FinishCustomSetSync(success, message, customSetID)
         end
     end
     pendingCustomSetSync = nil
+    if not success then PrintVerificationReport(report) end
     if QC.Notify then
-        QC.Notify("WARDROBE_CUSTOM_SET_SYNCED", concept, success, message)
+        QC.Notify("WARDROBE_CUSTOM_SET_SYNCED", concept, success, message, report)
         QC.Notify("WARDROBE_CONCEPTS_CHANGED", concept)
     end
 end
 
-local function TryVerifyPendingCustomSet()
+local function TryVerifyPendingCustomSet(finalAttempt)
     local request = pendingCustomSetSync
-    if not request then return false end
+    if not request then return false, false end
     local customSetID = request.customSetID
     if not customSetID then
         local info = FindCustomSetByName(request.name)
         customSetID = info and info.customSetID
     end
-    if customSetID and VerifyCustomSet(customSetID, request.itemTransmogInfoList) then
-        FinishCustomSetSync(true, request.mode == "update" and "Updated linked Custom Set." or "Saved to WoW Custom Sets.", customSetID)
-        return true
+    if not customSetID then
+        return false, false
     end
-    return false
+
+    local actual = SafeCall(C_TransmogCollection.GetCustomSetItemTransmogInfoList, tonumber(customSetID))
+    if type(actual) ~= "table" then
+        return false, false
+    end
+
+    local report = CompareCustomSetSlots(actual, request.expectedSlots)
+    local message = FormatVerificationMessage(report)
+    if report.success then
+        FinishCustomSetSync(true, message, customSetID, report)
+        return true, true, message
+    elseif finalAttempt then
+        FinishCustomSetSync(false, message, customSetID, report)
+        return true, false, message
+    end
+    return false, false, message
 end
 
 function Wardrobe.IsCustomSetSavingSupported()
@@ -1617,13 +1932,16 @@ function Wardrobe.GetConceptCustomSetStatus(concept)
     end
     if concept.blizzardCustomSetID then
         local info = GetCustomSetInfo(concept.blizzardCustomSetID)
-        if info then return "synced", "Custom Set: " .. tostring(info.name) end
-        return "missing", "Linked Custom Set missing"
+        if not info then return "missing", "Linked Custom Set missing" end
+        local report = concept.customSetVerification
+        if concept.customSetSyncError and report then
+            return "error", string.format("Custom Set mismatch: %d/%d slots", report.matched or 0, report.expected or 0)
+        end
+        return "synced", "Custom Set: " .. tostring(info.name)
     end
     if concept.customSetSyncError then return "error", "Custom Set save failed" end
     return "local", "Quest Chronicle only"
 end
-
 
 function Wardrobe.SaveConceptToCustomSet(conceptID, mode, targetCustomSetID)
     LoadTransmogSupport()
@@ -1650,7 +1968,18 @@ function Wardrobe.SaveConceptToCustomSet(conceptID, mode, targetCustomSetID)
     local customSetID = tonumber(targetCustomSetID)
     if mode == "auto" then
         customSetID = tonumber(concept.blizzardCustomSetID)
-        mode = customSetID and "update" or "new"
+        if customSetID and GetCustomSetInfo(customSetID) then
+            mode = "update"
+        else
+            local sameName = FindCustomSetByName(name)
+            if sameName then
+                customSetID = sameName.customSetID
+                mode = "replace"
+            else
+                customSetID = nil
+                mode = "new"
+            end
+        end
     elseif mode == "replace" then
         if not customSetID or not GetCustomSetInfo(customSetID) then
             return false, "Choose an existing Custom Set to replace."
@@ -1672,7 +2001,8 @@ function Wardrobe.SaveConceptToCustomSet(conceptID, mode, targetCustomSetID)
         end
     end
 
-    local list, populated = BuildConceptCustomSetList(concept)
+    local list, populated, expectedSlots, resolvedSources, buildError = BuildConceptCustomSetList(concept)
+    if not list then return false, buildError or "Unable to build the Custom Set slot list." end
     if populated == 0 then return false, "This concept has no selected appearances to save." end
     local icon = GetConceptOutfitIcon(concept)
 
@@ -1691,6 +2021,7 @@ function Wardrobe.SaveConceptToCustomSet(conceptID, mode, targetCustomSetID)
             while #concept.customSetReplacementBackups > 5 do table.remove(concept.customSetReplacementBackups, 1) end
         end
     end
+
     local ok, result
     if mode == "new" then
         ok, result = TryCall(C_TransmogCollection.NewCustomSet, name, icon, list)
@@ -1699,7 +2030,7 @@ function Wardrobe.SaveConceptToCustomSet(conceptID, mode, targetCustomSetID)
         ok, result = TryCall(C_TransmogCollection.ModifyCustomSet, customSetID, list)
         if ok and C_TransmogCollection.RenameCustomSet then
             local renameOK, renameError = TryCall(C_TransmogCollection.RenameCustomSet, customSetID, name)
-            if not renameOK then return false, "The appearances were staged, but WoW rejected the Custom Set name: " .. tostring(renameError) end
+            if not renameOK then return false, "The appearances were saved, but WoW rejected the Custom Set name: " .. tostring(renameError) end
         end
     end
     if not ok then return false, "World of Warcraft rejected the Custom Set save: " .. tostring(result) end
@@ -1711,24 +2042,31 @@ function Wardrobe.SaveConceptToCustomSet(conceptID, mode, targetCustomSetID)
         icon = icon,
         mode = mode,
         itemTransmogInfoList = list,
+        expectedSlots = expectedSlots,
+        resolvedSources = resolvedSources,
         startedAt = time(),
     }
     concept.customSetSyncPendingAt = time()
     concept.customSetSyncError = nil
+    concept.customSetVerification = nil
 
-    if TryVerifyPendingCustomSet() then
-        return true, mode == "update" and "Updated linked Custom Set." or "Saved to WoW Custom Sets."
+    local resolved, verified, verificationMessage = TryVerifyPendingCustomSet(false)
+    if resolved then
+        return verified, verificationMessage
     end
 
     if C_Timer and C_Timer.After then
         local request = pendingCustomSetSync
         C_Timer.After(CUSTOM_SET_SYNC_TIMEOUT, function()
-            if pendingCustomSetSync == request and not TryVerifyPendingCustomSet() then
-                FinishCustomSetSync(false, "World of Warcraft did not confirm the Custom Set save. Open the Custom Sets tab and check the result.")
+            if pendingCustomSetSync == request then
+                local finished = TryVerifyPendingCustomSet(true)
+                if not finished and pendingCustomSetSync == request then
+                    FinishCustomSetSync(false, "World of Warcraft did not return the saved Custom Set for verification.", customSetID)
+                end
             end
         end)
     end
-    return true, mode == "update" and "Updating linked Custom Set..." or "Saving to WoW Custom Sets..."
+    return true, mode == "update" and "Updating linked Custom Set and verifying every selected slot..." or "Saving to WoW Custom Sets and verifying every selected slot..."
 end
 
 function Wardrobe.GetSelectedSource(slotKey)
@@ -1810,6 +2148,9 @@ function Wardrobe.ValidateSource(source, slotKey)
     if type(source) ~= "table" then
         return false, "Appearance data is unavailable."
     end
+    if source.sourceIsCollected ~= true then
+        return false, "The visual is unlocked, but this particular preview source is not collected. Rescan the wardrobe to bind a collected source."
+    end
     if not source.isCollected and not source.appearanceIsCollected then
         return false, "This appearance is not collected."
     end
@@ -1817,7 +2158,7 @@ function Wardrobe.ValidateSource(source, slotKey)
         return false, "This character cannot display the appearance."
     end
     if source.isHideVisual then
-        return false, "Hidden-slot visuals are not included in the foundation preview."
+        return false, "Hidden-slot visuals are not included in the appearance browser."
     end
     if not source.itemID then
         return false, "WoW did not provide an item for this appearance."
@@ -1835,7 +2176,7 @@ local function NormalizeSource(source, appearance, slotKey, categoryID)
     end
 
     local itemID = GetSourceItemID(sourceID, source)
-    local sourceIsCollected = IsSourceCollected(sourceID, source, appearance)
+    local sourceIsCollected = IsSourceCollected(sourceID, source)
     local appearanceIsCollected = appearance and appearance.isCollected == true
     local normalized = {
         sourceID = sourceID,
@@ -2389,7 +2730,15 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
             ScheduleAutomaticRefresh(cache.dirtyReason or "COLLECTION_CHANGED")
         end
     elseif event == "TRANSMOG_CUSTOM_SETS_CHANGED" then
-        TryVerifyPendingCustomSet()
+        local request = pendingCustomSetSync
+        local resolved = TryVerifyPendingCustomSet(false)
+        if request and not resolved and C_Timer and C_Timer.After then
+            C_Timer.After(0.20, function()
+                if pendingCustomSetSync == request then
+                    TryVerifyPendingCustomSet(true)
+                end
+            end)
+        end
     elseif event == "TRANSMOG_COLLECTION_UPDATED"
         and internalUsabilityUpdateUntil
         and GetTime

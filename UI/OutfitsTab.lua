@@ -1312,6 +1312,9 @@ function UI.CreateOutfitsTab(parent)
     QC.RegisterCallback("WARDROBE_CUSTOM_SET_SYNCED", pane, function(_, success, message)
         if pane:IsShown() then pane:Refresh(message) end
         if conceptManager:IsShown() then conceptManager:Refresh(message) end
+        if not success and UIErrorsFrame then
+            UIErrorsFrame:AddMessage(message or "Custom Set verification failed.", 1, 0.25, 0.25)
+        end
     end)
     QC.RegisterCallback("WARDROBE_WORKBENCH_CHANGED", pane, function()
         if pane:IsShown() then pane:Refresh() end
@@ -1320,12 +1323,6 @@ function UI.CreateOutfitsTab(parent)
         if pane:IsShown() then
             pane:Refresh()
             if pane.conceptManager and pane.conceptManager:IsShown() then pane.conceptManager:Refresh() end
-        end
-    end)
-    QC.RegisterCallback("WARDROBE_NATIVE_OUTFIT_SYNCED", pane, function(_, success, message)
-        if pane:IsShown() then
-            pane:Refresh(message)
-            if pane.conceptManager and pane.conceptManager:IsShown() then pane.conceptManager:Refresh(message) end
         end
     end)
     QC.RegisterCallback("WARDROBE_ZONE_PREFERENCES_CHANGED", pane, function()

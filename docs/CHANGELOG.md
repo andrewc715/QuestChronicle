@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.2 - 2026-07-31
+
+### Fixed
+
+- Replaces the incorrect compact transmog-category Custom Set layout with actual WoW inventory slot IDs.
+- Builds the complete `ItemTransmogInfo` array through `INVSLOT_LAST_EQUIPPED`.
+- Correctly maps armor, Back, Tabard, Main Hand, and Off Hand destinations.
+- Rebinds each selected visual to a source WoW confirms is actually collected.
+- Encodes hidden Head, Back, Shirt, and Tabard choices with native hidden visuals.
+- Aborts before `NewCustomSet` or `ModifyCustomSet` when any intended slot is unresolved.
+- Repairs an unlinked same-name partial v1.0.1 set instead of creating a duplicate.
+- Verifies every intended inventory slot after saving and accepts only an exact source or the same visual.
+- Stores the resolved-source manifest and slot verification on the authoritative concept.
+
+### Compatibility
+
+- Advances wardrobe cache format from 5 to 6 so source representatives are rebuilt around genuinely collected sources.
+- Preserves SavedVariables schema 2 and Courier format 1.
+- Preserves Chronicle history, concepts, visual identities, locks, hidden slots, and linked Custom Set IDs.
+
 ## 1.0.1 - 2026-07-31
 
 ### Fixed

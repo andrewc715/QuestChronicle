@@ -33,6 +33,7 @@
         "SlashCmdList",
         "SAVE",
         "CANCEL",
-        "ItemUtil"
+        "ItemUtil",
+        "INVSLOT_LAST_EQUIPPED"
     ]
 }
