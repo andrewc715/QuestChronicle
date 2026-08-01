@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.5.1 - 2026-07-31
+
+### Fixed
+
+- Prioritizes equipped-item `itemEquipLoc` over broad transmog category compatibility when detecting weapon topology.
+- Correctly classifies two-handed swords, axes, maces, staves, and polearms as Two-Hand.
+- Keeps category compatibility only as a fallback when item equipment-location data is unavailable.
+- Adds equipment-location diagnostics to the internal topology record.
+
+### Compatibility
+
+- Preserves SavedVariables schema 2, Courier format 1, and wardrobe cache format 6.
+- No collection rescan or concept migration is required.
+
 ## 1.5.0 - 2026-07-31
 
 ### Added

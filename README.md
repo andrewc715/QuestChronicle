@@ -1,8 +1,8 @@
-# Quest Chronicle v1.5.0
+# Quest Chronicle v1.5.1
 
-> **Weapon Generation:** v1.5.0 adds topology-aware One-Hand, Two-Hand, Ranged, and Off-Hand generation checkboxes while preserving the deliberate one-scan-per-login wardrobe policy.
+> **Weapon Topology Fix:** v1.5.1 makes the equipped item's inventory location authoritative, preventing two-handed swords from being mistaken for one-hand weapons while preserving the v1.5.0 weapon-family controls.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.5.0 adds a saved, equipment-aware weapon-family generation system to the complete lifecycle, journal, Courier, Custom Set, and outfit-design toolset.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.5.1 fixes equipped weapon topology detection while preserving the complete lifecycle, journal, Courier, Custom Set, and outfit-design toolset.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

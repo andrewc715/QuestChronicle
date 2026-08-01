@@ -1,37 +1,26 @@
-# Quest Chronicle v1.5.0: Weapon Generation Families
+# Quest Chronicle v1.5.1: Two-Hand Topology Fix
 
-Version 1.5.0 turns weapon selection into a first-class part of the Outfits workbench.
+Version 1.5.1 corrects a live-client weapon-layout classification bug introduced with the v1.5.0 weapon-family controls.
 
-## Added
+## Fixed
 
-- Four independent generation checkboxes:
-  - One-Hand
-  - Two-Hand
-  - Ranged
-  - Off-Hand
-- Equipment-topology detection using the currently equipped main-hand and off-hand items.
-- Live recalculation after `PLAYER_EQUIPMENT_CHANGED`.
-- Dynamic tooltips explaining why each weapon family is available or unavailable.
-- Weapon-family preferences stored with every Quest Chronicle outfit concept.
-- Weapon-family summaries in the Outfit Concepts list.
-- Support for selecting any subset of compatible families when no main-hand weapon is equipped.
+- Equipped weapon topology now treats the item's `itemEquipLoc` as authoritative.
+- `INVTYPE_2HWEAPON` always resolves to **Two-Hand**, even when Blizzard also reports the item as valid for a broad sword, axe, or mace transmog category.
+- `INVTYPE_RANGED`, `INVTYPE_RANGEDRIGHT`, and `INVTYPE_THROWN` resolve to **Ranged**.
+- `INVTYPE_WEAPON`, `INVTYPE_WEAPONMAINHAND`, and `INVTYPE_WEAPONOFFHAND` resolve to **One-Hand**.
+- Shields and held-in-off-hand items resolve to **Off-Hand**.
+- Transmog-category checks remain only as a fallback when WoW cannot provide an equipment location.
+- Added the detected main-hand and off-hand equipment locations to the internal topology diagnostics.
 
-## Weapon topology rules
+## Root cause
 
-- **Two-handed melee, staff, or polearm:** Two-Hand only.
-- **Bow, crossbow, or gun:** Ranged only.
-- **One-hand with an empty off-hand:** One-Hand only.
-- **One-hand with shield or focus:** One-Hand, with Off-Hand independently optional.
-- **Dual wield:** One-Hand generates both hands; the separate Off-Hand pool is unavailable.
-- **No main-hand weapon:** any cached main family may be checked; Off-Hand requires One-Hand.
-
-Unchecked or incompatible families cannot be selected by Generate Outfit or Reroll Unlocked. A locked weapon that conflicts with the checkbox pool produces a clear error instead of silently changing topology.
+`C_TransmogCollection.IsCategoryValidForItem()` answers whether an item belongs to an appearance category. A two-handed sword may therefore be valid for a broad sword category even though its equipped hand layout is unambiguously two-handed. v1.5.0 consulted that category answer before `itemEquipLoc`, causing some two-handed swords to satisfy both One-Hand and Two-Hand and then fall into the One-Hand fallback.
 
 ## Preserved
 
 - SavedVariables schema 2.
 - Courier format 1.
-- Wardrobe cache format 6, so no collection rescan is required solely for this update.
-- Existing concepts migrate with all four weapon families enabled, matching earlier behavior before topology filtering.
-- Custom Set creation, verification, and authoritative Quest Chronicle concept backups.
-- One automatic wardrobe refresh per login or `/reload`; later changes only mark the cache stale.
+- Wardrobe cache format 6; no collection rescan is required.
+- Existing weapon-family preferences and outfit concepts.
+- Custom Set links and verification data.
+- One automatic collection scan per login or `/reload`.

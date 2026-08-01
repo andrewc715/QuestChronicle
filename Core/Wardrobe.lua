@@ -937,14 +937,67 @@ end
 
 local function GetItemEquipLocation(itemInfo)
     if not itemInfo then return nil end
-    local getInfo = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
-    if type(getInfo) ~= "function" then return nil end
-    local _, _, _, equipLoc = SafeCall(getInfo, itemInfo)
-    return equipLoc
+
+    -- GetItemInfoInstant is synchronous and its fourth return value is the
+    -- authoritative itemEquipLoc (for example INVTYPE_2HWEAPON). Prefer it to
+    -- broad transmog categories, because a two-handed sword can still be valid
+    -- for a generic sword appearance category.
+    local getInstant = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
+    if type(getInstant) == "function" then
+        local _, _, _, equipLoc = SafeCall(getInstant, itemInfo)
+        if equipLoc and equipLoc ~= "" then
+            return equipLoc
+        end
+    end
+
+    -- Fall back to the cached item-info API when instant data is unavailable.
+    local getInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
+    if type(getInfo) == "function" then
+        local _, _, _, _, _, _, _, _, equipLoc = SafeCall(getInfo, itemInfo)
+        if equipLoc and equipLoc ~= "" then
+            return equipLoc
+        end
+    end
+
+    return nil
+end
+
+local function EquipLocationSupportsWeaponFamily(equipLoc, familyKey)
+    if not equipLoc or equipLoc == "" then return nil end
+
+    if familyKey == "TWO_HAND" then
+        return equipLoc == "INVTYPE_2HWEAPON"
+    elseif familyKey == "RANGED" then
+        return equipLoc == "INVTYPE_RANGED"
+            or equipLoc == "INVTYPE_RANGEDRIGHT"
+            or equipLoc == "INVTYPE_THROWN"
+    elseif familyKey == "OFF_HAND" then
+        return equipLoc == "INVTYPE_SHIELD"
+            or equipLoc == "INVTYPE_HOLDABLE"
+            or equipLoc == "INVTYPE_WEAPONOFFHAND"
+    elseif familyKey == "ONE_HAND" then
+        return equipLoc == "INVTYPE_WEAPON"
+            or equipLoc == "INVTYPE_WEAPONMAINHAND"
+            or equipLoc == "INVTYPE_WEAPONOFFHAND"
+    end
+
+    return false
 end
 
 local function ItemSupportsWeaponFamily(itemInfo, familyKey)
     if not itemInfo then return false end
+
+    -- The equipped item's inventory location defines its hand topology. Do not
+    -- let IsCategoryValidForItem blur a two-handed sword into the one-hand sword
+    -- collection simply because both are swords.
+    local equipLoc = GetItemEquipLocation(itemInfo)
+    local equipResult = EquipLocationSupportsWeaponFamily(equipLoc, familyKey)
+    if equipResult ~= nil then
+        return equipResult
+    end
+
+    -- Category compatibility is only a last-resort fallback for unusual items
+    -- whose equipment location is not available yet.
     local definition = slotByKey[familyKey]
     if definition and C_TransmogCollection and type(C_TransmogCollection.IsCategoryValidForItem) == "function" then
         for _, categoryID in ipairs(ResolveCategoryIDs(definition)) do
@@ -954,16 +1007,6 @@ local function ItemSupportsWeaponFamily(itemInfo, familyKey)
         end
     end
 
-    local equipLoc = GetItemEquipLocation(itemInfo)
-    if familyKey == "TWO_HAND" then
-        return equipLoc == "INVTYPE_2HWEAPON"
-    elseif familyKey == "RANGED" then
-        return equipLoc == "INVTYPE_RANGED" or equipLoc == "INVTYPE_RANGEDRIGHT" or equipLoc == "INVTYPE_THROWN"
-    elseif familyKey == "OFF_HAND" then
-        return equipLoc == "INVTYPE_SHIELD" or equipLoc == "INVTYPE_HOLDABLE" or equipLoc == "INVTYPE_WEAPONOFFHAND"
-    elseif familyKey == "ONE_HAND" then
-        return equipLoc == "INVTYPE_WEAPON" or equipLoc == "INVTYPE_WEAPONMAINHAND" or equipLoc == "INVTYPE_WEAPONOFFHAND"
-    end
     return false
 end
 
@@ -975,8 +1018,15 @@ function Wardrobe.GetWeaponTopology()
     local mainItem = GetEquippedItemInfo("MAINHANDSLOT")
     local offItem = GetEquippedItemInfo("SECONDARYHANDSLOT")
     local topology = {
-        mainItem = mainItem, offItem = offItem, available = {}, reasons = {},
-        mode = "NONE", label = "No weapon equipped", offHandPolicy = "NONE",
+        mainItem = mainItem,
+        offItem = offItem,
+        mainEquipLoc = GetItemEquipLocation(mainItem),
+        offEquipLoc = GetItemEquipLocation(offItem),
+        available = {},
+        reasons = {},
+        mode = "NONE",
+        label = "No weapon equipped",
+        offHandPolicy = "NONE",
     }
 
     if not mainItem then
