@@ -1,34 +1,40 @@
-# Quest Chronicle v0.9.2: Internal Collection Event Hotfix
+# Quest Chronicle v1.0.0
 
-Version 0.9.2 stops outfit generation from causing an unnecessary automatic wardrobe rescan.
+Quest Chronicle reaches its first stable release with the complete Chronicle recorder, active quest lifecycle, RP journal, Courier export, zone-aware Outfit Workbench, saved concepts, and stable migrations.
 
-## Fixed
+## Concepts now become native WoW outfits
 
-Quest Chronicle refreshes Blizzard's current-character usable-appearance state before choosing weapons. That check is still required so generated weapons obey the equipped weapon and Blizzard's transmog rules. Blizzard also emits the broad `TRANSMOG_COLLECTION_UPDATED` event for that internal refresh, which v0.9.0 interpreted as a real collection mutation.
+Saving a concept can now create an actual World of Warcraft transmog outfit. Quest Chronicle translates its preview into Blizzard's native outfit format:
 
-v0.9.2 marks the brief usability update as internal and ignores only its matching generic notification. As a result:
+- collapsed visual IDs are saved instead of temporary representative source IDs;
+- selected armor is assigned to the matching native slot;
+- unselected armor records the equipped-gear state shown by the preview;
+- hidden helm, cloak, shirt, and tabard states remain hidden;
+- shoulders use Blizzard's primary shoulder slot without accidentally enabling an asymmetric secondary shoulder;
+- one-hand, two-hand, ranged, dagger, shield, holdable, and dual-wield appearances use the appropriate native weapon option;
+- the concept stores the resulting Blizzard outfit ID, so **Save / Update** updates that outfit rather than allocating another slot.
 
-- **Generate Outfit** no longer starts a wardrobe scan;
-- **Reroll Unlocked** no longer starts a wardrobe scan;
-- weapon-slot rerolls no longer start a wardrobe scan;
-- Blizzard-safe equipped-weapon validation is preserved;
-- genuine source-added, source-removed, and cosmetic-added events still queue an automatic refresh;
-- a later external generic collection update still queues an automatic refresh.
+Existing concepts are preserved as **Quest Chronicle only**. Select one and use **Save to WoW** to migrate it deliberately. Quest Chronicle never consumes native outfit slots automatically during login.
 
-The regression harness now simulates both the internal event and a later external event so the guard cannot silence real collection maintenance.
+Native saving is non-destructive: it does not apply the transmog, charge gold, or delete a native outfit when its Quest Chronicle concept is deleted. Blizzard still validates outfit names, collection ownership, character compatibility, combat restrictions, and the account's available outfit slots.
 
-## Also included
+## Complete v1.0 feature set
 
-- The v0.9.1 two-way Favor/Unfavor and Exclude/Allow repair.
-- All v0.9.0 era restriction, collection recovery, performance, zone coverage, settings, and accessibility improvements.
+- Records quest acceptance, activation, objective progress, state changes, abandonment, removal, and turn-in.
+- Maintains the current active-quest snapshot and reconciles it against the quest log.
+- Provides an RP journal with search, timestamps, and Chronicle integration.
+- Publishes the stable Courier format 1 snapshot.
+- Generates zone-, subzone-, era-, provenance-, faction-, enemy-, and recent-quest-aware outfits.
+- Supports Zone Native, Traveler, Class Fantasy, and Chronicle Echo modes.
+- Supports rerolls, locks, hidden layers, valid equipped-weapon handling, generated names, Current Look, concepts, zone favorites, and exclusions.
+- Debounces real wardrobe changes, suppresses internal usability events, and recovers changed representative sources by stable visual ID.
 
 ## Compatibility
 
 - SavedVariables schema 2 is preserved.
 - Courier format 1 is preserved.
 - Wardrobe cache format 5 is preserved.
-- Existing concepts, favorites, exclusions, selections, and locks remain compatible.
-- No collection rescan is required after updating.
-- Preview only: no transmog is applied and no Blizzard outfit slot is changed.
+- Existing Chronicle history, RP notes, active quests, settings, wardrobe data, selections, concepts, favorites, and exclusions remain compatible.
+- No collection rescan is required after updating from v0.9.2.
 
-See `INTERNAL_COLLECTION_EVENT_V092_TEST_CHECKLIST.md` for the live verification pass.
+See `QUEST_CHRONICLE_V100_TEST_CHECKLIST.md` for the live verification pass.

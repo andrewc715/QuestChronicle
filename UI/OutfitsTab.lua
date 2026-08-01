@@ -72,12 +72,14 @@ end
 local function ConceptDetail(concept)
     local updated = concept.updatedAt and UI.FormatShortTimestamp(concept.updatedAt) or "Unknown time"
     local mode = concept.styleMode and ZoneStyle and ZoneStyle.GetModeInfo(concept.styleMode)
+    local _, nativeStatus = Wardrobe.GetConceptNativeOutfitStatus(concept)
     return string.format(
-        "%d appearances • %d locked • %d hidden • %s • %s",
+        "%d appearances • %d locked • %d hidden • %s • %s • %s",
         CountMap(concept.selections),
         CountMap(concept.locks),
         CountMap(concept.hidden),
         mode and mode.label or "Current mode",
+        nativeStatus,
         updated
     )
 end
@@ -409,7 +411,7 @@ function UI.CreateOutfitsTab(parent)
     conceptBlocker:Hide()
 
     local conceptManager = UI.CreateInsetPanel(pane)
-    conceptManager:SetSize(450, 350)
+    conceptManager:SetSize(560, 350)
     conceptManager:SetPoint("CENTER", pane, "CENTER", 0, -4)
     conceptManager:SetFrameLevel(pane:GetFrameLevel() + 41)
     conceptManager:EnableMouse(true)
@@ -436,7 +438,7 @@ function UI.CreateOutfitsTab(parent)
 
     local saveCurrent = UI.CreateButton(conceptManager, "Save / Update", 122, 25)
     saveCurrent:SetPoint("LEFT", conceptName, "RIGHT", 11, 0)
-    UI.SetTooltip(saveCurrent, "Save Current Preview", "Saving an existing concept name overwrites it. Entering a new name creates another concept for this character.")
+    UI.SetTooltip(saveCurrent, "Save Current Preview", "Save the concept in Quest Chronicle, then create or update its linked World of Warcraft transmog outfit. The outfit is saved but not applied, and no gold is spent.")
 
     local managerStatus = conceptManager:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     managerStatus:SetPoint("TOPLEFT", conceptManager, "TOPLEFT", 15, -89)
@@ -505,10 +507,13 @@ function UI.CreateOutfitsTab(parent)
     local nextConcepts = UI.CreateButton(conceptManager, ">", 28, 23)
     nextConcepts:SetPoint("LEFT", conceptPage, "RIGHT", 6, 0)
 
+    local syncSelected = UI.CreateButton(conceptManager, "Save to WoW", 108, 23)
+    syncSelected:SetPoint("BOTTOMRIGHT", conceptManager, "BOTTOMRIGHT", -235, 12)
     local loadSelected = UI.CreateButton(conceptManager, "Load Selected", 110, 23)
-    loadSelected:SetPoint("BOTTOM", conceptManager, "BOTTOM", 36, 12)
+    loadSelected:SetPoint("LEFT", syncSelected, "RIGHT", 7, 0)
     local deleteSelected = UI.CreateButton(conceptManager, "Delete", 96, 23)
     deleteSelected:SetPoint("LEFT", loadSelected, "RIGHT", 7, 0)
+    UI.SetTooltip(syncSelected, "Save to World of Warcraft", "Create a native transmog outfit slot for this concept, or update the linked native outfit. This saves the design but does not apply or purchase the transmog.")
     UI.SetTooltip(loadSelected, "Load Selected Concept", "Restore the selected appearances, locks, hidden slots, and weapon configuration to the preview.")
     UI.SetTooltip(deleteSelected, "Delete Selected Concept", "Requires a second confirmation click. Deleting a concept does not change the current preview.")
 
@@ -544,6 +549,7 @@ function UI.CreateOutfitsTab(parent)
 
         local canSave = next(GetState().selections) ~= nil or next(GetState().locks) ~= nil or next(GetState().hidden) ~= nil
         saveCurrent:SetEnabled(canSave)
+        syncSelected:SetEnabled(self.selectedConceptID ~= nil and Wardrobe.IsNativeOutfitSavingSupported())
         loadSelected:SetEnabled(self.selectedConceptID ~= nil)
         deleteSelected:SetEnabled(self.selectedConceptID ~= nil)
         deleteSelected:SetText(self.pendingDeleteID == self.selectedConceptID and "Confirm Delete" or "Delete")
@@ -613,6 +619,14 @@ function UI.CreateOutfitsTab(parent)
             conceptManager.page = 1
             conceptName:SetText(concept.name or "")
             conceptName:ClearFocus()
+        end
+        conceptManager:Refresh(message)
+    end)
+    syncSelected:SetScript("OnClick", function()
+        if not conceptManager.selectedConceptID then return end
+        local ok, message = Wardrobe.SaveConceptToBlizzard(conceptManager.selectedConceptID)
+        if not ok and UIErrorsFrame then
+            UIErrorsFrame:AddMessage(message or "Unable to save the native outfit.", 1, 0.25, 0.25)
         end
         conceptManager:Refresh(message)
     end)
@@ -990,6 +1004,14 @@ function UI.CreateOutfitsTab(parent)
 
     function pane:SaveConcept(name)
         local ok, message, concept = Wardrobe.SaveConcept(name)
+        if ok and concept then
+            local nativeOK, nativeMessage = Wardrobe.SaveConceptToBlizzard(concept.id)
+            if nativeOK then
+                local nativeState = Wardrobe.GetConceptNativeOutfitStatus(concept)
+                nativeMessage = nativeState == "synced" and "Saved to a World of Warcraft outfit slot." or nativeMessage
+            end
+            message = message .. " " .. tostring(nativeMessage or "")
+        end
         self:Refresh(message)
         if not ok and UIErrorsFrame then
             UIErrorsFrame:AddMessage(message or "Unable to save outfit concept.", 1, 0.25, 0.25)
@@ -1173,7 +1195,16 @@ function UI.CreateOutfitsTab(parent)
         if pane:IsShown() then pane:Refresh() end
     end)
     QC.RegisterCallback("WARDROBE_CONCEPTS_CHANGED", pane, function()
-        if pane:IsShown() then pane:Refresh() end
+        if pane:IsShown() then
+            pane:Refresh()
+            if pane.conceptManager and pane.conceptManager:IsShown() then pane.conceptManager:Refresh() end
+        end
+    end)
+    QC.RegisterCallback("WARDROBE_NATIVE_OUTFIT_SYNCED", pane, function(_, success, message)
+        if pane:IsShown() then
+            pane:Refresh(message)
+            if pane.conceptManager and pane.conceptManager:IsShown() then pane.conceptManager:Refresh(message) end
+        end
     end)
     QC.RegisterCallback("WARDROBE_ZONE_PREFERENCES_CHANGED", pane, function()
         if pane:IsShown() then pane:Refresh() end

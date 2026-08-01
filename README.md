@@ -1,8 +1,8 @@
-# Quest Chronicle v0.9.2
+# Quest Chronicle v1.0.0
 
-> **Internal Collection Event Hotfix:** v0.9.2 stops Generate Outfit and rerolls from starting an unnecessary wardrobe rescan while preserving Blizzard-safe weapon validation and genuine collection-change refreshes.
+> **Quest Chronicle:** v1.0.0 completes the recorder, RP journal, Courier snapshot, and zone-aware Outfit Workbench—and can now save a Quest Chronicle concept into an actual World of Warcraft transmog outfit slot.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.9.2 includes the complete Era and Collection Polish release plus the zone-preference and internal-refresh hotfixes, without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.0.0 is the stable first release, combining the complete quest lifecycle, journal, Courier, and outfit-design systems without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -135,7 +135,9 @@ Bare `/qc` toggles the main window. `/qc help` displays command help.
 ## Compatibility
 
 - Existing v0.1 through v0.4.0 SavedVariables and historical records are retained.
-- Existing v0.6.x through v0.8.x wardrobe caches, outfit selections, locks, hidden slots, style modes, generated names, zone preferences, and saved concepts are retained.
+- Existing v0.6.x through v0.9.x wardrobe caches, outfit selections, locks, hidden slots, style modes, generated names, zone preferences, and saved concepts are retained.
+- Existing concepts begin as **Quest Chronicle only** and can be migrated individually with **Save to WoW**; no native outfit slots are consumed automatically during login.
+- A linked concept remembers its Blizzard outfit ID so later saves update the same native slot instead of creating duplicates.
 - Addon schema remains version 2 because the recorded data model is unchanged.
 - Courier export `formatVersion` remains 1.
 - Warcraft Quest Chronicle Courier v1.0.0 remains compatible.
@@ -170,6 +172,7 @@ QuestChronicle\
 ├── ERA_COLLECTION_POLISH_V090_TEST_CHECKLIST.md
 ├── ZONE_PREFERENCE_TOGGLE_V091_TEST_CHECKLIST.md
 ├── INTERNAL_COLLECTION_EVENT_V092_TEST_CHECKLIST.md
+├── QUEST_CHRONICLE_V100_TEST_CHECKLIST.md
 ├── WARDROBE_SCANNER_RECOVERY_TEST_CHECKLIST.md
 └── COURIER_CONFIG_PATCH.json
 ```
@@ -242,6 +245,8 @@ Selected Current Look layers use the same detailed tooltip as the appearance bro
 
 The Outfits tab can scan the account wardrobe for appearances collected and displayable by the current character. It caches compatible sources by equipment slot and lets the player manually assemble a non-destructive preview on an embedded character model. Collection events are debounced into one automatic refresh, which waits for combat and Blizzard's Wardrobe windows to clear. Each scan records its duration.
 
-Selections and concepts now retain each collapsed visual ID beside Blizzard's representative source ID. If a later scan chooses a different compatible source for the same visual, Quest Chronicle rebinds the preview and saved concept instead of treating the appearance as missing. Legacy selections and concepts gain this identity additively from the existing cache.
+Selections and concepts retain each collapsed visual ID beside Blizzard's representative source ID. If a later scan chooses a different compatible source for the same visual, Quest Chronicle rebinds the preview and saved concept instead of treating the appearance as missing. Legacy selections and concepts gain this identity additively from the existing cache.
 
-The preview does not apply transmogrification, spend gold, or alter Blizzard outfit slots. Use **Scan Collection** after installation; automatic collection refresh is enabled by default afterward, while **Rescan Collection** remains available at any time.
+Saving or updating a concept also offers a native **Save to WoW** path. It converts the preview into Blizzard's collapsed visual IDs, hidden/equipped slot states, and currently valid weapon option, then creates or updates the linked native transmog outfit. Saving never applies the transmog or spends gold. Deleting a Quest Chronicle concept does not delete its native WoW outfit.
+
+Existing pre-v1 concepts remain local until explicitly migrated. Use **Scan Collection** after a fresh installation; automatic collection refresh is enabled by default afterward, while **Rescan Collection** remains available at any time.
