@@ -1231,24 +1231,30 @@ local function GetLinkedWeaponSlotContext(outfitSlot)
     return context
 end
 
-local function GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)
-    if outfitSlot == nil or not C_TransmogOutfitInfo then return {}, nil, GetLinkedWeaponSlotContext(outfitSlot) end
+local MAIN_ROUTE_FAMILIES = { "ONE_HAND", "TWO_HAND", "RANGED" }
+local MAIN_ROUTE_FAMILY_SET = { ONE_HAND = true, TWO_HAND = true, RANGED = true }
 
-    -- Blizzard treats linked weapon hands as one option channel. The primary
-    -- slot owns the weapon-option dropdown, while the selected option is also
-    -- used to resolve the secondary slot's appearance. Asking the secondary
-    -- slot for an independent option list can omit Fury's one-hand option.
-    local slotContext = GetLinkedWeaponSlotContext(outfitSlot)
-    local optionOwnerSlot = slotContext.optionOwnerSlot or outfitSlot
+local weaponRouteCache
+local weaponRouteCacheKey
+local weaponRouteCacheExpiresAt = 0
+
+function Wardrobe.InvalidateWeaponAppearanceRoutes()
+    weaponRouteCache = nil
+    weaponRouteCacheKey = nil
+    weaponRouteCacheExpiresAt = 0
+end
+
+local function GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)
+    if outfitSlot == nil or not C_TransmogOutfitInfo then return {}, nil end
 
     local candidates = {}
     local seen = {}
     local equippedOption
     if type(C_TransmogOutfitInfo.GetEquippedSlotOptionFromTransmogSlot) == "function" then
-        equippedOption = SafeCall(C_TransmogOutfitInfo.GetEquippedSlotOptionFromTransmogSlot, optionOwnerSlot)
+        equippedOption = SafeCall(C_TransmogOutfitInfo.GetEquippedSlotOptionFromTransmogSlot, outfitSlot)
     end
 
-    local function AddOption(optionInfo, isArtifact)
+    local function AddOption(optionInfo, sourceKind)
         if not optionInfo or optionInfo.enabled == false or optionInfo.weaponOption == nil then return end
         local key = tostring(optionInfo.weaponOption)
         if seen[key] then return end
@@ -1257,140 +1263,359 @@ local function GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)
             weaponOption = optionInfo.weaponOption,
             name = optionInfo.name,
             enabled = optionInfo.enabled ~= false,
-            isArtifact = isArtifact == true,
+            sourceKind = sourceKind,
+            isArtifact = sourceKind == "ARTIFACT",
             isEquipped = equippedOption ~= nil and optionInfo.weaponOption == equippedOption,
         })
     end
 
     local weaponOptions, artifactOptions
     if type(C_TransmogOutfitInfo.GetWeaponOptionsForSlot) == "function" then
-        weaponOptions, artifactOptions = SafeCall(C_TransmogOutfitInfo.GetWeaponOptionsForSlot, optionOwnerSlot)
+        weaponOptions, artifactOptions = SafeCall(C_TransmogOutfitInfo.GetWeaponOptionsForSlot, outfitSlot)
     end
 
-    -- Blizzard exposes every enabled editing option for the hand. The equipped
-    -- option is only the preferred default in the native UI; it is not the full
-    -- permission set. Put it first for stable ordinary-item behavior, then test
-    -- every other enabled standard and artifact option.
+    -- Match Blizzard's preferred-option behavior without throwing away the
+    -- provenance of the remaining options. The equipped option is first, then
+    -- every other enabled standard and artifact route remains independent.
     for _, optionInfo in ipairs(weaponOptions or {}) do
-        if equippedOption ~= nil and optionInfo.weaponOption == equippedOption then
-            AddOption(optionInfo, false)
-        end
+        if equippedOption ~= nil and optionInfo.weaponOption == equippedOption then AddOption(optionInfo, "STANDARD") end
     end
     for _, optionInfo in ipairs(artifactOptions or {}) do
-        if equippedOption ~= nil and optionInfo.weaponOption == equippedOption then
-            AddOption(optionInfo, true)
-        end
+        if equippedOption ~= nil and optionInfo.weaponOption == equippedOption then AddOption(optionInfo, "ARTIFACT") end
     end
-    for _, optionInfo in ipairs(weaponOptions or {}) do AddOption(optionInfo, false) end
-    for _, optionInfo in ipairs(artifactOptions or {}) do AddOption(optionInfo, true) end
+    for _, optionInfo in ipairs(weaponOptions or {}) do AddOption(optionInfo, "STANDARD") end
+    for _, optionInfo in ipairs(artifactOptions or {}) do AddOption(optionInfo, "ARTIFACT") end
 
-    -- During early transmog initialization the option lists can briefly be
-    -- unavailable. Preserve the equipped-option fallback used by prior builds.
+    -- During early initialization Blizzard may briefly omit the option list but
+    -- still expose the equipped option. Preserve that single route. Do not
+    -- invent a catch-all None option: unknown native data must fail closed.
     if #candidates == 0 and equippedOption ~= nil then
         table.insert(candidates, {
             weaponOption = equippedOption,
             name = "Equipped weapon option",
             enabled = true,
+            sourceKind = "EQUIPPED_FALLBACK",
             isArtifact = false,
             isEquipped = true,
         })
     end
 
-    if #candidates == 0 then
-        table.insert(candidates, {
-            weaponOption = Enum and Enum.TransmogOutfitSlotOption and Enum.TransmogOutfitSlotOption.None or 0,
-            name = "Default weapon option",
-            enabled = true,
-            isArtifact = false,
-            isEquipped = true,
-        })
-    end
-
-    return candidates, equippedOption, slotContext
+    return candidates, equippedOption
 end
 
-local function GetBlizzardWeaponCategoryPermission(slotName, categoryID)
-    if not categoryID or not C_TransmogOutfitInfo
+local function QueryWeaponOptionSubtypes(outfitSlot, optionInfo)
+    local result = {
+        slot = outfitSlot,
+        weaponOption = optionInfo and optionInfo.weaponOption or nil,
+        optionName = optionInfo and optionInfo.name or nil,
+        subtypes = {},
+        families = {},
+    }
+    if outfitSlot == nil or not optionInfo or optionInfo.weaponOption == nil
+        or not C_TransmogOutfitInfo
         or type(C_TransmogOutfitInfo.GetCollectionInfoForSlotAndOption) ~= "function"
     then
-        return nil, nil
+        return result
     end
 
-    local outfitSlot = GetTransmogOutfitSlotForInventorySlotName(slotName)
-    if outfitSlot == nil then return nil, nil end
-
-    local options, equippedOption, slotContext = GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)
-    local checked = {}
-    for _, optionInfo in ipairs(options) do
-        -- Blizzard's linked secondary weapon is edited through the primary
-        -- slot's weapon-option channel. The secondary slot is used when reading
-        -- or applying its chosen appearance, but collection-category permission
-        -- belongs to the linked primary slot.
-        local permissionSlot = slotContext and slotContext.isSecondary
-            and slotContext.primarySlot or outfitSlot
-        local collectionInfo = SafeCall(
+    for _, subtypeKey in ipairs(Wardrobe.WEAPON_SUBTYPE_ORDER) do
+        local definition = Wardrobe.weaponSubtypeDefinitions[subtypeKey]
+        local categoryID = ResolveWeaponSubtypeCategoryID(definition)
+        local collectionInfo = categoryID and SafeCall(
             C_TransmogOutfitInfo.GetCollectionInfoForSlotAndOption,
-            permissionSlot,
+            outfitSlot,
             optionInfo.weaponOption,
             categoryID
-        )
-        table.insert(checked, {
-            weaponOption = optionInfo.weaponOption,
-            name = optionInfo.name,
-            enabled = optionInfo.enabled,
-            isArtifact = optionInfo.isArtifact,
-            isEquipped = optionInfo.isEquipped,
-            allowed = collectionInfo ~= nil and collectionInfo.isWeapon == true,
-        })
-        if collectionInfo ~= nil and collectionInfo.isWeapon == true then
-            return true, {
-                outfitSlot = outfitSlot,
-                permissionSlot = permissionSlot,
-                weaponOption = optionInfo.weaponOption,
-                weaponOptionName = optionInfo.name,
-                equippedWeaponOption = equippedOption,
+        ) or nil
+        if collectionInfo and collectionInfo.isWeapon == true then
+            result.subtypes[subtypeKey] = {
+                key = subtypeKey,
+                familyKey = definition.familyKey,
+                categoryID = categoryID,
                 collectionName = collectionInfo.name,
-                method = slotContext and slotContext.isLinked and "LINKED_OUTFIT_SLOT_OPTION_MATRIX" or "OUTFIT_SLOT_OPTION_MATRIX",
-                optionOwnerSlot = slotContext and slotContext.optionOwnerSlot or outfitSlot,
-                linkedPrimarySlot = slotContext and slotContext.primarySlot or nil,
-                linkedSecondarySlot = slotContext and slotContext.secondarySlot or nil,
-                linkedSecondary = slotContext and slotContext.isSecondary == true or false,
-                optionsChecked = checked,
+            }
+            result.families[definition.familyKey] = (result.families[definition.familyKey] or 0) + 1
+        end
+    end
+    return result
+end
+
+local function CopySubtypePermissionMap(source, familyKey, inherited)
+    local result = {}
+    for subtypeKey, permission in pairs(source or {}) do
+        local definition = Wardrobe.weaponSubtypeDefinitions[subtypeKey]
+        if definition and (not familyKey or definition.familyKey == familyKey) then
+            result[subtypeKey] = {
+                key = subtypeKey,
+                familyKey = definition.familyKey,
+                categoryID = permission.categoryID,
+                collectionName = permission.collectionName,
+                inheritedFromPrimary = inherited == true,
             }
         end
     end
+    return result
+end
 
-    return false, {
-        outfitSlot = outfitSlot,
-        permissionSlot = slotContext and slotContext.isSecondary and slotContext.primarySlot or outfitSlot,
-        equippedWeaponOption = equippedOption,
-        method = slotContext and slotContext.isLinked and "LINKED_OUTFIT_SLOT_OPTION_MATRIX" or "OUTFIT_SLOT_OPTION_MATRIX",
-        optionOwnerSlot = slotContext and slotContext.optionOwnerSlot or outfitSlot,
-        linkedPrimarySlot = slotContext and slotContext.primarySlot or nil,
-        linkedSecondarySlot = slotContext and slotContext.secondarySlot or nil,
-        linkedSecondary = slotContext and slotContext.isSecondary == true or false,
-        optionsChecked = checked,
+local function CountMapEntries(values)
+    local count = 0
+    for _ in pairs(values or {}) do count = count + 1 end
+    return count
+end
+
+local function ClassifyMainWeaponRoute(optionResult)
+    local families = {}
+    for _, familyKey in ipairs(MAIN_ROUTE_FAMILIES) do
+        if (optionResult.families[familyKey] or 0) > 0 then table.insert(families, familyKey) end
+    end
+    if #families == 1 then
+        return families[1]
+    elseif #families == 0 then
+        return nil, "The option exposes no main-weapon appearance family."
+    end
+    return nil, "The option exposes multiple main-weapon families and was rejected to preserve route provenance."
+end
+
+local function MakeWeaponRouteID(ownerSlot, optionInfo, familyKey, suffix)
+    return table.concat({
+        tostring(ownerSlot or "?"),
+        tostring(optionInfo and optionInfo.weaponOption or "?"),
+        tostring(familyKey or "UNKNOWN"),
+        tostring(suffix or "MAIN"),
+    }, ":")
+end
+
+local function GetWeaponRouteCacheKey(topology, mainOutfitSlot, offOutfitSlot)
+    local specID
+    if GetSpecialization and GetSpecializationInfo then
+        local specIndex = SafeCall(GetSpecialization)
+        if specIndex then specID = SafeCall(GetSpecializationInfo, specIndex) end
+    end
+    return table.concat({
+        tostring(topology.mainItem or "NONE"),
+        tostring(topology.offItem or "NONE"),
+        tostring(topology.mainEquipLoc or "NONE"),
+        tostring(topology.offEquipLoc or "NONE"),
+        tostring(mainOutfitSlot or "NONE"),
+        tostring(offOutfitSlot or "NONE"),
+        tostring(specID or "NONE"),
+    }, "|")
+end
+
+local function RouteHasCachedSubtype(route, targetKey)
+    local permissions = targetKey == "SECONDARY" and route.secondarySubtypes or route.primarySubtypes
+    for subtypeKey in pairs(permissions or {}) do
+        if CountCachedWeaponSubtype(subtypeKey) > 0 then return true end
+    end
+    return false
+end
+
+function Wardrobe.GetWeaponAppearanceRoutes(forceRefresh)
+    local topology = Wardrobe.GetWeaponTopology()
+    local mainOutfitSlot = GetTransmogOutfitSlotForInventorySlotName("MAINHANDSLOT")
+    local offOutfitSlot = GetTransmogOutfitSlotForInventorySlotName("SECONDARYHANDSLOT")
+    local cacheKey = GetWeaponRouteCacheKey(topology, mainOutfitSlot, offOutfitSlot)
+    local now = GetTime and GetTime() or 0
+    if not forceRefresh and weaponRouteCache and weaponRouteCacheKey == cacheKey and now < weaponRouteCacheExpiresAt then
+        return weaponRouteCache
+    end
+
+    local model = {
+        topology = topology,
+        mainOutfitSlot = mainOutfitSlot,
+        offOutfitSlot = offOutfitSlot,
+        routes = {},
+        routesByFamily = { ONE_HAND = {}, TWO_HAND = {}, RANGED = {}, OFF_HAND = {} },
+        companionRoutes = {},
+        unsupportedOptions = {},
+        linkedPair = false,
+        linkedContext = nil,
+    }
+
+    local linkedContext = GetLinkedWeaponSlotContext(mainOutfitSlot)
+    local linkedPair = topology.hasWeaponOffHand
+        and linkedContext
+        and linkedContext.isLinked == true
+        and linkedContext.secondarySlot ~= nil
+        and offOutfitSlot == linkedContext.secondarySlot
+    model.linkedPair = linkedPair
+    model.linkedContext = linkedContext
+
+    local optionOwnerSlot = linkedPair and linkedContext.primarySlot or mainOutfitSlot
+    local options = GetWeaponOptionCandidatesForOutfitSlot(optionOwnerSlot)
+    for _, optionInfo in ipairs(options or {}) do
+        local primaryResult = QueryWeaponOptionSubtypes(mainOutfitSlot or optionOwnerSlot, optionInfo)
+        local familyKey, classificationError = ClassifyMainWeaponRoute(primaryResult)
+        if familyKey then
+            local route = {
+                id = MakeWeaponRouteID(optionOwnerSlot, optionInfo, familyKey, linkedPair and "PAIR" or "SINGLE"),
+                familyKey = familyKey,
+                routeKind = linkedPair and (familyKey .. "_PAIR") or (familyKey .. "_SINGLE"),
+                optionOwnerSlot = optionOwnerSlot,
+                primarySlot = mainOutfitSlot or optionOwnerSlot,
+                secondarySlot = linkedPair and offOutfitSlot or nil,
+                weaponOption = optionInfo.weaponOption,
+                weaponOptionName = optionInfo.name,
+                optionSourceKind = optionInfo.sourceKind,
+                isArtifact = optionInfo.isArtifact == true,
+                isEquippedOption = optionInfo.isEquipped == true,
+                primarySubtypes = CopySubtypePermissionMap(primaryResult.subtypes, familyKey, false),
+                secondarySubtypes = {},
+                targetsSecondary = false,
+                permissionMethod = "PROVENANCE_ROUTE",
+            }
+
+            if linkedPair then
+                local secondaryResult = QueryWeaponOptionSubtypes(offOutfitSlot, optionInfo)
+                route.secondarySubtypes = CopySubtypePermissionMap(secondaryResult.subtypes, familyKey, false)
+                -- Blizzard's own character preview lets the primary slot handle
+                -- a linked secondary appearance with the primary weapon option.
+                -- Some clients therefore return no independent category rows for
+                -- the secondary slot. Inherit only the already-classified route
+                -- family, never categories from another option or family.
+                if CountMapEntries(route.secondarySubtypes) == 0 then
+                    route.secondarySubtypes = CopySubtypePermissionMap(route.primarySubtypes, familyKey, true)
+                    route.secondaryPermissionInherited = true
+                end
+                route.targetsSecondary = CountMapEntries(route.secondarySubtypes) > 0
+            end
+
+            route.available = RouteHasCachedSubtype(route, "PRIMARY")
+                and (not linkedPair or (route.targetsSecondary and RouteHasCachedSubtype(route, "SECONDARY")))
+            table.insert(model.routes, route)
+            table.insert(model.routesByFamily[familyKey], route)
+        else
+            table.insert(model.unsupportedOptions, {
+                optionOwnerSlot = optionOwnerSlot,
+                weaponOption = optionInfo.weaponOption,
+                weaponOptionName = optionInfo.name,
+                sourceKind = optionInfo.sourceKind,
+                reason = classificationError,
+                families = primaryResult.families,
+            })
+        end
+    end
+
+    -- Shields and holdables are a separate companion route. Never derive this
+    -- family from a linked secondary weapon hand.
+    if topology.offHandKind == "OFF_HAND" and offOutfitSlot ~= nil then
+        local offOptions = GetWeaponOptionCandidatesForOutfitSlot(offOutfitSlot)
+        for _, optionInfo in ipairs(offOptions or {}) do
+            local result = QueryWeaponOptionSubtypes(offOutfitSlot, optionInfo)
+            local subtypes = CopySubtypePermissionMap(result.subtypes, "OFF_HAND", false)
+            if CountMapEntries(subtypes) > 0 then
+                local route = {
+                    id = MakeWeaponRouteID(offOutfitSlot, optionInfo, "OFF_HAND", "COMPANION"),
+                    familyKey = "OFF_HAND",
+                    routeKind = "OFF_HAND_COMPANION",
+                    optionOwnerSlot = offOutfitSlot,
+                    primarySlot = nil,
+                    secondarySlot = offOutfitSlot,
+                    weaponOption = optionInfo.weaponOption,
+                    weaponOptionName = optionInfo.name,
+                    optionSourceKind = optionInfo.sourceKind,
+                    isArtifact = optionInfo.isArtifact == true,
+                    isEquippedOption = optionInfo.isEquipped == true,
+                    primarySubtypes = {},
+                    secondarySubtypes = subtypes,
+                    targetsSecondary = true,
+                    permissionMethod = "INDEPENDENT_COMPANION_ROUTE",
+                }
+                route.available = RouteHasCachedSubtype(route, "SECONDARY")
+                table.insert(model.routes, route)
+                table.insert(model.routesByFamily.OFF_HAND, route)
+                table.insert(model.companionRoutes, route)
+            end
+        end
+    end
+
+    -- Compatibility fallback for old clients without outfit weapon options.
+    -- It mirrors the physical topology and remains deliberately conservative.
+    if #model.routes == 0 and topology.mainItem then
+        local physicalFamily = topology.mainHandKind
+        if MAIN_ROUTE_FAMILY_SET[physicalFamily] then
+            local primarySubtypes = {}
+            for _, subtypeKey in ipairs(GetWeaponSubtypeKeysForFamily(physicalFamily)) do
+                local definition = Wardrobe.weaponSubtypeDefinitions[subtypeKey]
+                local categoryID = ResolveWeaponSubtypeCategoryID(definition)
+                if SafeCall(C_TransmogCollection and C_TransmogCollection.IsCategoryValidForItem, categoryID, topology.mainItem) == true then
+                    primarySubtypes[subtypeKey] = { key = subtypeKey, familyKey = physicalFamily, categoryID = categoryID }
+                end
+            end
+            if CountMapEntries(primarySubtypes) > 0 then
+                local route = {
+                    id = "FALLBACK:" .. physicalFamily,
+                    familyKey = physicalFamily,
+                    routeKind = physicalFamily .. "_FALLBACK",
+                    optionOwnerSlot = mainOutfitSlot,
+                    primarySlot = mainOutfitSlot,
+                    secondarySlot = nil,
+                    weaponOption = nil,
+                    weaponOptionName = "Legacy item-category fallback",
+                    primarySubtypes = primarySubtypes,
+                    secondarySubtypes = {},
+                    targetsSecondary = false,
+                    permissionMethod = "ITEM_CATEGORY_FALLBACK_ROUTE",
+                    available = true,
+                }
+                table.insert(model.routes, route)
+                table.insert(model.routesByFamily[physicalFamily], route)
+            end
+        end
+    end
+
+    weaponRouteCache = model
+    weaponRouteCacheKey = cacheKey
+    weaponRouteCacheExpiresAt = now + 0.20
+    return model
+end
+
+local function FindRouteCategoryPermission(route, targetKey, categoryID)
+    if not route or not categoryID then return false, nil end
+    local subtypeKey = GetWeaponSubtypeKeyForCategoryID(categoryID)
+    if not subtypeKey then return false, nil end
+    local permissions = targetKey == "SECONDARY" and route.secondarySubtypes or route.primarySubtypes
+    local permission = permissions and permissions[subtypeKey]
+    if not permission then return false, nil end
+    return true, {
+        method = route.permissionMethod,
+        routeID = route.id,
+        routeKind = route.routeKind,
+        routeFamily = route.familyKey,
+        weaponOption = route.weaponOption,
+        weaponOptionName = route.weaponOptionName,
+        optionOwnerSlot = route.optionOwnerSlot,
+        outfitSlot = targetKey == "SECONDARY" and route.secondarySlot or route.primarySlot,
+        permissionSlot = targetKey == "SECONDARY" and route.secondarySlot or route.primarySlot,
+        linkedPrimarySlot = route.primarySlot,
+        linkedSecondarySlot = route.secondarySlot,
+        linkedSecondary = targetKey == "SECONDARY" and route.targetsSecondary == true,
+        inheritedFromPrimary = permission.inheritedFromPrimary == true,
     }
 end
 
-local function IsWeaponCategoryPermitted(slotName, categoryID, itemInfo)
-    local nativeAllowed, details = GetBlizzardWeaponCategoryPermission(slotName, categoryID)
-    if nativeAllowed ~= nil then
-        return nativeAllowed, details
+local function IsWeaponCategoryPermitted(slotName, categoryID, itemInfo, requiredRoute)
+    local targetKey = slotName == "SECONDARYHANDSLOT" and "SECONDARY" or "PRIMARY"
+    if requiredRoute then
+        return FindRouteCategoryPermission(requiredRoute, targetKey, categoryID)
     end
 
-    -- Compatibility fallback for clients that do not expose the Midnight
-    -- outfit-slot API. This older check does not understand every specialization
-    -- exception, so it is intentionally secondary.
-    if itemInfo and C_TransmogCollection and type(C_TransmogCollection.IsCategoryValidForItem) == "function" then
-        local allowed = SafeCall(C_TransmogCollection.IsCategoryValidForItem, categoryID, itemInfo) == true
-        return allowed, { method = "ITEM_CATEGORY_FALLBACK" }
+    local subtypeKey = GetWeaponSubtypeKeyForCategoryID(categoryID)
+    local subtype = subtypeKey and Wardrobe.weaponSubtypeDefinitions[subtypeKey]
+    if not subtype then return false, { method = "UNKNOWN_CATEGORY" } end
+    local model = Wardrobe.GetWeaponAppearanceRoutes()
+    for _, route in ipairs(model.routesByFamily[subtype.familyKey] or {}) do
+        local allowed, details = FindRouteCategoryPermission(route, targetKey, categoryID)
+        if allowed then return true, details end
     end
-
-    return nil, { method = "UNAVAILABLE" }
+    return false, {
+        method = "NO_PROVENANCE_ROUTE",
+        routeFamily = subtype.familyKey,
+        target = targetKey,
+    }
 end
 
-local function BuildWeaponHandCapability(handKey, itemInfo, slotName, allowWithoutItem)
+local function CreateEmptyWeaponHandCapability(handKey, itemInfo, slotName)
     local capability = {
         handKey = handKey,
         itemInfo = itemInfo,
@@ -1399,95 +1624,93 @@ local function BuildWeaponHandCapability(handKey, itemInfo, slotName, allowWitho
         subtypes = {},
         families = {},
     }
+    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+        capability.families[familyKey] = { available = false, count = 0, routes = {} }
+    end
     for _, subtypeKey in ipairs(Wardrobe.WEAPON_SUBTYPE_ORDER) do
-        local subtype = Wardrobe.weaponSubtypeDefinitions[subtypeKey]
-        local categoryID = ResolveWeaponSubtypeCategoryID(subtype)
-        local count = CountCachedWeaponSubtype(subtypeKey)
-        local blizzardAllowed = false
-        local permissionDetails
-        if itemInfo then
-            local permitted
-            permitted, permissionDetails = IsWeaponCategoryPermitted(slotName, categoryID, itemInfo)
-            blizzardAllowed = permitted == true
-        elseif allowWithoutItem then
-            blizzardAllowed = true
-            permissionDetails = { method = "UNARMED_PREVIEW" }
-        end
-        local available = blizzardAllowed and count > 0
+        local definition = Wardrobe.weaponSubtypeDefinitions[subtypeKey]
         capability.subtypes[subtypeKey] = {
             key = subtypeKey,
-            familyKey = subtype.familyKey,
-            label = subtype.label,
-            shortLabel = subtype.shortLabel,
-            categoryID = categoryID,
-            count = count,
-            blizzardAllowed = blizzardAllowed,
-            available = available,
-            permissionMethod = permissionDetails and permissionDetails.method or nil,
-            outfitSlot = permissionDetails and permissionDetails.outfitSlot or nil,
-            permissionSlot = permissionDetails and permissionDetails.permissionSlot or nil,
-            weaponOption = permissionDetails and permissionDetails.weaponOption or nil,
-            weaponOptionName = permissionDetails and permissionDetails.weaponOptionName or nil,
-            equippedWeaponOption = permissionDetails and permissionDetails.equippedWeaponOption or nil,
-            optionOwnerSlot = permissionDetails and permissionDetails.optionOwnerSlot or nil,
-            linkedPrimarySlot = permissionDetails and permissionDetails.linkedPrimarySlot or nil,
-            linkedSecondarySlot = permissionDetails and permissionDetails.linkedSecondarySlot or nil,
-            linkedSecondary = permissionDetails and permissionDetails.linkedSecondary == true or false,
-            optionsChecked = permissionDetails and permissionDetails.optionsChecked or nil,
-            reason = available and (permissionDetails and (permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX" or permissionDetails.method == "LINKED_OUTFIT_SLOT_OPTION_MATRIX")
-                    and (permissionDetails.weaponOptionName
-                        and (permissionDetails.method == "LINKED_OUTFIT_SLOT_OPTION_MATRIX" and permissionDetails.linkedSecondary
-                            and ("Blizzard permits this appearance in the linked secondary hand through the primary hand's " .. tostring(permissionDetails.weaponOptionName) .. " option.")
-                            or ("Blizzard permits this appearance through the " .. tostring(permissionDetails.weaponOptionName) .. " option for this hand."))
-                        or "Blizzard permits this appearance through an enabled weapon option for this hand.")
-                    or "Blizzard permits this appearance category for the equipped hand.")
-                or (count == 0 and "No collected previewable appearances are cached for this type."
-                or (itemInfo and permissionDetails and (permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX" or permissionDetails.method == "LINKED_OUTFIT_SLOT_OPTION_MATRIX")
-                    and ("Blizzard rejected this appearance across " .. tostring(#(permissionDetails.optionsChecked or {})) .. " enabled weapon option(s) for this hand.")
-                or (itemInfo and "Blizzard does not permit this appearance category for the equipped hand."
-                or "No equipped item is available for Blizzard compatibility validation."))),
+            familyKey = definition.familyKey,
+            label = definition.label,
+            shortLabel = definition.shortLabel,
+            categoryID = ResolveWeaponSubtypeCategoryID(definition),
+            count = CountCachedWeaponSubtype(subtypeKey),
+            blizzardAllowed = false,
+            available = false,
+            routes = {},
+            reason = "No Blizzard weapon appearance route permits this type for the hand.",
         }
-        capability.families[subtype.familyKey] = capability.families[subtype.familyKey] or { available = false, count = 0 }
-        capability.families[subtype.familyKey].count = capability.families[subtype.familyKey].count + (available and count or 0)
-        capability.families[subtype.familyKey].available = capability.families[subtype.familyKey].available or available
     end
     return capability
 end
 
-function Wardrobe.GetWeaponRuleDiagnostics()
-    local topology = Wardrobe.GetWeaponTopology()
-    local mainInventorySlotID = SafeCall(GetInventorySlotInfo, "MAINHANDSLOT")
-    local offInventorySlotID = SafeCall(GetInventorySlotInfo, "SECONDARYHANDSLOT")
-    local mainOutfitSlot = GetTransmogOutfitSlotForInventorySlotName("MAINHANDSLOT")
-    local offOutfitSlot = GetTransmogOutfitSlotForInventorySlotName("SECONDARYHANDSLOT")
-    local mainLinked = GetLinkedWeaponSlotContext(mainOutfitSlot)
-    local offLinked = GetLinkedWeaponSlotContext(offOutfitSlot)
-    local capabilities = Wardrobe.GetWeaponAppearanceCapabilities()
-    local state = EnsurePreviewState()
+local function AddRouteToHandCapability(capability, route, targetKey)
+    local permissions = targetKey == "SECONDARY" and route.secondarySubtypes or route.primarySubtypes
+    for subtypeKey, permission in pairs(permissions or {}) do
+        local subtype = capability.subtypes[subtypeKey]
+        if subtype then
+            subtype.blizzardAllowed = true
+            subtype.available = subtype.count > 0
+            subtype.routeID = subtype.routeID or route.id
+            subtype.routeKind = subtype.routeKind or route.routeKind
+            subtype.weaponOption = subtype.weaponOption or route.weaponOption
+            subtype.weaponOptionName = subtype.weaponOptionName or route.weaponOptionName
+            subtype.optionOwnerSlot = subtype.optionOwnerSlot or route.optionOwnerSlot
+            subtype.outfitSlot = subtype.outfitSlot or (targetKey == "SECONDARY" and route.secondarySlot or route.primarySlot)
+            subtype.permissionSlot = subtype.outfitSlot
+            subtype.permissionMethod = route.permissionMethod
+            subtype.inheritedFromPrimary = permission.inheritedFromPrimary == true
+            table.insert(subtype.routes, route)
+            subtype.reason = subtype.available
+                and (permission.inheritedFromPrimary
+                    and ("Blizzard permits this through the linked primary route " .. tostring(route.weaponOptionName or route.id) .. ".")
+                    or ("Blizzard permits this through the " .. tostring(route.weaponOptionName or route.routeKind) .. " route."))
+                or "The route is valid, but no collected previewable appearances are cached for this type."
 
-    local function SelectedSubtypeSummary(hand)
-        local values = {}
-        for _, subtypeKey in ipairs(Wardrobe.WEAPON_SUBTYPE_ORDER) do
-            local capability = hand and hand.subtypes and hand.subtypes[subtypeKey]
-            if capability and capability.available then
-                table.insert(values, subtypeKey .. "@" .. tostring(capability.permissionSlot or capability.outfitSlot or "?"))
+            local family = capability.families[subtype.familyKey]
+            if family then
+                family.available = family.available or subtype.available
+                if subtype.available then family.count = family.count + subtype.count end
+                table.insert(family.routes, route)
             end
         end
-        return #values > 0 and table.concat(values, ", ") or "none"
     end
+end
 
+function Wardrobe.GetWeaponRuleDiagnostics()
+    local routeModel = Wardrobe.GetWeaponAppearanceRoutes(true)
+    local topology = routeModel.topology
+    local state = EnsurePreviewState()
+    local routeLines = {}
+    for _, route in ipairs(routeModel.routes) do
+        table.insert(routeLines, string.format(
+            "%s [%s] option=%s primary=%d secondary=%d available=%s",
+            tostring(route.id),
+            tostring(route.routeKind),
+            tostring(route.weaponOptionName or route.weaponOption),
+            CountMapEntries(route.primarySubtypes),
+            CountMapEntries(route.secondarySubtypes),
+            tostring(route.available == true)
+        ))
+    end
+    for _, unsupported in ipairs(routeModel.unsupportedOptions) do
+        table.insert(routeLines, string.format(
+            "UNSUPPORTED option=%s reason=%s",
+            tostring(unsupported.weaponOptionName or unsupported.weaponOption),
+            tostring(unsupported.reason)
+        ))
+    end
     return {
         topology = topology.label,
-        mainInventorySlotID = mainInventorySlotID,
-        offInventorySlotID = offInventorySlotID,
-        mainInventoryEnum = mainInventorySlotID and (mainInventorySlotID - 1) or nil,
-        offInventoryEnum = offInventorySlotID and (offInventorySlotID - 1) or nil,
-        mainOutfitSlot = mainOutfitSlot,
-        offOutfitSlot = offOutfitSlot,
-        mainOptionOwner = mainLinked and mainLinked.optionOwnerSlot or nil,
-        offOptionOwner = offLinked and offLinked.optionOwnerSlot or nil,
-        mainAvailable = SelectedSubtypeSummary(capabilities.main),
-        offAvailable = SelectedSubtypeSummary(capabilities.off),
+        mainInventorySlotID = SafeCall(GetInventorySlotInfo, "MAINHANDSLOT"),
+        offInventorySlotID = SafeCall(GetInventorySlotInfo, "SECONDARYHANDSLOT"),
+        mainOutfitSlot = routeModel.mainOutfitSlot,
+        offOutfitSlot = routeModel.offOutfitSlot,
+        linkedPair = routeModel.linkedPair,
+        routeLines = routeLines,
+        lastRouteID = state.lastWeaponRoute and state.lastWeaponRoute.routeID or nil,
+        lastRouteKind = state.lastWeaponRoute and state.lastWeaponRoute.routeKind or nil,
         mainSelection = state.selections and (state.selections.ONE_HAND or state.selections.TWO_HAND or state.selections.RANGED) or nil,
         offSelection = state.selections and state.selections.OFF_HAND or nil,
         linked = state.linkWeaponHands ~= false,
@@ -1497,41 +1720,58 @@ end
 function Wardrobe.PrintWeaponRuleDiagnostics()
     local d = Wardrobe.GetWeaponRuleDiagnostics()
     local printLine = QC.Print or print
-    printLine("Weapon rule diagnostics:")
+    printLine("Weapon appearance route diagnostics:")
     printLine(string.format("Topology: %s", tostring(d.topology)))
-    printLine(string.format("Inventory slots: MH %s -> enum %s | OH %s -> enum %s", tostring(d.mainInventorySlotID), tostring(d.mainInventoryEnum), tostring(d.offInventorySlotID), tostring(d.offInventoryEnum)))
-    printLine(string.format("Outfit slots: MH %s (owner %s) | OH %s (owner %s)", tostring(d.mainOutfitSlot), tostring(d.mainOptionOwner), tostring(d.offOutfitSlot), tostring(d.offOptionOwner)))
-    printLine(string.format("Available MH: %s", tostring(d.mainAvailable)))
-    printLine(string.format("Available OH: %s", tostring(d.offAvailable)))
+    printLine(string.format("Inventory slots: MH %s | OH %s", tostring(d.mainInventorySlotID), tostring(d.offInventorySlotID)))
+    printLine(string.format("Outfit slots: MH %s | OH %s | linked pair %s", tostring(d.mainOutfitSlot), tostring(d.offOutfitSlot), tostring(d.linkedPair)))
+    for _, line in ipairs(d.routeLines or {}) do printLine(line) end
+    printLine(string.format("Last route: %s [%s]", tostring(d.lastRouteID), tostring(d.lastRouteKind)))
     printLine(string.format("Selections: MH %s | OH %s | linked %s", tostring(d.mainSelection), tostring(d.offSelection), tostring(d.linked)))
     return d
 end
 
 function Wardrobe.GetWeaponAppearanceCapabilities()
-    local topology = Wardrobe.GetWeaponTopology()
-    local unarmed = topology.mode == "UNARMED"
-    local main = BuildWeaponHandCapability("MAIN", topology.mainItem, "MAINHANDSLOT", unarmed)
-    local off = BuildWeaponHandCapability("OFF", topology.offItem, "SECONDARYHANDSLOT", unarmed)
+    local routeModel = Wardrobe.GetWeaponAppearanceRoutes()
+    local topology = routeModel.topology
+    local main = CreateEmptyWeaponHandCapability("MAIN", topology.mainItem, "MAINHANDSLOT")
+    local off = CreateEmptyWeaponHandCapability("OFF", topology.offItem, "SECONDARYHANDSLOT")
+
+    for _, route in ipairs(routeModel.routes) do
+        if route.familyKey == "OFF_HAND" then
+            AddRouteToHandCapability(off, route, "SECONDARY")
+        else
+            AddRouteToHandCapability(main, route, "PRIMARY")
+            if route.targetsSecondary then AddRouteToHandCapability(off, route, "SECONDARY") end
+        end
+    end
+
     local capabilities = {
         topology = topology,
         main = main,
         off = off,
+        routes = routeModel,
+        routesByFamily = routeModel.routesByFamily,
+        companionRoutes = routeModel.companionRoutes,
         availableFamilies = {},
         reasons = {},
     }
-    for _, familyKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+    for _, familyKey in ipairs(MAIN_ROUTE_FAMILIES) do
         local available = main.families[familyKey] and main.families[familyKey].available == true
         capabilities.availableFamilies[familyKey] = available
         capabilities.reasons[familyKey] = available
-            and "Blizzard permits at least one selected appearance type in this family for the equipped main hand."
-            or "No collected appearance type in this family is permitted for the equipped main hand."
+            and ("A complete Blizzard " .. Wardrobe.weaponFamilyDefinitions[familyKey].label .. " route is available for this layout.")
+            or ("No complete Blizzard " .. Wardrobe.weaponFamilyDefinitions[familyKey].label .. " route is available for this layout.")
     end
-    local offAvailable = off.families.OFF_HAND and off.families.OFF_HAND.available == true
+
+    local offAvailable = #routeModel.companionRoutes > 0 and off.families.OFF_HAND.available == true
     capabilities.availableFamilies.OFF_HAND = offAvailable
-    capabilities.reasons.OFF_HAND = offAvailable
-        and "Blizzard permits a shield or holdable appearance for the equipped off hand."
-        or (topology.hasWeaponOffHand and "The equipped off hand is a weapon; use One-Hand or Two-Hand appearance families instead."
-        or "No collected shield or holdable appearance is permitted for the equipped off hand.")
+    if routeModel.linkedPair then
+        capabilities.reasons.OFF_HAND = "The secondary slot is part of a linked weapon pair. Shields and holdables require an independent companion slot."
+    else
+        capabilities.reasons.OFF_HAND = offAvailable
+            and "Blizzard exposes an independent shield or holdable companion route."
+            or "No independent shield or holdable companion route is available."
+    end
     return capabilities
 end
 
@@ -1858,7 +2098,12 @@ local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, cont
     local permitted = true
     local permissionDetails
     if equippedItem then
-        permitted, permissionDetails = IsWeaponCategoryPermitted(definition and definition.slotName, source.categoryID, equippedItem)
+        permitted, permissionDetails = IsWeaponCategoryPermitted(
+            definition and definition.slotName,
+            source.categoryID,
+            equippedItem,
+            context and context.activeRoute or nil
+        )
         if permitted == nil then
             return Finish(false, "WoW's slot weapon-option compatibility check is unavailable.")
         end
@@ -1874,8 +2119,11 @@ local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, cont
     -- is the authoritative answer. The older appearance usability flags can
     -- remain false even while the native Transmog UI permits the category.
     local appearance = GetGenerationAppearance(source, definition, context)
-    local nativeSlotRule = permissionDetails and (permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX"
-        or permissionDetails.method == "LINKED_OUTFIT_SLOT_OPTION_MATRIX")
+    local nativeSlotRule = permissionDetails and (
+        permissionDetails.method == "PROVENANCE_ROUTE"
+        or permissionDetails.method == "INDEPENDENT_COMPANION_ROUTE"
+        or permissionDetails.method == "ITEM_CATEGORY_FALLBACK_ROUTE"
+    )
 
     if appearance and appearance.isCollected == false then
         return Finish(false, "WoW no longer reports this weapon visual as collected.")
@@ -1925,11 +2173,10 @@ local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, cont
         end
     end
 
-    return Finish(true, permissionDetails and (permissionDetails.method == "OUTFIT_SLOT_OPTION_MATRIX"
-        or permissionDetails.method == "LINKED_OUTFIT_SLOT_OPTION_MATRIX")
-        and (permissionDetails.method == "LINKED_OUTFIT_SLOT_OPTION_MATRIX"
-            and "Compatible with Blizzard's linked primary weapon option"
-            or "Compatible with Blizzard's enabled slot and weapon option")
+    return Finish(true, nativeSlotRule
+        and (permissionDetails.linkedSecondary
+            and "Compatible with the selected linked weapon appearance route"
+            or "Compatible with the selected Blizzard weapon appearance route")
         or "Compatible with the equipped item")
 end
 
@@ -2069,6 +2316,24 @@ local function ChooseLinkedWeaponSource(primarySource, equippedItem, context, ex
     return nil, nil, "No valid second-hand appearance matched the linked visual or weapon type."
 end
 
+local BuildRouteHandCapability
+
+local function FindPrimaryRoutesForSource(source, capabilities, requireSameSubtype)
+    local routes = {}
+    if not source then return routes end
+    local subtypeKey = GetWeaponSubtypeKeyForCategoryID(source.categoryID)
+    local definition = subtypeKey and Wardrobe.weaponSubtypeDefinitions[subtypeKey]
+    if not definition then return routes end
+    for _, route in ipairs(capabilities.routesByFamily[definition.familyKey] or {}) do
+        local secondaryCompatible = route.targetsSecondary
+            and (requireSameSubtype ~= true or route.secondarySubtypes[subtypeKey] ~= nil)
+        if route.primarySubtypes[subtypeKey] and secondaryCompatible then
+            table.insert(routes, route)
+        end
+    end
+    return routes, subtypeKey
+end
+
 local function SynchronizeLinkedOffHand(state, primarySource, styleMode, styleContext, excludedSourceID)
     if state.linkWeaponHands == false or not primarySource then return nil, nil end
     local styleEngine = QC.ZoneStyle
@@ -2081,19 +2346,46 @@ local function SynchronizeLinkedOffHand(state, primarySource, styleMode, styleCo
     local topology = context.topology
     if not topology.offItem or topology.offHandKind == "OFF_HAND" then return nil, nil end
 
+    local routes = FindPrimaryRoutesForSource(primarySource, context.capabilities, true)
+    if #routes == 0 then
+        SetSelectedSource(state, "OFF_HAND", nil)
+        return nil, "The selected main-hand appearance has no complete linked weapon route."
+    end
+    Shuffle(routes)
     local excluded = excludedSourceID and { OFF_HAND = excludedSourceID } or nil
-    local source, linkKind, notice = ChooseLinkedWeaponSource(
-        primarySource,
-        context.offItem,
-        context,
-        excluded,
-        "OFF_HAND",
-        styleMode,
-        styleContext,
-        context.capabilities.off
-    )
-    SetSelectedSource(state, "OFF_HAND", source)
-    return linkKind, notice
+    for _, route in ipairs(routes) do
+        context.activeRoute = route
+        local routeCapability = BuildRouteHandCapability(route, "SECONDARY", context.capabilities.off)
+        local source, linkKind, notice = ChooseLinkedWeaponSource(
+            primarySource,
+            context.offItem,
+            context,
+            excluded,
+            "OFF_HAND",
+            styleMode,
+            styleContext,
+            routeCapability
+        )
+        if source then
+            SetSelectedSource(state, "OFF_HAND", source)
+            state.lastWeaponRoute = {
+                routeID = route.id,
+                routeKind = route.routeKind,
+                familyKey = route.familyKey,
+                weaponOption = route.weaponOption,
+                weaponOptionName = route.weaponOptionName,
+                mainSubtype = GetWeaponSubtypeKeyForCategoryID(primarySource.categoryID),
+                mainSourceID = primarySource.sourceID,
+                offSourceID = source.sourceID,
+                linked = true,
+                committedAt = time and time() or 0,
+            }
+            return linkKind, notice
+        end
+    end
+
+    SetSelectedSource(state, "OFF_HAND", nil)
+    return nil, "No complete linked weapon route could populate the secondary hand."
 end
 
 local function GetLockedWeaponMode(state)
@@ -2106,10 +2398,128 @@ local function GetLockedWeaponMode(state)
             lockedMode = slotKey
         end
     end
-    -- A locked off-hand no longer dictates the main-hand appearance family.
-    -- Fury and other Blizzard exceptions may permit two-handed or one-handed
-    -- visuals independently in each occupied weapon hand.
     return lockedMode
+end
+
+BuildRouteHandCapability = function(route, targetKey, baseCapability)
+    local result = {
+        handKey = targetKey,
+        itemInfo = baseCapability and baseCapability.itemInfo or nil,
+        slotName = targetKey == "SECONDARY" and "SECONDARYHANDSLOT" or "MAINHANDSLOT",
+        physicalSubtype = baseCapability and baseCapability.physicalSubtype or nil,
+        subtypes = {},
+        families = {},
+    }
+    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+        result.families[familyKey] = { available = false, count = 0 }
+    end
+    local permissions = targetKey == "SECONDARY" and route.secondarySubtypes or route.primarySubtypes
+    for _, subtypeKey in ipairs(Wardrobe.WEAPON_SUBTYPE_ORDER) do
+        local base = baseCapability and baseCapability.subtypes and baseCapability.subtypes[subtypeKey]
+        local permission = permissions and permissions[subtypeKey]
+        local definition = Wardrobe.weaponSubtypeDefinitions[subtypeKey]
+        local available = permission ~= nil and base and base.count > 0
+        result.subtypes[subtypeKey] = {
+            key = subtypeKey,
+            familyKey = definition.familyKey,
+            label = definition.label,
+            shortLabel = definition.shortLabel,
+            categoryID = ResolveWeaponSubtypeCategoryID(definition),
+            count = base and base.count or CountCachedWeaponSubtype(subtypeKey),
+            blizzardAllowed = permission ~= nil,
+            available = available == true,
+            routeID = route.id,
+            routeKind = route.routeKind,
+            weaponOption = route.weaponOption,
+            weaponOptionName = route.weaponOptionName,
+            reason = permission and ("Available through " .. tostring(route.weaponOptionName or route.routeKind))
+                or "This type is outside the selected weapon route.",
+        }
+        if available then
+            local family = result.families[definition.familyKey]
+            family.available = true
+            family.count = family.count + result.subtypes[subtypeKey].count
+        end
+    end
+    return result
+end
+
+local function RouteHasEnabledSubtype(state, route, targetKey, requiredSubtype)
+    local permissions = targetKey == "SECONDARY" and route.secondarySubtypes or route.primarySubtypes
+    if requiredSubtype then
+        return permissions and permissions[requiredSubtype] ~= nil and state.weaponSubtypes[requiredSubtype] == true
+    end
+    for subtypeKey in pairs(permissions or {}) do
+        if state.weaponSubtypes[subtypeKey] == true and CountCachedWeaponSubtype(subtypeKey) > 0 then return true end
+    end
+    return false
+end
+
+local function GetEnabledMainRoutes(state, capabilities, lockedMode, lockedSubtype)
+    local routes = {}
+    for _, route in ipairs(capabilities.routes.routes or {}) do
+        if route.familyKey ~= "OFF_HAND"
+            and route.available == true
+            and state.weaponFamilies[route.familyKey] == true
+            and (not lockedMode or route.familyKey == lockedMode)
+            and RouteHasEnabledSubtype(state, route, "PRIMARY", lockedSubtype)
+        then
+            local secondaryOK = true
+            if route.targetsSecondary then
+                if state.linkWeaponHands and lockedSubtype then
+                    secondaryOK = RouteHasEnabledSubtype(state, route, "SECONDARY", lockedSubtype)
+                elseif state.linkWeaponHands then
+                    secondaryOK = false
+                    for subtypeKey in pairs(route.primarySubtypes or {}) do
+                        if state.weaponSubtypes[subtypeKey] == true
+                            and route.secondarySubtypes[subtypeKey]
+                            and CountCachedWeaponSubtype(subtypeKey) > 0
+                        then
+                            secondaryOK = true
+                            break
+                        end
+                    end
+                else
+                    secondaryOK = RouteHasEnabledSubtype(state, route, "SECONDARY")
+                end
+            end
+            if secondaryOK then table.insert(routes, route) end
+        end
+    end
+    return routes
+end
+
+local function GetEnabledCompanionRoutes(state, capabilities)
+    local routes = {}
+    if state.weaponFamilies.OFF_HAND ~= true then return routes end
+    for _, route in ipairs(capabilities.companionRoutes or {}) do
+        if route.available and RouteHasEnabledSubtype(state, route, "SECONDARY") then table.insert(routes, route) end
+    end
+    return routes
+end
+
+local function ChooseRoute(routes)
+    if not routes or #routes == 0 then return nil end
+    local choices = {}
+    for _, route in ipairs(routes) do table.insert(choices, route) end
+    Shuffle(choices)
+    return choices[1]
+end
+
+local function ValidateLockedSourceForRoute(source, route, targetKey, equippedItem, context)
+    if not source then return false, "The locked weapon source is missing from the cache." end
+    local subtypeKey = GetWeaponSubtypeKeyForCategoryID(source.categoryID)
+    local permissions = targetKey == "SECONDARY" and route.secondarySubtypes or route.primarySubtypes
+    if not subtypeKey or not permissions[subtypeKey] then
+        return false, "The locked weapon type is outside the selected Blizzard appearance route."
+    end
+    if not EnsurePreviewState().weaponSubtypes[subtypeKey] then
+        return false, "The locked weapon type is excluded by the current subtype filters."
+    end
+    context.activeRoute = route
+    local slotKey = targetKey == "SECONDARY" and "OFF_HAND" or route.familyKey
+    local valid, reason = ValidateGeneratedWeaponSource(source, slotKey, equippedItem, context)
+    return valid, reason, subtypeKey
 end
 
 local function GenerateWeapons(state, reroll, styleMode, styleContext)
@@ -2119,130 +2529,184 @@ local function GenerateWeapons(state, reroll, styleMode, styleContext)
     local context = CreateWeaponGenerationContext()
     local capabilities = NormalizeWeaponFamilyChoices(state, context.capabilities)
     local topology = capabilities.topology
-    local enabledMain = {}
-    for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
-        if capabilities.availableFamilies[familyKey] and state.weaponFamilies[familyKey] then
-            local hasSubtype = false
-            for _, subtypeKey in ipairs(GetWeaponSubtypeKeysForFamily(familyKey)) do
-                local subtype = capabilities.main.subtypes[subtypeKey]
-                if subtype and subtype.available and state.weaponSubtypes[subtypeKey] then hasSubtype = true break end
-            end
-            if hasSubtype then table.insert(enabledMain, familyKey) end
-        end
-    end
-    if #enabledMain == 0 then
-        return false, "Select at least one Blizzard-compatible main weapon type before generating."
-    end
-
-    if lockedMode and not state.weaponFamilies[lockedMode] then
-        return false, string.format("The locked %s appearance is excluded by the weapon-family checkboxes. Enable it or unlock the slot.", slotByKey[lockedMode].label)
-    end
 
     local lockedMainSource, lockedSubtype
-    if lockedMode and state.locks[lockedMode] and state.selections[lockedMode] then
+    if lockedMode and state.selections[lockedMode] then
         lockedMainSource = GetSourceByID(lockedMode, state.selections[lockedMode])
         lockedSubtype = lockedMainSource and GetWeaponSubtypeKeyForCategoryID(lockedMainSource.categoryID)
-        if not lockedSubtype or not state.weaponSubtypes[lockedSubtype] then
-            return false, "The locked weapon appearance type is excluded by the current type filters."
-        end
-        local capability = capabilities.main.subtypes[lockedSubtype]
-        if not capability or not capability.available then
-            return false, "The locked weapon appearance type is not permitted for the equipped main hand."
-        end
-        local valid, reason = ValidateGeneratedWeaponSource(lockedMainSource, lockedMode, context.mainItem, context)
-        if not valid then
-            return false, string.format("The locked %s appearance is not valid for the equipped main-hand item: %s", slotByKey[lockedMode].label, reason or "incompatible")
-        end
+        if not lockedSubtype then return false, "The locked main-hand appearance has no recognized weapon subtype." end
     end
 
-    local mode = lockedMode
-    local selectedMain = lockedMainSource
-    local mainSubtype = lockedSubtype
-    if not selectedMain then
-        local excluded = {}
-        if reroll then
-            for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do excluded[familyKey] = state.selections[familyKey] end
-        end
-        selectedMain, mode, mainSubtype = ChooseGeneratedWeaponSource(enabledMain, context.mainItem, context, excluded, nil, styleMode, styleContext, capabilities.main)
-        if selectedMain then SetSelectedSource(state, mode, selectedMain) end
+    local candidateRoutes = GetEnabledMainRoutes(state, capabilities, lockedMode, lockedSubtype)
+    if #candidateRoutes == 0 then
+        return false, "No complete Blizzard weapon appearance route matches the selected families and subtypes."
     end
 
-    for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
-        if familyKey ~= mode and not state.locks[familyKey] then SetSelectedSource(state, familyKey, nil) end
-    end
-    if not selectedMain then
-        if not state.locks.OFF_HAND then SetSelectedSource(state, "OFF_HAND", nil) end
-        return true, 0, "No cached weapon visual matched the selected Blizzard-compatible types; armor was generated and equipped weapons were left unchanged."
-    end
+    -- A locked source may be valid in more than one artifact route. Shuffle the
+    -- route candidates, then accept the first route that validates the complete
+    -- main/secondary bundle. Nothing is committed until the bundle is complete.
+    Shuffle(candidateRoutes)
+    local selectedRoute, selectedMain, selectedOff, mainFamily, mainSubtype, notice
+    local lastFailure
 
-    if QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then QC.ZoneStyle.AddSourceToGenerationContext(styleContext, selectedMain) end
+    for _, route in ipairs(candidateRoutes) do
+        context.activeRoute = route
+        local routeMainCapability = BuildRouteHandCapability(route, "PRIMARY", capabilities.main)
+        local mainSource = lockedMainSource
+        local chosenFamily = lockedMode or route.familyKey
+        local chosenSubtype = lockedSubtype
 
-    local selectedWeapons = 1
-    local notice
-    local generateOffHand = topology.offItem ~= nil
-    if generateOffHand then
-        if state.locks.OFF_HAND and state.selections.OFF_HAND then
-            local lockedOff = GetSourceByID("OFF_HAND", state.selections.OFF_HAND)
-            local offSubtype = lockedOff and GetWeaponSubtypeKeyForCategoryID(lockedOff.categoryID)
-            local capability = offSubtype and capabilities.off.subtypes[offSubtype]
-            if not capability or not capability.available or not state.weaponSubtypes[offSubtype] then
-                return false, "The locked off-hand appearance conflicts with the current Blizzard weapon rules or type filters."
+        if mainSource then
+            local valid, reason = ValidateLockedSourceForRoute(mainSource, route, "PRIMARY", context.mainItem, context)
+            if not valid then
+                lastFailure = reason
+                mainSource = nil
             end
-            local valid, reason = ValidateGeneratedWeaponSource(lockedOff, "OFF_HAND", context.offItem, context)
-            if not valid then return false, "The locked off-hand appearance is not valid: " .. tostring(reason or "incompatible") end
-            selectedWeapons = selectedWeapons + 1
         else
-            local offFamilies = {}
-            if topology.offHandKind == "OFF_HAND" then
-                if state.weaponFamilies.OFF_HAND and capabilities.availableFamilies.OFF_HAND then table.insert(offFamilies, "OFF_HAND") end
-            else
-                if state.linkWeaponHands and mode and capabilities.off.families[mode] and capabilities.off.families[mode].available then
-                    table.insert(offFamilies, mode)
-                else
-                    for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
-                        if state.weaponFamilies[familyKey] and capabilities.off.families[familyKey] and capabilities.off.families[familyKey].available then
-                            table.insert(offFamilies, familyKey)
-                        end
-                    end
-                end
-            end
-            if #offFamilies > 0 then
-                local excluded = reroll and { OFF_HAND = state.selections.OFF_HAND } or nil
-                local offHand
-                if state.linkWeaponHands and topology.offHandKind ~= "OFF_HAND" then
-                    local linkKind, linkNotice
-                    offHand, linkKind, linkNotice = ChooseLinkedWeaponSource(
-                        selectedMain,
+            local excluded = reroll and { [route.familyKey] = state.selections[route.familyKey] } or nil
+            mainSource, chosenFamily, chosenSubtype = ChooseGeneratedWeaponSource(
+                { route.familyKey },
+                context.mainItem,
+                context,
+                excluded,
+                nil,
+                styleMode,
+                styleContext,
+                routeMainCapability
+            )
+            if not mainSource then lastFailure = "No collected appearance matched the route's primary-hand types." end
+        end
+
+        if mainSource then
+            local offSource
+            local routeNotice
+            local routeValid = true
+
+            if route.targetsSecondary then
+                local routeOffCapability = BuildRouteHandCapability(route, "SECONDARY", capabilities.off)
+                if state.locks.OFF_HAND and state.selections.OFF_HAND then
+                    offSource = GetSourceByID("OFF_HAND", state.selections.OFF_HAND)
+                    local valid, reason = ValidateLockedSourceForRoute(offSource, route, "SECONDARY", context.offItem, context)
+                    if not valid then routeValid = false lastFailure = reason end
+                elseif state.linkWeaponHands then
+                    offSource, _, routeNotice = ChooseLinkedWeaponSource(
+                        mainSource,
                         context.offItem,
                         context,
-                        excluded,
+                        reroll and { OFF_HAND = state.selections.OFF_HAND } or nil,
                         "OFF_HAND",
                         styleMode,
                         styleContext,
-                        capabilities.off
+                        routeOffCapability
                     )
-                    notice = linkNotice
+                    if not offSource then
+                        routeValid = false
+                        lastFailure = routeNotice or "The linked route could not produce a compatible secondary appearance."
+                    end
                 else
-                    offHand = ChooseGeneratedWeaponSource(offFamilies, context.offItem, context, excluded, "OFF_HAND", styleMode, styleContext, capabilities.off)
+                    offSource = ChooseGeneratedWeaponSource(
+                        { route.familyKey },
+                        context.offItem,
+                        context,
+                        reroll and { OFF_HAND = state.selections.OFF_HAND } or nil,
+                        "OFF_HAND",
+                        styleMode,
+                        styleContext,
+                        routeOffCapability
+                    )
+                    if not offSource then
+                        routeValid = false
+                        lastFailure = "The route could not produce a compatible secondary-hand appearance."
+                    end
                 end
-                SetSelectedSource(state, "OFF_HAND", offHand)
-                if offHand then
-                    if QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then QC.ZoneStyle.AddSourceToGenerationContext(styleContext, offHand) end
-                    selectedWeapons = selectedWeapons + 1
-                else
-                    notice = notice or (state.linkWeaponHands
-                        and "Linked hands remained strict, so Quest Chronicle left the second hand on its equipped appearance rather than choose an unrelated weapon type."
-                        or "No valid appearance matched the equipped off-hand and selected type filters.")
+            elseif topology.offHandKind == "OFF_HAND" then
+                local companionRoutes = GetEnabledCompanionRoutes(state, capabilities)
+                if state.locks.OFF_HAND and state.selections.OFF_HAND then
+                    offSource = GetSourceByID("OFF_HAND", state.selections.OFF_HAND)
+                    local companionValid = false
+                    for _, companionRoute in ipairs(companionRoutes) do
+                        context.activeRoute = companionRoute
+                        local valid = ValidateLockedSourceForRoute(offSource, companionRoute, "SECONDARY", context.offItem, context)
+                        if valid then companionValid = true break end
+                    end
+                    if not companionValid then
+                        routeValid = false
+                        lastFailure = "The locked shield or focus does not match an enabled companion route."
+                    end
+                elseif #companionRoutes > 0 then
+                    local companionRoute = ChooseRoute(companionRoutes)
+                    context.activeRoute = companionRoute
+                    local companionCapability = BuildRouteHandCapability(companionRoute, "SECONDARY", capabilities.off)
+                    offSource = ChooseGeneratedWeaponSource(
+                        { "OFF_HAND" },
+                        context.offItem,
+                        context,
+                        reroll and { OFF_HAND = state.selections.OFF_HAND } or nil,
+                        "OFF_HAND",
+                        styleMode,
+                        styleContext,
+                        companionCapability
+                    )
+                    if not offSource then
+                        routeValid = false
+                        lastFailure = "The enabled shield/focus companion route had no valid collected appearance."
+                    end
                 end
-            elseif not state.locks.OFF_HAND then
-                SetSelectedSource(state, "OFF_HAND", nil)
+            elseif state.locks.OFF_HAND and state.selections.OFF_HAND then
+                routeValid = false
+                lastFailure = "The locked off-hand appearance does not belong to the selected weapon route."
+            end
+
+            if routeValid then
+                selectedRoute = route
+                selectedMain = mainSource
+                selectedOff = offSource
+                mainFamily = chosenFamily or route.familyKey
+                mainSubtype = chosenSubtype or GetWeaponSubtypeKeyForCategoryID(mainSource.categoryID)
+                notice = routeNotice
+                break
             end
         end
+    end
+
+    if not selectedRoute or not selectedMain then
+        return false, lastFailure or "No complete weapon route could be generated."
+    end
+
+    -- Atomic commit: clear stale families and write the complete route bundle in
+    -- one step only after every required hand has validated.
+    for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
+        if familyKey == mainFamily then
+            SetSelectedSource(state, familyKey, selectedMain)
+        elseif not state.locks[familyKey] then
+            SetSelectedSource(state, familyKey, nil)
+        end
+    end
+    if selectedOff then
+        SetSelectedSource(state, "OFF_HAND", selectedOff)
     elseif not state.locks.OFF_HAND then
         SetSelectedSource(state, "OFF_HAND", nil)
     end
 
-    return true, selectedWeapons, notice
+    state.lastWeaponRoute = {
+        routeID = selectedRoute.id,
+        routeKind = selectedRoute.routeKind,
+        familyKey = selectedRoute.familyKey,
+        weaponOption = selectedRoute.weaponOption,
+        weaponOptionName = selectedRoute.weaponOptionName,
+        mainSubtype = mainSubtype,
+        mainSourceID = selectedMain.sourceID,
+        offSourceID = selectedOff and selectedOff.sourceID or nil,
+        linked = state.linkWeaponHands ~= false,
+        committedAt = time and time() or 0,
+    }
+
+    if QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then
+        QC.ZoneStyle.AddSourceToGenerationContext(styleContext, selectedMain)
+        if selectedOff then QC.ZoneStyle.AddSourceToGenerationContext(styleContext, selectedOff) end
+    end
+
+    return true, selectedOff and 2 or 1, notice
 end
 
 function Wardrobe.GenerateOutfit(reroll, requestedStyleMode)
@@ -2342,17 +2806,40 @@ function Wardrobe.RerollSlot(slotKey)
             if context.topology.offHandKind == "OFF_HAND" then
                 if not state.weaponFamilies.OFF_HAND then return false, "Enable Off-Hand generation before rerolling this slot." end
                 sourceFamilies = { "OFF_HAND" }
+                local companionRoutes = GetEnabledCompanionRoutes(state, capabilities)
+                context.activeRoute = ChooseRoute(companionRoutes)
+                if not context.activeRoute then return false, "No enabled shield/focus companion route is available." end
+                handCapability = BuildRouteHandCapability(context.activeRoute, "SECONDARY", capabilities.off)
             else
+                local selectedMain
                 for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
-                    if state.weaponFamilies[familyKey] and handCapability.families[familyKey] and handCapability.families[familyKey].available then
-                        table.insert(sourceFamilies, familyKey)
-                    end
+                    selectedMain = state.selections[familyKey] and GetSourceByID(familyKey, state.selections[familyKey]) or selectedMain
                 end
+                if not selectedMain then return false, "Select or generate a main-hand appearance before rerolling the linked second hand." end
+                local routes = FindPrimaryRoutesForSource(selectedMain, capabilities, state.linkWeaponHands == true)
+                if #routes == 0 then return false, "The current main-hand appearance has no complete linked route." end
+                context.activeRoute = ChooseRoute(routes)
+                handCapability = BuildRouteHandCapability(context.activeRoute, "SECONDARY", capabilities.off)
+                sourceFamilies = { context.activeRoute.familyKey }
+                preferredSubtype = state.linkWeaponHands and GetWeaponSubtypeKeyForCategoryID(selectedMain.categoryID) or nil
                 if state.linkWeaponHands then
-                    for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
-                        local selected = state.selections[familyKey] and GetSourceByID(familyKey, state.selections[familyKey])
-                        if selected then preferredSubtype = GetWeaponSubtypeKeyForCategoryID(selected.categoryID) break end
-                    end
+                    local source, _, notice = ChooseLinkedWeaponSource(
+                        selectedMain,
+                        equippedItem,
+                        context,
+                        { OFF_HAND = state.selections.OFF_HAND },
+                        "OFF_HAND",
+                        styleMode,
+                        styleContext,
+                        handCapability
+                    )
+                    if not source then return false, notice or "No linked secondary appearance is available." end
+                    SetSelectedSource(state, "OFF_HAND", source)
+                    if styleEngine and styleEngine.AddSourceToGenerationContext then styleEngine.AddSourceToGenerationContext(styleContext, source) end
+                    state.selectedConceptID = nil
+                    local generatedName = RefreshGeneratedOutfitName(state, styleEngine, styleMode, styleContext)
+                    if QC.Notify then QC.Notify("WARDROBE_WORKBENCH_CHANGED", slotKey) end
+                    return true, string.format("%s rerolled%s.", definition.label, generatedName and ("; the current look is now " .. generatedName) or "")
                 end
             end
         else
@@ -3482,6 +3969,7 @@ local function ScheduleLoginRefresh()
 end
 
 function Wardrobe.MarkDirty(reason)
+    Wardrobe.InvalidateWeaponAppearanceRoutes()
     local cache = EnsureCache()
     cache.dirty = true
     cache.dirtyReason = reason or "COLLECTION_CHANGED"
@@ -3589,6 +4077,7 @@ function Wardrobe.Scan(force, trigger)
         cache.characterKey = QC.GetCurrentCharacter().key
         cache.scanDurationMS = scanStartedPrecise and GetTime and math.floor(((GetTime() - scanStartedPrecise) * 1000) + 0.5) or nil
         RecoverAppearanceReferences(cache)
+        Wardrobe.InvalidateWeaponAppearanceRoutes()
         if cache.scanTrigger == "AUTO_LOGIN" then
             cache.lastLoginRefreshAt = cache.scanCompletedAt
             cache.loginRefreshDeferredReason = nil
@@ -3826,6 +4315,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
         or event == "TRAIT_CONFIG_UPDATED"
     then
         local eventArg1 = select(1, ...)
+        Wardrobe.InvalidateWeaponAppearanceRoutes()
         local now = GetTime and GetTime()
         internalUsabilityUpdateUntil = now and (now + 1.0) or nil
         SafeCall(C_TransmogCollection and C_TransmogCollection.UpdateUsableAppearances)

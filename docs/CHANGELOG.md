@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.7.0 - 2026-08-01
+
+### Changed
+
+- Replaced the flat union of Blizzard weapon-category permissions with provenance-preserving weapon appearance routes.
+- Classifies each native weapon option independently and rejects ambiguous multi-family options instead of activating unrelated families.
+- Models linked Main Hand and Secondary Hand targets as one complete One-Hand, Two-Hand, or Ranged route.
+- Restricts Off-Hand to independent Shield and Holdable / Focus companion routes.
+- Generates and validates a complete weapon bundle before committing any selection.
+- Keeps linked hands inside the same route and exact subtype.
+- Applies route provenance to browser filtering, rerolls, manual selection, and diagnostics.
+- Expands `/qc weapon debug` with accepted routes, rejected options, and the last committed route.
+
+### Compatibility
+
+- Preserves SavedVariables schema 2, Courier format 1, and wardrobe cache format 6.
+- No wardrobe rescan, concept migration, or Custom Set rebuild is required.
+
 ## 1.6.8 - 2026-08-01
 
 ### Fixed

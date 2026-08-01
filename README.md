@@ -1,8 +1,8 @@
-# Quest Chronicle v1.6.8
+# Quest Chronicle v1.7.0
 
-> **Inventory-slot enum repair:** v1.6.8 corrects the boundary between WoW's traditional 1-based inventory slot IDs and the zero-based `Enum.InventorySlots` values required by the Transmog Outfit API. Main Hand and Secondary Hand now resolve to their intended native outfit slots before linked weapon permissions are evaluated.
+> **Weapon appearance routes:** v1.7.0 replaces the flat union of weapon permissions with provenance-preserving Blizzard option routes. One-Hand, Two-Hand, Ranged, and shield/focus companion layouts are now generated as complete atomic bundles.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.6.8 preserves physical dual-two-hand topology while correcting the native slot mapping used to discover and commit linked Fury one-hand appearances for both weapon hands.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.7.0 separates physical weapon topology from Blizzard appearance-option routes, prevents unrelated weapon families from leaking into generation, and commits complete Main Hand and Secondary Hand bundles atomically.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -120,6 +120,7 @@ Settings include:
 /qc objectives on|off
 /qc removals on|off
 /qc minimap show|hide|toggle|reset
+/qc weapon debug
 ```
 
 Bare `/qc` toggles the main window. `/qc help` displays command help.
