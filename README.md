@@ -1,37 +1,116 @@
-# Quest Chronicle 0.3.0
+# Quest Chronicle v0.4.0
 
-Quest Chronicle records a character's quest journey inside World of Warcraft Retail and prepares a JSON snapshot for Warcraft Quest Chronicle Courier.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.4.0 adds a standalone Blizzard-styled interface while preserving the lifecycle recorder and Courier export introduced in v0.3.0.
 
-Version 0.3.0 expands the Chronicle from completions and RP notes into a lifecycle recorder.
+It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
-## New in 0.3.0
+## UI foundation
 
-- Records standard quest acceptance.
-- Maintains an exported snapshot of the character's currently active quests.
-- Records objective progress and intermediate objective stages.
-- Records quest state changes such as `ACTIVE`, `READY_FOR_TURN_IN`, and `FAILED`.
-- Records confirmed player abandonment as `QUEST_ABANDONED`.
-- Separately records uncertain or automatic removals as `QUEST_REMOVED`.
-- Preserves initial and final objective snapshots on acceptance, abandonment, and turn-in events.
-- Keeps the Courier format version at 1 for compatibility while advancing the addon data schema to 2.
+Open the window with:
 
-Existing Quest Chronicle 0.1.0 and 0.2.0 data remains in `QuestChronicleDB`. Old events are not rewritten or discarded.
+```text
+/qc
+/qc show
+```
 
-## Install or upgrade
+You can also open it through WoW's AddOn Compartment beside the minimap:
 
-1. Close World of Warcraft completely.
-2. Back up:
+- Left-click: toggle the main window.
+- Right-click: open Status & Maintenance.
 
-   `World of Warcraft\_retail_\WTF\Account\<ACCOUNT>\SavedVariables\QuestChronicle.lua`
+The window remembers its position unless that option is disabled. It can also be locked in WoW's AddOns settings.
 
-3. Replace the existing `QuestChronicle` addon folder with the folder from this archive.
-4. Launch WoW and verify that Quest Chronicle is enabled.
-5. Log in and run `/qc status`.
-6. Run `/qc active` to inspect the baseline active-quest snapshot.
-7. Accept a disposable quest, advance one objective, and abandon it to perform the first live lifecycle test.
-8. Run `/reload` so WoW writes the updated SavedVariables file for the Courier.
+## Chronicle tab
 
-## Event types
+The Chronicle tab browses the complete event history for the current character.
+
+Features in v0.4.0:
+
+- 25-event pages, so thousands of records do not create thousands of UI frames.
+- Newest-first or oldest-first display.
+- Text search across event type, quest name and ID, objective text, RP notes, location, and change reason.
+- Filters for all events, quest lifecycle, objectives and state, RP notes, and removals.
+- Event sequence, timestamp, location, level, quest rewards, and lifecycle details.
+
+## Active Quests tab
+
+The Active Quests tab shows the addon's current quest-log snapshot:
+
+- quest name, ID, and state;
+- quest level;
+- accepted or first-seen time;
+- elapsed active time;
+- all current objectives and completion marks;
+- ready-for-turn-in state.
+
+`Rescan Quest Log` performs the same underlying operation as `/qc sync` and refreshes the Courier snapshot.
+
+## Write Note tab
+
+The note editor replaces the need to compose longer RP observations inside a slash command.
+
+- Multiline notes up to 4,000 characters.
+- Automatic character, level, time, zone, map, and coordinate context.
+- Per-character draft preservation.
+- Record, Record & Close, and Clear controls.
+- `Ctrl+Enter` records the current note.
+
+The underlying event remains `RP_NOTE`, so Courier behavior is unchanged.
+
+## Status & Maintenance tab
+
+The status page contains:
+
+- current character and recorder health;
+- event, active quest, acceptance, completion, abandonment, removal, and RP-note counts;
+- last event and quest-sync timestamps;
+- Courier snapshot size;
+- manual quest-log rescan;
+- manual Courier export refresh;
+- all existing recording toggles.
+
+WoW still decides when SavedVariables are written to disk. Use `/reload`, log out, or exit WoW after refreshing the Courier export when you need the external Courier to see it immediately.
+
+## WoW AddOns settings
+
+Quest Chronicle registers a native category under:
+
+```text
+Escape → Options → AddOns → Quest Chronicle
+```
+
+Settings include:
+
+- Enable all recording
+- Show chat notifications
+- Record quest lifecycle
+- Record objective progress
+- Record abandonments and removals
+- Remember window position
+- Lock window position
+
+## Existing slash commands
+
+All v0.3.0 commands remain available:
+
+```text
+/qc help
+/qc status
+/qc recent [1-30]
+/qc active [1-50]
+/qc sync
+/qc note <text>
+/qc export
+/qc on|off
+/qc chat on|off
+/qc lifecycle on|off
+/qc objectives on|off
+/qc removals on|off
+```
+
+The only intentional behavior change is that bare `/qc` now opens the main window. Use `/qc help` for the command list.
+
+## Recorded event types
 
 - `QUEST_ACCEPTED`
 - `QUEST_BECAME_ACTIVE`
@@ -42,79 +121,31 @@ Existing Quest Chronicle 0.1.0 and 0.2.0 data remains in `QuestChronicleDB`. Old
 - `QUEST_TURNED_IN`
 - `RP_NOTE`
 
-## Abandonment accuracy
+## Compatibility
 
-WoW's `QUEST_REMOVED` event does not prove that the player clicked **Abandon Quest**. Quests may also disappear because an event expired, a dynamic task ended, phasing changed, or the game removed the quest through a script.
+- Existing v0.1, v0.2, and v0.3 SavedVariables are retained.
+- Addon schema version remains 2 because the recorded data model is unchanged.
+- Courier export `formatVersion` remains 1.
+- Warcraft Quest Chronicle Courier v1.0.0 remains compatible.
 
-Quest Chronicle therefore hooks the normal quest-log abandonment flow:
+## File layout
 
-- A removal following the player's confirmed abandonment call becomes `QUEST_ABANDONED` with `removalConfidence = CONFIRMED`.
-- Other removals become `QUEST_REMOVED` with an explanatory reason and `removalConfidence = UNCONFIRMED`.
-
-This intentionally favors an honest Chronicle over a dramatic but inaccurate one.
-
-## Objective behavior
-
-Quest Chronicle diffs the current quest state against the previous snapshot. Although `QUEST_LOG_UPDATE` can fire frequently, an event is stored only when an objective or quest state actually changed.
-
-Rapid changes may be coalesced by the short synchronization delay. For example, several progress increments occurring within roughly a third of a second may appear as one intermediate jump.
-
-Each objective event can include:
-
-- objective index;
-- displayed objective text;
-- objective type;
-- completed state;
-- fulfilled and required values;
-- previous objective values;
-- the event that caused the quest-log rescan.
-
-## Active quest snapshot
-
-Each character now has `activeQuests` in both `QuestChronicleDB` and `QuestChronicleCourierExport`.
-
-A quest that was already active when 0.3.0 was first installed is added to the baseline snapshot without inventing a historical acceptance event. New quests accepted afterward receive acceptance events normally.
-
-## Commands
-
-- `/qc status`
-- `/qc recent 10`
-- `/qc active 25`
-- `/qc sync`
-- `/qc note <roleplay observation>`
-- `/qc export`
-- `/qc on` and `/qc off`
-- `/qc chat on` and `/qc chat off`
-- `/qc lifecycle on` and `/qc lifecycle off`
-- `/qc objectives on` and `/qc objectives off`
-- `/qc removals on` and `/qc removals off`
-
-`/qc export` rescans the quest log and refreshes the in-memory JSON snapshot. Run `/reload` afterward to write it to disk immediately.
-
-## Courier configuration
-
-Warcraft Quest Chronicle Courier 1.0.0 was initially configured for only completions and RP notes. To deliver the new lifecycle events, expand `includeEventTypes` in its live configuration to:
-
-```json
-"includeEventTypes": [
-  "QUEST_ACCEPTED",
-  "QUEST_BECAME_ACTIVE",
-  "QUEST_OBJECTIVE_UPDATED",
-  "QUEST_STATE_CHANGED",
-  "QUEST_ABANDONED",
-  "QUEST_REMOVED",
-  "QUEST_TURNED_IN",
-  "RP_NOTE"
-]
+```text
+QuestChronicle\
+├── QuestChronicle.toc
+├── QuestChronicle.lua
+├── UI\
+│   ├── Shared.lua
+│   ├── ChronicleTab.lua
+│   ├── ActiveQuestsTab.lua
+│   ├── NoteTab.lua
+│   ├── StatusTab.lua
+│   ├── Settings.lua
+│   └── MainWindow.lua
+├── CHANGELOG.md
+├── LIVE_TEST_CHECKLIST.md
+├── UI_FOUNDATION_TEST_CHECKLIST.md
+└── COURIER_CONFIG_PATCH.json
 ```
 
-The existing Courier may preserve the new events in JSON while presenting unfamiliar event types generically in text output. A companion Courier update can add purpose-built human-readable formatting and active-quest sections.
-
-## Known boundaries
-
-- The addon can only observe events while it is enabled and the character is logged in.
-- Quests abandoned while the addon is disabled cannot be reconstructed later.
-- Quests already active at first 0.3.0 login receive a baseline state but no invented acceptance timestamp.
-- Bonus objectives and temporary task quests can behave differently from ordinary quest-log entries. They may be recorded as `QUEST_BECAME_ACTIVE` and later `QUEST_REMOVED` rather than normal acceptance and abandonment.
-- Some hidden or heavily scripted quests may expose incomplete objective information through the public UI API.
-- WoW writes SavedVariables on `/reload`, logout, or game exit. The Courier cannot see unsaved in-memory changes.
+The recorder remains in `QuestChronicle.lua`. UI modules use a small public API instead of reaching into the recorder's local state.

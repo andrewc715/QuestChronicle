@@ -31,25 +31,21 @@ function UI.CreateChronicleTab(parent)
     searchLabel:SetText("Search")
 
     local searchBox = CreateFrame("EditBox", nil, pane, "InputBoxTemplate")
-    searchBox:SetSize(205, 24)
+    searchBox:SetSize(245, 24)
     searchBox:SetPoint("TOPLEFT", searchLabel, "BOTTOMLEFT", 4, -4)
     searchBox:SetAutoFocus(false)
     searchBox:SetMaxLetters(80)
     pane.searchBox = searchBox
 
-    local clearSearchButton = UI.CreateButton(pane, "Clear", 55, 24)
-    clearSearchButton:SetPoint("LEFT", searchBox, "RIGHT", 8, 0)
-    pane.clearSearchButton = clearSearchButton
-
     local filterButton = UI.CreateButton(pane, "Filter: All Events", 170, 24)
-    filterButton:SetPoint("LEFT", clearSearchButton, "RIGHT", 10, 0)
+    filterButton:SetPoint("LEFT", searchBox, "RIGHT", 12, 0)
     pane.filterButton = filterButton
 
     local orderButton = UI.CreateButton(pane, "Newest First", 120, 24)
     orderButton:SetPoint("LEFT", filterButton, "RIGHT", 8, 0)
     pane.orderButton = orderButton
 
-    local refreshButton = UI.CreateButton(pane, "Refresh", 75, 24)
+    local refreshButton = UI.CreateButton(pane, "Refresh", 85, 24)
     refreshButton:SetPoint("LEFT", orderButton, "RIGHT", 8, 0)
 
     local resultLabel = pane:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
@@ -67,19 +63,13 @@ function UI.CreateChronicleTab(parent)
 
     local pageLabel = pane:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     pageLabel:SetPoint("LEFT", newerButton, "RIGHT", 12, 0)
-    pageLabel:SetWidth(245)
+    pageLabel:SetWidth(170)
     pageLabel:SetJustifyH("CENTER")
     pane.pageLabel = pageLabel
 
     local olderButton = UI.CreateButton(pane, "Older", 90, 24)
     olderButton:SetPoint("LEFT", pageLabel, "RIGHT", 12, 0)
     pane.olderButton = olderButton
-
-    UI.SetTooltip(searchBox, "Search Chronicle", "Search quest names, quest IDs, objective text, locations, RP notes, event types, and quest states.")
-    UI.SetTooltip(clearSearchButton, "Clear Search", "Remove the current search text and return to all events allowed by the selected filter.")
-    UI.SetTooltip(filterButton, "Event Filter", "Cycle through Chronicle event groups. Hold Shift while clicking to cycle backward.")
-    UI.SetTooltip(orderButton, "Chronicle Order", "Switch between newest-first and oldest-first display.")
-    UI.SetTooltip(refreshButton, "Refresh View", "Rebuild the current Chronicle page from the latest in-memory addon data.")
 
     local function GetFilter()
         local uiState = QC.GetUIState()
@@ -107,20 +97,6 @@ function UI.CreateChronicleTab(parent)
         return results
     end
 
-    local function AddEventWithSeparator(lines, event, previousDayKey)
-        local settings = QC.GetSettings()
-        local dayKey = UI.GetDayKey(event.timestamp)
-        if settings.showDateSeparators ~= false and dayKey ~= previousDayKey then
-            if #lines > 0 then
-                table.insert(lines, "")
-            end
-            table.insert(lines, UI.FormatDaySeparator(event.timestamp))
-            table.insert(lines, "")
-        end
-        table.insert(lines, UI.FormatEvent(event))
-        return dayKey
-    end
-
     function pane:Refresh()
         local results = GetFilteredEvents()
         local uiState = QC.GetUIState()
@@ -134,12 +110,9 @@ function UI.CreateChronicleTab(parent)
         orderButton:SetText(newestFirst and "Newest First" or "Oldest First")
         newerButton:SetText(newestFirst and "Newer" or "Older")
         olderButton:SetText(newestFirst and "Older" or "Newer")
-        clearSearchButton:SetEnabled(UI.Trim(searchBox:GetText()) ~= "")
 
-        local first = #results > 0 and ((self.page - 1) * self.pageSize + 1) or 0
-        local last = #results > 0 and math.min(#results, first + self.pageSize - 1) or 0
-        resultLabel:SetText(string.format("%s matching events", UI.FormatNumber(#results)))
-        pageLabel:SetText(string.format("Page %d of %d  •  Events %s-%s", self.page, pageCount, UI.FormatNumber(first), UI.FormatNumber(last)))
+        resultLabel:SetText(string.format("%d matching events", #results))
+        pageLabel:SetText(string.format("Page %d of %d", self.page, pageCount))
         newerButton:SetEnabled(self.page > 1)
         olderButton:SetEnabled(self.page < pageCount)
 
@@ -149,30 +122,24 @@ function UI.CreateChronicleTab(parent)
         end
 
         local lines = {}
-        local previousDayKey
+        local first = (self.page - 1) * self.pageSize + 1
+        local last = math.min(#results, first + self.pageSize - 1)
 
         if newestFirst then
             for displayIndex = first, last do
                 local eventIndex = #results - displayIndex + 1
-                previousDayKey = AddEventWithSeparator(lines, results[eventIndex], previousDayKey)
-                if displayIndex < last then
-                    table.insert(lines, "")
-                end
+                table.insert(lines, UI.FormatEvent(results[eventIndex]))
             end
         else
             for eventIndex = first, last do
-                previousDayKey = AddEventWithSeparator(lines, results[eventIndex], previousDayKey)
-                if eventIndex < last then
-                    table.insert(lines, "")
-                end
+                table.insert(lines, UI.FormatEvent(results[eventIndex]))
             end
         end
 
-        scroller:SetText(table.concat(lines, "\n"))
+        scroller:SetText(table.concat(lines, "\n\n"))
     end
 
-    searchBox:SetScript("OnTextChanged", function(self)
-        QC.GetUIState().chronicleSearch = self:GetText() or ""
+    searchBox:SetScript("OnTextChanged", function()
         pane.page = 1
         pane:Refresh()
     end)
@@ -183,23 +150,11 @@ function UI.CreateChronicleTab(parent)
         self:ClearFocus()
     end)
 
-    clearSearchButton:SetScript("OnClick", function()
-        searchBox:SetText("")
-        searchBox:SetFocus()
-    end)
-
     filterButton:SetScript("OnClick", function()
         local current = FILTER_INDEX[GetFilter()] or 1
-        if IsShiftKeyDown and IsShiftKeyDown() then
-            current = current - 1
-            if current < 1 then
-                current = #FILTERS
-            end
-        else
-            current = current + 1
-            if current > #FILTERS then
-                current = 1
-            end
+        current = current + 1
+        if current > #FILTERS then
+            current = 1
         end
         SetFilter(FILTERS[current].key)
     end)
@@ -235,24 +190,11 @@ function UI.CreateChronicleTab(parent)
             pane:Refresh()
         end
     end)
-    QC.RegisterCallback("SETTINGS_CHANGED", pane, function(settingName)
-        if pane:IsShown() and (settingName == "showQuestIDs" or settingName == "showDateSeparators") then
-            pane:Refresh()
-        end
-    end)
     QC.RegisterCallback("PLAYER_READY", pane, function()
-        local savedSearch = QC.GetUIState().chronicleSearch or ""
-        if searchBox:GetText() ~= savedSearch then
-            searchBox:SetText(savedSearch)
-        end
         pane:Refresh()
     end)
 
     pane:SetScript("OnShow", function()
-        local savedSearch = QC.GetUIState().chronicleSearch or ""
-        if searchBox:GetText() ~= savedSearch then
-            searchBox:SetText(savedSearch)
-        end
         pane:Refresh()
     end)
 

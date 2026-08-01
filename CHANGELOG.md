@@ -1,27 +1,34 @@
 # Changelog
 
-## 0.3.0 - 2026-07-28
+## 0.4.0 - 2026-07-30
 
 ### Added
 
-- Quest acceptance recording.
-- Persistent and exported active-quest snapshots.
-- Objective-progress diffing and intermediate-stage events.
-- Quest state transition events.
-- Confirmed player-abandonment detection through the built-in quest abandonment flow.
-- Honest fallback events for automatic or uncertain quest removals.
-- `/qc active`, `/qc sync`, and lifecycle tracking controls.
-- Nested objective data in the Courier JSON export.
+- Standalone Blizzard-styled Quest Chronicle window.
+- AddOn Compartment integration with left-click Chronicle and right-click Status behavior.
+- Native AddOns settings category using Blizzard's modern Settings API.
+- Chronicle browser with pagination, search, filtering, and chronological ordering.
+- Active Quests browser with objectives, state, timestamps, and manual rescan.
+- Multiline RP-note editor with per-character draft preservation and Ctrl+Enter submission.
+- Status & Maintenance page with event counts, snapshot information, synchronization controls, and recording toggles.
+- Remembered window position and optional position locking.
+- Public read/action API between the tested recorder and separate UI modules.
+- UI callback bus for event, active-quest, settings, and Courier refresh updates.
 
 ### Changed
 
-- Addon database schema advanced from 1 to 2.
-- Existing Courier format version remains 1 for backward compatibility.
-- Status and recent-event output now understand lifecycle events.
+- Bare `/qc` now toggles the Quest Chronicle window.
+- `/qc help` explicitly displays slash-command help.
+- Login message now points players to `/qc`.
+- Addon version advanced to 0.4.0 while data schema remains version 2 and Courier format remains version 1.
 
 ### Preserved
 
-- Existing quest completion events.
-- Existing RP notes.
-- Existing sessions and character history.
-- Existing SavedVariables names and upgrade path.
+- Every v0.3.0 lifecycle event and classification rule.
+- Existing SavedVariables and historical records.
+- Existing Courier JSON structure and compatibility.
+- All previous slash commands.
+
+## 0.3.0
+
+- Added quest acceptance, active-state discovery, objective progression, state changes, confirmed abandonment, uncertain removals, and active quest snapshots.

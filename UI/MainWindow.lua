@@ -1,32 +1,12 @@
 local QC = QuestChronicle
 local UI = QC.UI
 
-local DEFAULT_WIDTH = 790
-local DEFAULT_HEIGHT = 610
-local MIN_WIDTH = 790
-local MIN_HEIGHT = 610
-local MAX_WIDTH = 1120
-local MAX_HEIGHT = 880
-
 local TAB_DEFINITIONS = {
-    { key = "chronicle", label = "Chronicle", width = 122, tooltip = "Browse recorded quests, objectives, state changes, removals, and RP notes.", constructor = UI.CreateChronicleTab },
-    { key = "active", label = "Active Quests", width = 142, tooltip = "Review the current active quest snapshot and objective progress.", constructor = UI.CreateActiveQuestsTab },
-    { key = "note", label = "Write Note", width = 122, tooltip = "Record an RP observation with location and character context.", constructor = UI.CreateNoteTab },
-    { key = "status", label = "Status", width = 102, tooltip = "Review recorder health, Courier readiness, settings, and maintenance tools.", constructor = UI.CreateStatusTab },
-    { key = "outfits", label = "Outfits", width = 102, tooltip = "Generate, refine, preview, save, and load outfit concepts from collected appearances.", constructor = UI.CreateOutfitsTab },
+    { key = "chronicle", label = "Chronicle", constructor = UI.CreateChronicleTab },
+    { key = "active", label = "Active Quests", constructor = UI.CreateActiveQuestsTab },
+    { key = "note", label = "Write Note", constructor = UI.CreateNoteTab },
+    { key = "status", label = "Status", constructor = UI.CreateStatusTab },
 }
-
-local function UpdateOutfitsTabLabel(frame)
-    local tab = frame and frame.tabs and frame.tabs.outfits
-    if not tab then return end
-    local suggestion = QC.ZoneStyle and QC.ZoneStyle.GetPendingSuggestion and QC.ZoneStyle.GetPendingSuggestion()
-    tab:SetText(suggestion and suggestion.unread and "Outfits *" or "Outfits")
-end
-
-local function Clamp(value, minimum, maximum)
-    value = tonumber(value) or minimum
-    return math.max(minimum, math.min(maximum, value))
-end
 
 local function SaveWindowPosition(frame)
     local settings = QC.GetSettings()
@@ -49,15 +29,6 @@ local function RestoreWindowPosition(frame)
     local state = QC.GetUIState().window
     frame:ClearAllPoints()
 
-    if settings.rememberWindowPosition then
-        frame:SetSize(
-            Clamp(state.width or DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH),
-            Clamp(state.height or DEFAULT_HEIGHT, MIN_HEIGHT, MAX_HEIGHT)
-        )
-    else
-        frame:SetSize(DEFAULT_WIDTH, DEFAULT_HEIGHT)
-    end
-
     if settings.rememberWindowPosition and state.point then
         frame:SetPoint(state.point, UIParent, state.relativePoint or state.point, state.x or 0, state.y or 0)
     else
@@ -69,35 +40,14 @@ local function UpdateHeader(frame)
     local character = QC.GetCurrentCharacter()
     local status = QC.GetStatus()
     frame.characterText:SetText(string.format(
-        "%s%s - %s|r    %s%s events • %s active quests|r",
+        "%s%s - %s|r    %s%d events • %d active quests|r",
         UI.gold,
         character.name or "Unknown",
         character.realm or "Unknown Realm",
         UI.muted,
-        UI.FormatNumber(status.eventCount),
-        UI.FormatNumber(status.activeQuestCount)
+        status.eventCount,
+        status.activeQuestCount
     ))
-end
-
-local function UpdateResizeGrip(frame)
-    if frame.resizeGrip then
-        frame.resizeGrip:SetShown(not QC.GetSettings().lockWindow)
-    end
-end
-
-function QC.ResetWindowPosition()
-    local state = QC.GetUIState().window
-    for key in pairs(state) do
-        state[key] = nil
-    end
-
-    local frame = QC.mainWindow
-    if frame then
-        frame:ClearAllPoints()
-        frame:SetSize(DEFAULT_WIDTH, DEFAULT_HEIGHT)
-        frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-        SaveWindowPosition(frame)
-    end
 end
 
 function QC.InitializeUI()
@@ -106,17 +56,10 @@ function QC.InitializeUI()
     end
 
     local frame = CreateFrame("Frame", "QuestChronicleMainFrame", UIParent, "BasicFrameTemplateWithInset")
-    frame:SetSize(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+    frame:SetSize(790, 610)
     frame:SetFrameStrata("DIALOG")
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
-    frame:SetResizable(true)
-    if frame.SetResizeBounds then
-        frame:SetResizeBounds(MIN_WIDTH, MIN_HEIGHT, MAX_WIDTH, MAX_HEIGHT)
-    elseif frame.SetMinResize and frame.SetMaxResize then
-        frame:SetMinResize(MIN_WIDTH, MIN_HEIGHT)
-        frame:SetMaxResize(MAX_WIDTH, MAX_HEIGHT)
-    end
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
     frame:Hide()
@@ -150,52 +93,31 @@ function QC.InitializeUI()
     frame.characterText = characterText
 
     local tabBar = CreateFrame("Frame", nil, frame)
-    tabBar:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 12, 7)
-    tabBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -28, 7)
-    tabBar:SetHeight(32)
+    tabBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -58)
+    tabBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -12, -58)
+    tabBar:SetHeight(30)
     frame.tabBar = tabBar
 
     local content = UI.CreateInsetPanel(frame)
-    content:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -58)
-    content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, 41)
+    content:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -92)
+    content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, 12)
     frame.content = content
-
-    local resizeGrip = CreateFrame("Button", nil, frame)
-    resizeGrip:SetSize(16, 16)
-    resizeGrip:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3, 3)
-    resizeGrip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    resizeGrip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-    resizeGrip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-    resizeGrip:SetScript("OnMouseDown", function(_, button)
-        if button == "LeftButton" and not QC.GetSettings().lockWindow then
-            frame:StartSizing("BOTTOMRIGHT")
-        end
-    end)
-    resizeGrip:SetScript("OnMouseUp", function()
-        frame:StopMovingOrSizing()
-        SaveWindowPosition(frame)
-    end)
-    UI.SetTooltip(resizeGrip, "Resize Quest Chronicle", "Drag to resize the window. The size is saved with its position.", "ANCHOR_TOPLEFT")
-    frame.resizeGrip = resizeGrip
 
     frame.tabs = {}
     frame.panes = {}
     local previousButton
 
     for _, definition in ipairs(TAB_DEFINITIONS) do
-        local button = CreateFrame("Button", nil, tabBar, "PanelTabButtonTemplate")
-        button:SetSize(definition.width or 120, 32)
-        button:SetText(definition.label)
+        local button = UI.CreateButton(tabBar, definition.label, 135, 26)
         if previousButton then
-            button:SetPoint("LEFT", previousButton, "RIGHT", 1, 0)
+            button:SetPoint("LEFT", previousButton, "RIGHT", 6, 0)
         else
-            button:SetPoint("BOTTOMLEFT", tabBar, "BOTTOMLEFT", 0, 0)
+            button:SetPoint("LEFT", tabBar, "LEFT", 0, 0)
         end
         button.key = definition.key
         button:SetScript("OnClick", function(self)
             frame:SelectTab(self.key)
         end)
-        UI.SetTooltip(button, definition.label, definition.tooltip)
         frame.tabs[definition.key] = button
         previousButton = button
 
@@ -212,30 +134,11 @@ function QC.InitializeUI()
         for tabKey, pane in pairs(self.panes) do
             local selected = tabKey == key
             pane:SetShown(selected)
-            local tab = self.tabs[tabKey]
-            if selected then
-                if PanelTemplates_SelectTab then
-                    PanelTemplates_SelectTab(tab)
-                else
-                    tab:LockHighlight()
-                    tab:SetEnabled(false)
-                end
-            else
-                if PanelTemplates_DeselectTab then
-                    PanelTemplates_DeselectTab(tab)
-                else
-                    tab:UnlockHighlight()
-                    tab:SetEnabled(true)
-                end
-            end
+            self.tabs[tabKey]:SetEnabled(not selected)
         end
 
         self.selectedTab = key
         QC.GetUIState().lastTab = key
-        if key == "outfits" and QC.ZoneStyle and QC.ZoneStyle.AcknowledgeSuggestion then
-            QC.ZoneStyle.AcknowledgeSuggestion()
-        end
-        UpdateOutfitsTabLabel(self)
         UpdateHeader(self)
         local pane = self.panes[key]
         if pane and pane.Refresh then
@@ -245,12 +148,10 @@ function QC.InitializeUI()
 
     frame:SetScript("OnShow", function(self)
         UpdateHeader(self)
-        UpdateResizeGrip(self)
         self:SelectTab(QC.GetUIState().lastTab or "chronicle")
     end)
 
     RestoreWindowPosition(frame)
-    UpdateResizeGrip(frame)
     frame:SelectTab(QC.GetUIState().lastTab or "chronicle")
 
     QC.mainWindow = frame
@@ -269,22 +170,10 @@ function QC.InitializeUI()
     QC.RegisterCallback("SETTINGS_CHANGED", frame, function(settingName)
         if settingName == "rememberWindowPosition" and not QC.GetSettings().rememberWindowPosition then
             RestoreWindowPosition(frame)
-        elseif settingName == "lockWindow" then
-            UpdateResizeGrip(frame)
         end
     end)
     QC.RegisterCallback("PLAYER_READY", frame, function()
         UpdateHeader(frame)
-        UpdateOutfitsTabLabel(frame)
-    end)
-    QC.RegisterCallback("ZONE_STYLE_SUGGESTION", frame, function()
-        UpdateOutfitsTabLabel(frame)
-    end)
-    QC.RegisterCallback("ZONE_STYLE_SUGGESTION_ACKNOWLEDGED", frame, function()
-        UpdateOutfitsTabLabel(frame)
-    end)
-    QC.RegisterCallback("ZONE_STYLE_SUGGESTION_CONSUMED", frame, function()
-        UpdateOutfitsTabLabel(frame)
     end)
 
     return frame
@@ -325,7 +214,7 @@ end
 
 function QuestChronicle_OnAddonCompartmentEnter(frame)
     GameTooltip:SetOwner(frame, "ANCHOR_LEFT")
-    GameTooltip:SetText("Quest Chronicle " .. tostring(QC.version or ""))
+    GameTooltip:SetText("Quest Chronicle")
     GameTooltip:AddLine("Left-click to open the Chronicle.", 1, 1, 1)
     GameTooltip:AddLine("Right-click to open Status & Maintenance.", 1, 1, 1)
     GameTooltip:Show()

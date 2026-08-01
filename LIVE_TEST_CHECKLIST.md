@@ -1,6 +1,6 @@
-# Quest Chronicle 0.3.0 Live Test Checklist
+# Quest Chronicle 0.4.0 Lifecycle Regression Checklist
 
-Use a disposable low-stakes quest for this test.
+Use a disposable low-stakes quest for this test after the UI foundation checklist. This confirms the v0.3.0 recorder still behaves identically beneath the new interface.
 
 1. Log in and run `/qc status`.
 2. Run `/qc active 50`; existing quests should appear without new acceptance spam.

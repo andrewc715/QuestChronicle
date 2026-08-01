@@ -1,8 +1,19 @@
 ## Interface: 120000
 ## Title: Quest Chronicle
-## Notes: Records quest lifecycle, objective progress, completions, and roleplay notes for character journey storytelling.
+## Notes: Records quest lifecycle, objective progress, completions, and roleplay notes, with a native-styled Chronicle window.
 ## Author: OpenAI & Andrew
-## Version: 0.3.0
+## Version: 0.4.0
+## IconTexture: Interface\Icons\INV_Misc_Book_09
+## AddonCompartmentFunc: QuestChronicle_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: QuestChronicle_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: QuestChronicle_OnAddonCompartmentLeave
 ## SavedVariables: QuestChronicleDB, QuestChronicleCourierExport
 
 QuestChronicle.lua
+UI\Shared.lua
+UI\ChronicleTab.lua
+UI\ActiveQuestsTab.lua
+UI\NoteTab.lua
+UI\StatusTab.lua
+UI\Settings.lua
+UI\MainWindow.lua

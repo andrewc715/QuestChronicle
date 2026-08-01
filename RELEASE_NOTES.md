@@ -1,34 +1,28 @@
-# Quest Chronicle v0.9.2: Internal Collection Event Hotfix
+# Quest Chronicle v0.4.0 Release Notes
 
-Version 0.9.2 stops outfit generation from causing an unnecessary automatic wardrobe rescan.
+Version 0.4.0 gives Quest Chronicle its own native-styled home without altering Blizzard's Quest Log.
 
-## Fixed
+The tested v0.3.0 lifecycle recorder remains the engine. A small public API now exposes safe read and action methods to separate UI modules, keeping the interface from reaching into private tracking state.
 
-Quest Chronicle refreshes Blizzard's current-character usable-appearance state before choosing weapons. That check is still required so generated weapons obey the equipped weapon and Blizzard's transmog rules. Blizzard also emits the broad `TRANSMOG_COLLECTION_UPDATED` event for that internal refresh, which v0.9.0 interpreted as a real collection mutation.
+## First-release scope
 
-v0.9.2 marks the brief usability update as internal and ignores only its matching generic notification. As a result:
+- Chronicle event browser
+- Active quest and objective browser
+- Multiline RP-note editor
+- Status and maintenance dashboard
+- Recording controls
+- WoW AddOns settings category
+- AddOn Compartment launcher
+- Remembered and lockable window placement
 
-- **Generate Outfit** no longer starts a wardrobe scan;
-- **Reroll Unlocked** no longer starts a wardrobe scan;
-- weapon-slot rerolls no longer start a wardrobe scan;
-- Blizzard-safe equipped-weapon validation is preserved;
-- genuine source-added, source-removed, and cosmetic-added events still queue an automatic refresh;
-- a later external generic collection update still queues an automatic refresh.
+## Compatibility promises
 
-The regression harness now simulates both the internal event and a later external event so the guard cannot silence real collection maintenance.
+- Existing Chronicle history is preserved.
+- Data schema remains version 2.
+- Courier export format remains version 1.
+- Warcraft Quest Chronicle Courier v1.0.0 requires no structural update.
+- Every v0.3.0 slash command remains available.
 
-## Also included
+## First live-test priorities
 
-- The v0.9.1 two-way Favor/Unfavor and Exclude/Allow repair.
-- All v0.9.0 era restriction, collection recovery, performance, zone coverage, settings, and accessibility improvements.
-
-## Compatibility
-
-- SavedVariables schema 2 is preserved.
-- Courier format 1 is preserved.
-- Wardrobe cache format 5 is preserved.
-- Existing concepts, favorites, exclusions, selections, and locks remain compatible.
-- No collection rescan is required after updating.
-- Preview only: no transmog is applied and no Blizzard outfit slot is changed.
-
-See `INTERNAL_COLLECTION_EVENT_V092_TEST_CHECKLIST.md` for the live verification pass.
+The mock harness validated UI creation, tab switching, v0.3.0 data preservation, note recording, Courier refresh, lifecycle progression, turn-in handling, and confirmed abandonment. The live client still needs to validate Blizzard frame templates, AddOn Compartment metadata, window interaction, and the modern Settings panel on the installed Retail build.

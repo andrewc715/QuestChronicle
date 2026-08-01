@@ -1,5 +1,8 @@
 local ADDON_NAME = ...
 
+QuestChronicle = QuestChronicle or {}
+local QC = QuestChronicle
+
 local frame = CreateFrame("Frame")
 local currentCharacter
 local currentSession
@@ -13,11 +16,16 @@ local questSyncToken = 0
 
 local SCHEMA_VERSION = 2
 local COURIER_FORMAT_VERSION = 1
-local ADDON_VERSION = "0.3.0"
+local ADDON_VERSION = "0.4.0"
 local PREFIX = "|cffd9b36cQuest Chronicle:|r "
 local OBJECTIVE_SYNC_DELAY = 0.35
 local REMOVAL_CLASSIFY_DELAY = 0.45
 local RECENT_EVENT_WINDOW = 8
+
+QC.addonName = ADDON_NAME
+QC.version = ADDON_VERSION
+QC.schemaVersion = SCHEMA_VERSION
+QC.courierFormatVersion = COURIER_FORMAT_VERSION
 
 local function Print(message)
     DEFAULT_CHAT_FRAME:AddMessage(PREFIX .. tostring(message))
@@ -275,6 +283,9 @@ end
 
 local function RefreshCourierExport()
     QuestChronicleCourierExport = BuildCourierExport()
+    if QC.Notify then
+        QC.Notify("COURIER_EXPORT_REFRESHED", #QuestChronicleCourierExport)
+    end
     return QuestChronicleCourierExport
 end
 
@@ -322,7 +333,15 @@ local function EnsureDatabase()
     QuestChronicleDB.settings.lifecycleTracking = QuestChronicleDB.settings.lifecycleTracking ~= false
     QuestChronicleDB.settings.objectiveTracking = QuestChronicleDB.settings.objectiveTracking ~= false
     QuestChronicleDB.settings.removalTracking = QuestChronicleDB.settings.removalTracking ~= false
+    QuestChronicleDB.settings.rememberWindowPosition = QuestChronicleDB.settings.rememberWindowPosition ~= false
+    QuestChronicleDB.settings.lockWindow = QuestChronicleDB.settings.lockWindow == true
     QuestChronicleDB.characters = QuestChronicleDB.characters or {}
+    QuestChronicleDB.ui = QuestChronicleDB.ui or {}
+    QuestChronicleDB.ui.lastTab = QuestChronicleDB.ui.lastTab or "chronicle"
+    QuestChronicleDB.ui.noteDrafts = QuestChronicleDB.ui.noteDrafts or {}
+    QuestChronicleDB.ui.chronicleFilter = QuestChronicleDB.ui.chronicleFilter or "ALL"
+    QuestChronicleDB.ui.chronicleNewestFirst = QuestChronicleDB.ui.chronicleNewestFirst ~= false
+    QuestChronicleDB.ui.window = QuestChronicleDB.ui.window or {}
 end
 
 local function EnsureCharacter()
@@ -443,6 +462,10 @@ local function AddEvent(eventType, payload)
     character.lastEventAt = now
     character.lastEventAtText = event.timestampText
 
+    if QC.Notify then
+        QC.Notify("EVENT_RECORDED", event)
+    end
+
     return event
 end
 
@@ -501,6 +524,9 @@ local function UpdatePendingQuestTitles(questID)
     end
 
     pendingQuestTitles[questID] = nil
+    if QC.Notify then
+        QC.Notify("DATA_UPDATED", "QUEST_TITLE", questID)
+    end
 end
 
 local function SafeQuestBoolean(functionName, questID)
@@ -880,6 +906,10 @@ local function SyncQuestLog(sourceEvent, suppressLifecycleEvents)
     character.activeQuests = currentMap
     character.lastQuestSyncAt = now
     character.lastQuestSyncAtText = TimestampText(now)
+
+    if QC.Notify then
+        QC.Notify("ACTIVE_QUESTS_UPDATED", sourceEvent)
+    end
 end
 
 local function ScheduleQuestSync(sourceEvent, delay)
@@ -1006,6 +1036,8 @@ local function RecordNote(text)
     if event then
         Print("Recorded RP note #" .. tostring(event.sequence) .. ".")
     end
+
+    return event
 end
 
 local function CountEvents(character, eventType)
@@ -1146,6 +1178,8 @@ end
 
 local function PrintHelp()
     Print("Commands:")
+    DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc|r or |cffd9b36c/qc show|r - open the Quest Chronicle window")
+    DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc help|r - show command help")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc status|r - show recorder and lifecycle status")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc recent [1-30]|r - show recent events")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc active [1-50]|r - show the current active quest snapshot")
@@ -1164,7 +1198,13 @@ local function HandleSlashCommand(message)
     command = string.lower(command or "")
     rest = rest or ""
 
-    if command == "" or command == "help" then
+    if command == "" or command == "show" or command == "window" then
+        if QC.ToggleWindow then
+            QC.ToggleWindow()
+        else
+            PrintHelp()
+        end
+    elseif command == "help" then
         PrintHelp()
     elseif command == "status" then
         PrintStatus()
@@ -1209,6 +1249,104 @@ local function HandleSlashCommand(message)
         PrintHelp()
     end
 end
+
+-- Public API used by the v0.4.0 UI modules. The recorder remains local so
+-- future UI work cannot accidentally replace its event handlers.
+function QC.GetDatabase()
+    EnsureDatabase()
+    return QuestChronicleDB
+end
+
+function QC.GetCurrentCharacter()
+    return currentCharacter or EnsureCharacter()
+end
+
+function QC.GetSettings()
+    EnsureDatabase()
+    return QuestChronicleDB.settings
+end
+
+function QC.GetUIState()
+    EnsureDatabase()
+    return QuestChronicleDB.ui
+end
+
+function QC.SetSetting(settingName, value)
+    EnsureDatabase()
+    QuestChronicleDB.settings[settingName] = value
+    if QC.Notify then
+        QC.Notify("SETTINGS_CHANGED", settingName, value)
+    end
+end
+
+function QC.GetEvents()
+    local character = QC.GetCurrentCharacter()
+    return character.events or {}
+end
+
+function QC.GetActiveQuests()
+    local character = QC.GetCurrentCharacter()
+    local quests = {}
+    for _, quest in pairs(character.activeQuests or {}) do
+        table.insert(quests, quest)
+    end
+    table.sort(quests, function(left, right)
+        local leftName = SafeText(left.questName):lower()
+        local rightName = SafeText(right.questName):lower()
+        if leftName == rightName then
+            return (left.questID or 0) < (right.questID or 0)
+        end
+        return leftName < rightName
+    end)
+    return quests
+end
+
+function QC.RecordNote(text)
+    return RecordNote(text)
+end
+
+function QC.SynchronizeQuestLog(sourceEvent)
+    SyncQuestLog(sourceEvent or "UI_MANUAL_SYNC", false)
+    RefreshCourierExport()
+    return CountActiveQuests(QC.GetCurrentCharacter())
+end
+
+function QC.RefreshCourierSnapshot(syncFirst)
+    if syncFirst then
+        SyncQuestLog("UI_MANUAL_EXPORT", false)
+    end
+    return RefreshCourierExport()
+end
+
+function QC.GetCourierSnapshotSize()
+    return type(QuestChronicleCourierExport) == "string" and #QuestChronicleCourierExport or 0
+end
+
+function QC.GetStatus()
+    local character = QC.GetCurrentCharacter()
+    return {
+        characterKey = character.key,
+        eventCount = CountEvents(character),
+        activeQuestCount = CountActiveQuests(character),
+        acceptedCount = CountEvents(character, "QUEST_ACCEPTED"),
+        completedCount = CountEvents(character, "QUEST_TURNED_IN"),
+        abandonedCount = CountEvents(character, "QUEST_ABANDONED"),
+        removedCount = CountEvents(character, "QUEST_REMOVED"),
+        noteCount = CountEvents(character, "RP_NOTE"),
+        lastEventAt = character.lastEventAt,
+        lastEventAtText = character.lastEventAtText,
+        lastQuestSyncAt = character.lastQuestSyncAt,
+        lastQuestSyncAtText = character.lastQuestSyncAtText,
+        courierSnapshotSize = QC.GetCourierSnapshotSize(),
+    }
+end
+
+QC.GetLocation = GetLocation
+QC.TimestampText = TimestampText
+QC.EventSummary = EventSummary
+QC.CountEvents = CountEvents
+QC.CountActiveQuests = CountActiveQuests
+QC.Print = Print
 
 local function InstallAbandonHooks()
     if not hooksecurefunc or not C_QuestLog then
@@ -1267,12 +1405,22 @@ frame:SetScript("OnEvent", function(_, event, ...)
         SlashCmdList.QUESTCHRONICLE = HandleSlashCommand
         InstallAbandonHooks()
 
+        if QC.RegisterSettings then
+            QC.RegisterSettings()
+        end
+
     elseif event == "PLAYER_LOGIN" then
         EnsureCharacter()
         StartSession()
         SyncQuestLog("PLAYER_LOGIN_BASELINE", true)
         RefreshCourierExport()
-        Print("v" .. ADDON_VERSION .. " loaded. Quest lifecycle and objective progress are being recorded.")
+        if QC.InitializeUI then
+            QC.InitializeUI()
+        end
+        if QC.Notify then
+            QC.Notify("PLAYER_READY")
+        end
+        Print("v" .. ADDON_VERSION .. " loaded. Type /qc to open the Chronicle.")
 
     elseif event == "PLAYER_LOGOUT" then
         SyncQuestLog("PLAYER_LOGOUT", false)
