@@ -75,11 +75,12 @@ local function ConceptDetail(concept)
     local mode = concept.styleMode and ZoneStyle and ZoneStyle.GetModeInfo(concept.styleMode)
     local _, nativeStatus = Wardrobe.GetConceptCustomSetStatus(concept)
     return string.format(
-        "%d appearances • %d locked • %d hidden • %s • %s • %s",
+        "%d appearances • %d locked • %d hidden • %s • Weapons: %s • %s • %s",
         CountMap(concept.selections),
         CountMap(concept.locks),
         CountMap(concept.hidden),
         mode and mode.label or "Current mode",
+        Wardrobe.GetWeaponFamilySummary(concept.weaponFamilies),
         nativeStatus,
         updated
     )
@@ -344,8 +345,55 @@ function UI.CreateOutfitsTab(parent)
     styleInfo:SetWordWrap(true)
     pane.styleInfo = styleInfo
 
+    local weaponHeader = modelPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    weaponHeader:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 10, -96)
+    weaponHeader:SetPoint("RIGHT", modelPanel, "RIGHT", -10, 0)
+    weaponHeader:SetJustifyH("CENTER")
+    weaponHeader:SetText("Weapon Generation")
+    pane.weaponHeader = weaponHeader
+
+    pane.weaponFamilyChecks = {}
+    local weaponPositions = {
+        ONE_HAND = { 9, -108 }, TWO_HAND = { 148, -108 },
+        RANGED = { 9, -132 }, OFF_HAND = { 148, -132 },
+    }
+    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+        local definition = Wardrobe.weaponFamilyDefinitions[familyKey]
+        local check = CreateFrame("CheckButton", nil, modelPanel, "UICheckButtonTemplate")
+        check:SetSize(22, 22)
+        check:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", weaponPositions[familyKey][1], weaponPositions[familyKey][2])
+        check.familyKey = familyKey
+        local label = modelPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        label:SetPoint("LEFT", check, "RIGHT", 1, 0)
+        label:SetText(definition.label)
+        check.label = label
+        check:SetScript("OnClick", function(self)
+            local desired = self:GetChecked() == true
+            local ok, message = Wardrobe.SetWeaponFamilyEnabled(self.familyKey, desired)
+            if not ok and UIErrorsFrame then UIErrorsFrame:AddMessage(message or "That weapon family is unavailable.", 1, 0.25, 0.25) end
+            pane:Refresh(message)
+        end)
+        check:SetScript("OnEnter", function(self)
+            local options, topology = Wardrobe.GetWeaponGenerationOptions()
+            local option
+            for _, candidate in ipairs(options) do if candidate.key == self.familyKey then option = candidate break end end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText((option and option.label or definition.label) .. " Generation", 1, 0.82, 0)
+            GameTooltip:AddLine(option and option.reason or "Weapon generation option.", 1, 1, 1, true)
+            GameTooltip:AddLine("Current layout: " .. tostring(topology and topology.label or "Unknown"), 0.65, 0.65, 0.65, true)
+            if self.familyKey == "OFF_HAND" then
+                GameTooltip:AddLine("Off-Hand requires One-Hand. Dual wielding uses the One-Hand pool for both weapon hands.", 0.8, 0.8, 0.8, true)
+            else
+                GameTooltip:AddLine("Checked families form the pool Quest Chronicle may choose during Generate Outfit and Reroll Unlocked.", 0.8, 0.8, 0.8, true)
+            end
+            GameTooltip:Show()
+        end)
+        check:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        pane.weaponFamilyChecks[familyKey] = check
+    end
+
     local model = CreateFrame("DressUpModel", nil, modelPanel)
-    model:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -98)
+    model:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -158)
     model:SetPoint("BOTTOMRIGHT", modelPanel, "BOTTOMRIGHT", -8, 112)
     model:SetUnit("player")
     if model.SetFacing then model:SetFacing(0) end
@@ -381,8 +429,8 @@ function UI.CreateOutfitsTab(parent)
     local clearAll = UI.CreateButton(modelPanel, "Reset Outfit", 100, 24)
     clearAll:SetPoint("LEFT", loadConcept, "RIGHT", 4, 0)
 
-    UI.SetTooltip(generateButton, "Generate Outfit", "Build a promo-free weighted outfit in the selected style. Quest Chronicle starts with the major armor silhouette, favors pieces from the same Blizzard transmog set or shared motif, rejects isolated dramatic outliers, and keeps weapons within Blizzard's equipped-item rules. Locked and hidden choices are preserved.")
-    UI.SetTooltip(rerollUnlocked, "Reroll Unlocked", "Replace every unlocked choice using the same promo-free, set-aware, motif-coherent rules while preserving Blizzard-safe weapon compatibility.")
+    UI.SetTooltip(generateButton, "Generate Outfit", "Build a promo-free weighted outfit in the selected style. Checked weapon families form the allowed generation pool, then the equipped hand layout removes impossible combinations. Locked and hidden choices are preserved.")
+    UI.SetTooltip(rerollUnlocked, "Reroll Unlocked", "Replace every unlocked choice using the selected weapon families and the same promo-free, set-aware, motif-coherent rules.")
     UI.SetTooltip(saveConcept, "Save Concept", "Open the Outfit Concepts manager to name and save the current selections, locks, hidden slots, and weapon configuration.")
     UI.SetTooltip(loadConcept, "Outfit Concepts", "Open the Outfit Concepts manager to inspect, load, overwrite, or delete this character's saved concepts.")
     UI.SetTooltip(clearAll, "Reset Outfit", "Clear selections, locks, and hidden-slot choices, returning the preview to currently equipped gear.")
@@ -1215,6 +1263,18 @@ function UI.CreateOutfitsTab(parent)
             exclusionCount
         ))
 
+        local weaponOptions, weaponTopology = Wardrobe.GetWeaponGenerationOptions()
+        weaponHeader:SetText("Weapon Generation • " .. tostring(weaponTopology.label or "Unknown layout"))
+        for _, option in ipairs(weaponOptions) do
+            local check = self.weaponFamilyChecks[option.key]
+            if check then
+                check:SetChecked(option.checked == true)
+                check.available = option.available
+                check:SetAlpha(option.available and 1.0 or 0.42)
+                if check.label then check.label:SetTextColor(option.available and 1 or 0.55, option.available and 1 or 0.55, option.available and 1 or 0.55) end
+            end
+        end
+
         local manifest = self:RefreshCurrentLook()
         local manifestBySlot = {}
         for _, entry in ipairs(manifest) do manifestBySlot[entry.slotKey] = entry end
@@ -1352,6 +1412,12 @@ function UI.CreateOutfitsTab(parent)
     end)
     QC.RegisterCallback("WARDROBE_WORKBENCH_CHANGED", pane, function()
         if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("WARDROBE_WEAPON_OPTIONS_CHANGED", pane, function()
+        if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("WARDROBE_WEAPON_TOPOLOGY_CHANGED", pane, function(topology)
+        if pane:IsShown() then pane:Refresh("Weapon layout changed: " .. tostring(topology and topology.label or "equipment updated") .. ".") end
     end)
     QC.RegisterCallback("WARDROBE_CONCEPTS_CHANGED", pane, function()
         if pane:IsShown() then

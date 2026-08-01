@@ -6,6 +6,14 @@ local Wardrobe = QC.Wardrobe
 Wardrobe.CACHE_VERSION = 6
 Wardrobe.PAGE_SIZE = 7
 
+Wardrobe.WEAPON_FAMILY_ORDER = { "ONE_HAND", "TWO_HAND", "RANGED", "OFF_HAND" }
+Wardrobe.weaponFamilyDefinitions = {
+    ONE_HAND = { key = "ONE_HAND", label = "One-Hand", shortLabel = "1H" },
+    TWO_HAND = { key = "TWO_HAND", label = "Two-Hand", shortLabel = "2H" },
+    RANGED = { key = "RANGED", label = "Ranged", shortLabel = "Ranged" },
+    OFF_HAND = { key = "OFF_HAND", label = "Off-Hand", shortLabel = "Off-Hand" },
+}
+
 local LOGIN_REFRESH_DELAY = 3.0
 local LOGIN_REFRESH_RETRY_DELAY = 2.0
 local LOGIN_REFRESH_MAX_ATTEMPTS = 15
@@ -124,6 +132,14 @@ local function EnsurePreviewState()
     state.outfits.pages = state.outfits.pages or {}
     state.outfits.locks = state.outfits.locks or {}
     state.outfits.hidden = state.outfits.hidden or {}
+    state.outfits.weaponFamilies = state.outfits.weaponFamilies or {
+        ONE_HAND = true, TWO_HAND = true, RANGED = true, OFF_HAND = true,
+    }
+    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+        if state.outfits.weaponFamilies[familyKey] == nil then
+            state.outfits.weaponFamilies[familyKey] = true
+        end
+    end
     return state.outfits
 end
 
@@ -160,6 +176,9 @@ local function EnsureConceptStore()
         if concept.customSetSyncPendingAt and (not pendingCustomSetSync or pendingCustomSetSync.conceptID ~= concept.id) then
             concept.customSetSyncPendingAt = nil
         end
+        concept.weaponFamilies = concept.weaponFamilies or {
+            ONE_HAND = true, TWO_HAND = true, RANGED = true, OFF_HAND = true,
+        }
     end
     return store, characterKey
 end
@@ -916,6 +935,197 @@ local function GetEquippedItemInfo(slotName)
     return SafeCall(GetInventoryItemID, "player", slotID)
 end
 
+local function GetItemEquipLocation(itemInfo)
+    if not itemInfo then return nil end
+    local getInfo = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
+    if type(getInfo) ~= "function" then return nil end
+    local _, _, _, equipLoc = SafeCall(getInfo, itemInfo)
+    return equipLoc
+end
+
+local function ItemSupportsWeaponFamily(itemInfo, familyKey)
+    if not itemInfo then return false end
+    local definition = slotByKey[familyKey]
+    if definition and C_TransmogCollection and type(C_TransmogCollection.IsCategoryValidForItem) == "function" then
+        for _, categoryID in ipairs(ResolveCategoryIDs(definition)) do
+            if SafeCall(C_TransmogCollection.IsCategoryValidForItem, categoryID, itemInfo) == true then
+                return true
+            end
+        end
+    end
+
+    local equipLoc = GetItemEquipLocation(itemInfo)
+    if familyKey == "TWO_HAND" then
+        return equipLoc == "INVTYPE_2HWEAPON"
+    elseif familyKey == "RANGED" then
+        return equipLoc == "INVTYPE_RANGED" or equipLoc == "INVTYPE_RANGEDRIGHT" or equipLoc == "INVTYPE_THROWN"
+    elseif familyKey == "OFF_HAND" then
+        return equipLoc == "INVTYPE_SHIELD" or equipLoc == "INVTYPE_HOLDABLE" or equipLoc == "INVTYPE_WEAPONOFFHAND"
+    elseif familyKey == "ONE_HAND" then
+        return equipLoc == "INVTYPE_WEAPON" or equipLoc == "INVTYPE_WEAPONMAINHAND" or equipLoc == "INVTYPE_WEAPONOFFHAND"
+    end
+    return false
+end
+
+local function HasCachedWeaponFamily(familyKey)
+    return #(Wardrobe.GetSlotSources(familyKey) or {}) > 0
+end
+
+function Wardrobe.GetWeaponTopology()
+    local mainItem = GetEquippedItemInfo("MAINHANDSLOT")
+    local offItem = GetEquippedItemInfo("SECONDARYHANDSLOT")
+    local topology = {
+        mainItem = mainItem, offItem = offItem, available = {}, reasons = {},
+        mode = "NONE", label = "No weapon equipped", offHandPolicy = "NONE",
+    }
+
+    if not mainItem then
+        topology.mode = "UNARMED"
+        topology.label = "No main-hand weapon equipped"
+        topology.available.ONE_HAND = HasCachedWeaponFamily("ONE_HAND")
+        topology.available.TWO_HAND = HasCachedWeaponFamily("TWO_HAND")
+        topology.available.RANGED = HasCachedWeaponFamily("RANGED")
+        topology.available.OFF_HAND = topology.available.ONE_HAND and HasCachedWeaponFamily("OFF_HAND")
+        topology.offHandPolicy = topology.available.OFF_HAND and "OPTIONAL" or "NONE"
+        topology.reasons.ONE_HAND = topology.available.ONE_HAND and "Available from the cached collection." or "No cached one-hand appearances are available."
+        topology.reasons.TWO_HAND = topology.available.TWO_HAND and "Available from the cached collection." or "No cached two-hand appearances are available."
+        topology.reasons.RANGED = topology.available.RANGED and "Available from the cached collection." or "No cached ranged appearances are available."
+        topology.reasons.OFF_HAND = topology.available.OFF_HAND and "Available only when One-Hand is also selected." or "Off-Hand requires One-Hand and a cached off-hand appearance."
+        return topology
+    end
+
+    local mainOne = ItemSupportsWeaponFamily(mainItem, "ONE_HAND")
+    local mainTwo = ItemSupportsWeaponFamily(mainItem, "TWO_HAND")
+    local mainRanged = ItemSupportsWeaponFamily(mainItem, "RANGED")
+
+    if mainRanged and not mainOne then
+        topology.mode = "RANGED"
+        topology.label = "Ranged weapon equipped"
+        topology.available.RANGED = true
+    elseif mainTwo and not mainOne then
+        topology.mode = "TWO_HAND"
+        topology.label = "Two-handed weapon equipped"
+        topology.available.TWO_HAND = true
+    else
+        topology.mode = "ONE_HAND"
+        topology.label = "One-hand weapon equipped"
+        topology.available.ONE_HAND = true
+        if offItem then
+            if ItemSupportsWeaponFamily(offItem, "ONE_HAND") then
+                topology.mode = "DUAL_WIELD"
+                topology.label = "Dual-wield weapons equipped"
+                topology.offHandPolicy = "DUAL_WIELD"
+            elseif ItemSupportsWeaponFamily(offItem, "OFF_HAND") then
+                topology.mode = "ONE_HAND_OFF_HAND"
+                topology.label = "One-hand and off-hand equipped"
+                topology.available.OFF_HAND = true
+                topology.offHandPolicy = "OPTIONAL"
+            end
+        end
+    end
+
+    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+        if topology.available[familyKey] then
+            if familyKey == "OFF_HAND" then
+                topology.reasons[familyKey] = "Generate the equipped shield or focus alongside One-Hand."
+            elseif topology.mode == "DUAL_WIELD" and familyKey == "ONE_HAND" then
+                topology.reasons[familyKey] = "One-Hand generates both equipped weapon hands."
+            else
+                topology.reasons[familyKey] = "Compatible with the currently equipped weapon layout."
+            end
+        elseif familyKey == "OFF_HAND" and topology.mode == "DUAL_WIELD" then
+            topology.reasons[familyKey] = "Dual wielding uses the One-Hand pool for both hands."
+        elseif familyKey == "OFF_HAND" then
+            topology.reasons[familyKey] = "Off-Hand requires an equipped shield or focus with a one-hand weapon."
+        else
+            topology.reasons[familyKey] = string.format("%s is unavailable for the currently equipped weapon layout.", Wardrobe.weaponFamilyDefinitions[familyKey].label)
+        end
+    end
+    return topology
+end
+
+local function NormalizeWeaponFamilyChoices(state, topology)
+    topology = topology or Wardrobe.GetWeaponTopology()
+    state.weaponFamilies = state.weaponFamilies or {}
+    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+        if state.weaponFamilies[familyKey] == nil then state.weaponFamilies[familyKey] = true end
+    end
+    if topology.available.OFF_HAND and state.weaponFamilies.OFF_HAND and not state.weaponFamilies.ONE_HAND then
+        state.weaponFamilies.ONE_HAND = true
+    end
+    local anyMain = false
+    for _, familyKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+        if topology.available[familyKey] and state.weaponFamilies[familyKey] then anyMain = true break end
+    end
+    if not anyMain then
+        for _, familyKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+            if topology.available[familyKey] then
+                state.weaponFamilies[familyKey] = true
+                anyMain = true
+                break
+            end
+        end
+    end
+    if not topology.available.OFF_HAND then
+        -- Preserve the preference internally, but it remains ineffective while unavailable.
+    end
+    return topology
+end
+
+function Wardrobe.GetWeaponGenerationOptions()
+    local state = EnsurePreviewState()
+    local topology = NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponTopology())
+    local options = {}
+    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+        local available = topology.available[familyKey] == true
+        table.insert(options, {
+            key = familyKey,
+            label = Wardrobe.weaponFamilyDefinitions[familyKey].label,
+            available = available,
+            checked = available and state.weaponFamilies[familyKey] == true,
+            reason = topology.reasons[familyKey],
+        })
+    end
+    return options, topology
+end
+
+function Wardrobe.SetWeaponFamilyEnabled(familyKey, enabled)
+    local definition = Wardrobe.weaponFamilyDefinitions[familyKey]
+    if not definition then return false, "Unknown weapon family." end
+    local state = EnsurePreviewState()
+    local topology = NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponTopology())
+    if not topology.available[familyKey] then
+        return false, topology.reasons[familyKey] or (definition.label .. " is unavailable.")
+    end
+    enabled = enabled == true
+    local previous = state.weaponFamilies[familyKey]
+    state.weaponFamilies[familyKey] = enabled
+    if familyKey == "OFF_HAND" and enabled then state.weaponFamilies.ONE_HAND = true end
+    if familyKey == "ONE_HAND" and not enabled then state.weaponFamilies.OFF_HAND = false end
+
+    local anyMain = false
+    for _, key in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+        if topology.available[key] and state.weaponFamilies[key] then anyMain = true break end
+    end
+    if not anyMain then
+        state.weaponFamilies[familyKey] = previous
+        if familyKey == "ONE_HAND" and previous then state.weaponFamilies.OFF_HAND = state.weaponFamilies.OFF_HAND or false end
+        return false, "At least one available main weapon family must remain selected."
+    end
+    state.selectedConceptID = nil
+    if QC.Notify then QC.Notify("WARDROBE_WEAPON_OPTIONS_CHANGED", familyKey, enabled, topology) end
+    return true, string.format("%s generation %s.", definition.label, enabled and "enabled" or "disabled")
+end
+
+function Wardrobe.GetWeaponFamilySummary(families)
+    families = families or EnsurePreviewState().weaponFamilies
+    local labels = {}
+    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+        if families and families[familyKey] then table.insert(labels, Wardrobe.weaponFamilyDefinitions[familyKey].shortLabel) end
+    end
+    return #labels > 0 and table.concat(labels, ", ") or "None"
+end
+
 local function CreateWeaponGenerationContext()
     local now = GetTime and GetTime()
     internalUsabilityUpdateUntil = now and (now + 1.0) or nil
@@ -926,6 +1136,7 @@ local function CreateWeaponGenerationContext()
         appearancesByCategory = {},
         locationsBySlot = {},
         validation = {},
+        topology = Wardrobe.GetWeaponTopology(),
     }
 end
 
@@ -976,16 +1187,13 @@ local function ValidateGeneratedWeaponSource(source, slotKey, equippedItem, cont
     if not basicValid then
         return Finish(false, basicReason)
     end
-    if not equippedItem then
-        return Finish(false, slotKey == "OFF_HAND" and "No off-hand item is equipped." or "No main-hand item is equipped.")
-    end
     if not source.categoryID then
         return Finish(false, "This cached weapon appearance has no collection category. Rescan the collection.")
     end
     if not C_TransmogCollection or type(C_TransmogCollection.IsCategoryValidForItem) ~= "function" then
         return Finish(false, "WoW's equipped-item transmog compatibility check is unavailable.")
     end
-    if SafeCall(C_TransmogCollection.IsCategoryValidForItem, source.categoryID, equippedItem) ~= true then
+    if equippedItem and SafeCall(C_TransmogCollection.IsCategoryValidForItem, source.categoryID, equippedItem) ~= true then
         return Finish(false, "That appearance category cannot transmogrify the currently equipped item.")
     end
 
@@ -1047,11 +1255,11 @@ local function ChooseGeneratedWeaponSource(slotKeys, equippedItem, context, excl
             local validationSlotKey = targetSlotKey or slotKey
             local candidateSource = CopySourceForSlot(source, validationSlotKey)
             local basicValid = Wardrobe.ValidateSource(candidateSource, validationSlotKey)
-            local categoryValid = equippedItem and candidateSource.categoryID and SafeCall(
+            local categoryValid = candidateSource.categoryID and (not equippedItem or SafeCall(
                 C_TransmogCollection and C_TransmogCollection.IsCategoryValidForItem,
                 candidateSource.categoryID,
                 equippedItem
-            ) == true
+            ) == true)
             if basicValid and categoryValid then
                 table.insert(candidates, { source = candidateSource, slotKey = validationSlotKey })
             end
@@ -1100,74 +1308,60 @@ local function GetLockedWeaponMode(state)
 end
 
 local function GenerateWeapons(state, reroll, styleMode, styleContext)
-    local mode, errorMessage = GetLockedWeaponMode(state)
-    if errorMessage then
-        return false, errorMessage
-    end
+    local lockedMode, errorMessage = GetLockedWeaponMode(state)
+    if errorMessage then return false, errorMessage end
+
     local context = CreateWeaponGenerationContext()
+    local topology = NormalizeWeaponFamilyChoices(state, context.topology)
+    local enabledMain = {}
+    for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
+        if topology.available[familyKey] and state.weaponFamilies[familyKey] then
+            table.insert(enabledMain, familyKey)
+        end
+    end
+    if #enabledMain == 0 then
+        return false, "Select at least one available main weapon family before generating."
+    end
+
+    if lockedMode and not state.weaponFamilies[lockedMode] then
+        return false, string.format("The locked %s appearance is excluded by the weapon-family checkboxes. Enable it or unlock the slot.", slotByKey[lockedMode].label)
+    end
+
     local lockedMainSource
-
-    if not context.mainItem then
-        for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
-            if state.locks[slotKey] and state.selections[slotKey] then
-                return false, "A main-hand weapon appearance is locked, but no main-hand item is equipped. Equip a weapon or unlock that slot."
-            end
-            SetSelectedSource(state, slotKey, nil)
-        end
-        if state.locks.OFF_HAND and state.selections.OFF_HAND then
-            return false, "An off-hand appearance is locked, but no main-hand item is equipped. Equip your weapons or unlock the slot."
-        end
-        SetSelectedSource(state, "OFF_HAND", nil)
-        return true, 0, "No main-hand item is equipped, so Quest Chronicle generated armor only."
-    end
-
-    if mode and state.locks[mode] and state.selections[mode] then
-        lockedMainSource = GetSourceByID(mode, state.selections[mode])
-        local valid, reason = ValidateGeneratedWeaponSource(lockedMainSource, mode, context.mainItem, context)
+    if lockedMode and state.locks[lockedMode] and state.selections[lockedMode] then
+        lockedMainSource = GetSourceByID(lockedMode, state.selections[lockedMode])
+        local valid, reason = ValidateGeneratedWeaponSource(lockedMainSource, lockedMode, context.mainItem, context)
         if not valid then
-            return false, string.format("The locked %s appearance is not valid for the equipped main-hand item: %s Unlock it or equip a compatible weapon.", slotByKey[mode].label, reason or "incompatible")
+            return false, string.format("The locked %s appearance is not valid for the equipped main-hand item: %s", slotByKey[lockedMode].label, reason or "incompatible")
         end
     end
+
     if state.locks.OFF_HAND and state.selections.OFF_HAND then
-        local lockedOffHand = GetSourceByID("OFF_HAND", state.selections.OFF_HAND)
-        local valid, reason = ValidateGeneratedWeaponSource(lockedOffHand, "OFF_HAND", context.offItem, context)
-        if not valid then
-            return false, string.format("The locked Off-Hand appearance is not valid for the equipped off-hand item: %s Unlock it or equip a compatible item.", reason or "incompatible")
+        if topology.offHandPolicy ~= "OPTIONAL" and topology.offHandPolicy ~= "DUAL_WIELD" and topology.mode ~= "UNARMED" then
+            return false, "The locked Off-Hand appearance conflicts with the current equipped weapon layout."
         end
+        local lockedOff = GetSourceByID("OFF_HAND", state.selections.OFF_HAND)
+        local valid, reason = ValidateGeneratedWeaponSource(lockedOff, "OFF_HAND", context.offItem, context)
+        if not valid then return false, "The locked Off-Hand appearance is not valid: " .. tostring(reason or "incompatible") end
     end
 
-    local selectedMain
-    if lockedMainSource then
-        selectedMain = lockedMainSource
-    else
-        local allowedSlots = mode and { mode } or MAIN_WEAPON_SLOT_KEYS
+    local mode = lockedMode
+    local selectedMain = lockedMainSource
+    if not selectedMain then
         local excluded = {}
         if reroll then
-            for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
-                excluded[slotKey] = state.selections[slotKey]
-            end
+            for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do excluded[familyKey] = state.selections[familyKey] end
         end
-        selectedMain, mode = ChooseGeneratedWeaponSource(allowedSlots, context.mainItem, context, excluded, nil, styleMode, styleContext)
-        if selectedMain then
-            SetSelectedSource(state, mode, selectedMain)
-        end
+        selectedMain, mode = ChooseGeneratedWeaponSource(enabledMain, context.mainItem, context, excluded, nil, styleMode, styleContext)
+        if selectedMain then SetSelectedSource(state, mode, selectedMain) end
     end
 
-    for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
-        if slotKey ~= mode and not state.locks[slotKey] then
-            SetSelectedSource(state, slotKey, nil)
-        end
+    for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
+        if familyKey ~= mode and not state.locks[familyKey] then SetSelectedSource(state, familyKey, nil) end
     end
     if not selectedMain then
-        for _, slotKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
-            if not state.locks[slotKey] then
-                SetSelectedSource(state, slotKey, nil)
-            end
-        end
-        if not state.locks.OFF_HAND then
-            SetSelectedSource(state, "OFF_HAND", nil)
-        end
-        return true, 0, "WoW found no cached weapon visual valid for the equipped main-hand item; armor was generated and the equipped weapon was left unchanged."
+        if not state.locks.OFF_HAND then SetSelectedSource(state, "OFF_HAND", nil) end
+        return true, 0, "No cached weapon visual matched the selected weapon families; armor was generated and equipped weapons were left unchanged."
     end
 
     if QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then
@@ -1176,20 +1370,37 @@ local function GenerateWeapons(state, reroll, styleMode, styleContext)
 
     local selectedWeapons = 1
     local notice
-    if mode == "ONE_HAND" and context.offItem then
+    local generateOffHand = false
+    local offHandSourceSlots
+    local offHandItem = context.offItem
+    if mode == "ONE_HAND" then
+        if topology.offHandPolicy == "DUAL_WIELD" then
+            generateOffHand = true
+            offHandSourceSlots = { "ONE_HAND" }
+        elseif topology.offHandPolicy == "OPTIONAL" and state.weaponFamilies.OFF_HAND then
+            generateOffHand = true
+            offHandSourceSlots = { "OFF_HAND" }
+        elseif topology.mode == "UNARMED" and state.weaponFamilies.OFF_HAND then
+            generateOffHand = true
+            offHandSourceSlots = { "OFF_HAND" }
+            offHandItem = nil
+        end
+    end
+
+    if generateOffHand then
         if state.locks.OFF_HAND and state.selections.OFF_HAND then
             selectedWeapons = selectedWeapons + 1
         elseif not state.locks.OFF_HAND then
             local excluded = reroll and { OFF_HAND = state.selections.OFF_HAND } or nil
-            local offHand = ChooseGeneratedWeaponSource({ "OFF_HAND", "ONE_HAND" }, context.offItem, context, excluded, "OFF_HAND", styleMode, styleContext)
+            local offHand = ChooseGeneratedWeaponSource(offHandSourceSlots, offHandItem, context, excluded, "OFF_HAND", styleMode, styleContext)
             SetSelectedSource(state, "OFF_HAND", offHand)
             if offHand then
-                if QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then
-                    QC.ZoneStyle.AddSourceToGenerationContext(styleContext, offHand)
-                end
+                if QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then QC.ZoneStyle.AddSourceToGenerationContext(styleContext, offHand) end
                 selectedWeapons = selectedWeapons + 1
             else
-                notice = "No cached Off-Hand visual matched the equipped off-hand item, so its current appearance was left unchanged."
+                notice = topology.offHandPolicy == "DUAL_WIELD"
+                    and "No valid one-hand visual was found for the equipped off-hand weapon."
+                    or "No valid Off-Hand visual was found, so its current appearance was left unchanged."
             end
         end
     elseif not state.locks.OFF_HAND then
@@ -1288,11 +1499,29 @@ function Wardrobe.RerollSlot(slotKey)
     local styleContext = styleEngine and CreateStyleGenerationContext(state, styleEngine, styleEngine.GetCurrentContext(), slotKey, false) or nil
     if definition.weaponRole then
         local context = CreateWeaponGenerationContext()
+        local topology = NormalizeWeaponFamilyChoices(state, context.topology)
         local equippedItem = slotKey == "OFF_HAND" and context.offItem or context.mainItem
-        local sourceSlots = slotKey == "OFF_HAND" and { "OFF_HAND", "ONE_HAND" } or { slotKey }
+        local sourceSlots
+        if slotKey == "OFF_HAND" then
+            if topology.offHandPolicy == "DUAL_WIELD" and state.weaponFamilies.ONE_HAND then
+                sourceSlots = { "ONE_HAND" }
+            elseif (topology.offHandPolicy == "OPTIONAL" or topology.mode == "UNARMED") and topology.available.OFF_HAND and state.weaponFamilies.OFF_HAND then
+                sourceSlots = { "OFF_HAND" }
+            else
+                return false, topology.reasons.OFF_HAND or "Off-Hand generation is unavailable for the current weapon layout."
+            end
+        else
+            if not topology.available[slotKey] then
+                return false, topology.reasons[slotKey] or "That weapon family is unavailable for the current weapon layout."
+            end
+            if not state.weaponFamilies[slotKey] then
+                return false, string.format("Enable %s in Weapon Generation before rerolling this slot.", definition.label)
+            end
+            sourceSlots = { slotKey }
+        end
         local source = ChooseGeneratedWeaponSource(sourceSlots, equippedItem, context, { [slotKey] = state.selections[slotKey] }, slotKey, styleMode, styleContext)
         if not source then
-            return false, "No cached appearance in this weapon category is valid for the currently equipped item."
+            return false, "No cached appearance in this enabled weapon family is valid for the current weapon layout."
         end
         SetSelectedSource(state, slotKey, source)
         if styleEngine and styleEngine.AddSourceToGenerationContext then
@@ -1381,6 +1610,7 @@ function Wardrobe.SaveConcept(name)
     concept.visuals = CopyPrimitiveMap(state.selectionVisuals)
     concept.locks = CopyPrimitiveMap(state.locks)
     concept.hidden = CopyPrimitiveMap(state.hidden)
+    concept.weaponFamilies = CopyPrimitiveMap(state.weaponFamilies)
     concept.styleMode = QC.ZoneStyle and QC.ZoneStyle.NormalizeMode(state.styleMode) or state.styleMode
     concept.generatedName = state.generatedName
     concept.generatedAt = state.generatedAt
@@ -1404,6 +1634,8 @@ function Wardrobe.LoadConcept(conceptID)
     state.selectionVisuals = visuals
     state.locks = CopyPrimitiveMap(concept.locks)
     state.hidden = CopyPrimitiveMap(concept.hidden)
+    state.weaponFamilies = CopyPrimitiveMap(concept.weaponFamilies or { ONE_HAND = true, TWO_HAND = true, RANGED = true, OFF_HAND = true })
+    NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponTopology())
     state.generatedName = concept.generatedName
     state.generatedAt = concept.generatedAt
     if QC.ZoneStyle then
@@ -2715,6 +2947,7 @@ eventFrame:RegisterEvent("TRANSMOG_COLLECTION_SOURCE_REMOVED")
 eventFrame:RegisterEvent("TRANSMOG_COSMETIC_COLLECTION_SOURCE_ADDED")
 pcall(eventFrame.RegisterEvent, eventFrame, "TRANSMOG_CUSTOM_SETS_CHANGED")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+pcall(eventFrame.RegisterEvent, eventFrame, "PLAYER_EQUIPMENT_CHANGED")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_ENTERING_WORLD" then
         local cache = EnsureCache()
@@ -2728,6 +2961,10 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
             cache.dirtyReason = "CHARACTER_CHANGED"
         end
         ScheduleLoginRefresh()
+    elseif event == "PLAYER_EQUIPMENT_CHANGED" then
+        local state = EnsurePreviewState()
+        local topology = NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponTopology())
+        if QC.Notify then QC.Notify("WARDROBE_WEAPON_TOPOLOGY_CHANGED", topology, ...) end
     elseif event == "TRANSMOG_CUSTOM_SETS_CHANGED" then
         local request = pendingCustomSetSync
         local resolved = TryVerifyPendingCustomSet(false)

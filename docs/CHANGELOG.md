@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.5.0 - 2026-07-31
+
+### Added
+
+- Added One-Hand, Two-Hand, Ranged, and Off-Hand generation checkboxes to the Outfits workbench.
+- Added equipped weapon topology detection and live `PLAYER_EQUIPMENT_CHANGED` refreshes.
+- Added coherent rules for two-hand, ranged, one-hand, shield/focus, dual-wield, and unarmed layouts.
+- Added dynamic availability tooltips that remain readable even for unavailable families.
+- Saved weapon-family choices with Quest Chronicle outfit concepts.
+- Added weapon-family summaries to the concept manager.
+
+### Changed
+
+- Generate Outfit and Reroll Unlocked now use only checked, topology-compatible weapon families.
+- Off-Hand generation requires One-Hand; dual wield uses the One-Hand pool for both hands.
+- Locked weapon conflicts now stop generation with an explicit explanation.
+
+### Compatibility
+
+- Preserves SavedVariables schema 2, Courier format 1, and wardrobe cache format 6.
+- Existing concepts migrate to all-family preferences without requiring a wardrobe rescan.
+
 ## 1.0.6 - 2026-07-31
 
 ### Changed

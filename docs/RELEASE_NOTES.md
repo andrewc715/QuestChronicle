@@ -1,39 +1,37 @@
-# Quest Chronicle v1.0.6: Deliberate Wardrobe Refreshes
+# Quest Chronicle v1.5.0: Weapon Generation Families
 
-Version 1.0.6 removes mid-session automatic wardrobe rescans. Quest Chronicle now refreshes the wardrobe exactly once after login or `/reload`, then leaves further refreshes under player control.
+Version 1.5.0 turns weapon selection into a first-class part of the Outfits workbench.
 
-## New refresh policy
+## Added
 
-- The first `PLAYER_ENTERING_WORLD` event in a freshly loaded addon session schedules one wardrobe scan.
-- Additional loading screens and zone transitions in the same session do not schedule another scan.
-- `/reload` starts a new addon session, so it receives one new login scan.
-- Learning, removing, or otherwise changing transmog appearances only marks the cache stale.
-- Collection events never launch a background rescan.
-- **Scan Collection** remains available for deliberate manual refreshes at any time.
+- Four independent generation checkboxes:
+  - One-Hand
+  - Two-Hand
+  - Ranged
+  - Off-Hand
+- Equipment-topology detection using the currently equipped main-hand and off-hand items.
+- Live recalculation after `PLAYER_EQUIPMENT_CHANGED`.
+- Dynamic tooltips explaining why each weapon family is available or unavailable.
+- Weapon-family preferences stored with every Quest Chronicle outfit concept.
+- Weapon-family summaries in the Outfit Concepts list.
+- Support for selecting any subset of compatible families when no main-hand weapon is equipped.
 
-## UI
+## Weapon topology rules
 
-When WoW reports a collection change after the most recent scan, the Outfits header displays:
+- **Two-handed melee, staff, or polearm:** Two-Hand only.
+- **Bow, crossbow, or gun:** Ranged only.
+- **One-hand with an empty off-hand:** One-Hand only.
+- **One-hand with shield or focus:** One-Hand, with Off-Hand independently optional.
+- **Dual wield:** One-Hand generates both hands; the separate Off-Hand pool is unavailable.
+- **No main-hand weapon:** any cached main family may be checked; Off-Hand requires One-Hand.
 
-```text
-Collection may be stale    [Scan Collection]
-```
-
-The warning disappears after a successful manual scan or the next login/reload scan. Its tooltip explains that Quest Chronicle intentionally does not refresh again automatically during the current session.
-
-Status & Maintenance now reports **Collection may be stale** instead of implying that an automatic scan is queued.
-
-## Settings
-
-The old **Refresh the wardrobe after collection changes** setting has been retired because collection events no longer trigger scans. The remaining wardrobe-maintenance chat setting now applies to the one-time login scan, deferred login scans, and appearance-source recovery notices.
+Unchecked or incompatible families cannot be selected by Generate Outfit or Reroll Unlocked. A locked weapon that conflicts with the checkbox pool produces a clear error instead of silently changing topology.
 
 ## Preserved
 
 - SavedVariables schema 2.
 - Courier format 1.
-- Wardrobe cache format 6.
-- Chronicle history, RP notes, active quests, outfit concepts, locks, hidden slots, source identities, and zone preferences.
-- Linked and verified Blizzard Custom Sets.
-- Minimap button and AddOn Compartment access.
-
-No wardrobe cache migration or Custom Set resave is required.
+- Wardrobe cache format 6, so no collection rescan is required solely for this update.
+- Existing concepts migrate with all four weapon families enabled, matching earlier behavior before topology filtering.
+- Custom Set creation, verification, and authoritative Quest Chronicle concept backups.
+- One automatic wardrobe refresh per login or `/reload`; later changes only mark the cache stale.

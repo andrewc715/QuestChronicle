@@ -1,8 +1,8 @@
-# Quest Chronicle v1.0.6
+# Quest Chronicle v1.5.0
 
-> **Quest Chronicle:** v1.0.6 performs one wardrobe refresh per login or `/reload`; later collection changes display a stale-cache notice until the player chooses **Scan Collection**.
+> **Weapon Generation:** v1.5.0 adds topology-aware One-Hand, Two-Hand, Ranged, and Off-Hand generation checkboxes while preserving the deliberate one-scan-per-login wardrobe policy.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.0.6 preserves the complete quest lifecycle, journal, Courier, Custom Set, and outfit-design systems while limiting wardrobe automation to one scan per login or `/reload`.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.5.0 adds a saved, equipment-aware weapon-family generation system to the complete lifecycle, journal, Courier, Custom Set, and outfit-design toolset.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -231,6 +231,19 @@ Generated outfits and rerolls always reject Blizzard's Trading Post source type.
 Manual browsing remains unrestricted. Promotional rows say **Promo excluded**, and their tooltip explains that the restriction applies only to generation.
 
 For visual coherence, the generator establishes the outfit from major armor silhouettes first. It strongly favors pieces belonging to the same Blizzard transmog set, rewards shared motifs such as fire, frost, shadow, radiant, nature, arcane, storm, fel, necrotic, mechanical, rustic, or regal, and rejects isolated dramatic accents that conflict with the established outfit. Weapons are chosen afterward so they reinforce the armor while still passing every equipped-item transmog rule. Individual rerolls build their profile from the rest of the visible preview.
+
+### Weapon generation families
+
+The Outfits workbench exposes independent checkboxes for **One-Hand**, **Two-Hand**, **Ranged**, and **Off-Hand**. Checked families form the generation pool, but the equipped hand layout remains the final authority:
+
+- a two-handed weapon permits Two-Hand only;
+- a bow, crossbow, or gun permits Ranged only;
+- a lone one-hand weapon permits One-Hand only;
+- a one-hand weapon with a shield or focus permits One-Hand with optional Off-Hand generation;
+- dual wielding uses One-Hand for both equipped weapon hands;
+- with no main-hand weapon equipped, any cached family may be selected for preview generation.
+
+Unavailable choices stay visible with explanatory tooltips. At least one available main family must remain checked. Weapon-family choices are saved with outfit concepts and recomputed whenever equipped weapons change.
 
 ### Current Look
 
