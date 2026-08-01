@@ -1186,7 +1186,16 @@ local function GetTransmogOutfitSlotForInventorySlotName(slotName)
     end
     local inventorySlotID = SafeCall(GetInventorySlotInfo, slotName)
     if inventorySlotID == nil then return nil end
-    return SafeCall(C_TransmogOutfitInfo.GetTransmogOutfitSlotFromInventorySlot, inventorySlotID)
+
+    -- GetInventorySlotInfo returns the traditional 1-based INVSLOT_* value
+    -- (Main Hand 16, Off Hand 17). GetTransmogOutfitSlotFromInventorySlot
+    -- accepts Enum.InventorySlots, whose equipment values are zero-based
+    -- (Main Hand 15, Off Hand 16). Passing the INVSLOT value directly shifts
+    -- every lookup one slot to the right: Main Hand becomes Off Hand and Off
+    -- Hand becomes Ranged. That left Fury's secondary one-hand capability empty.
+    local inventorySlotEnum = inventorySlotID - 1
+    if inventorySlotEnum < 0 then return nil end
+    return SafeCall(C_TransmogOutfitInfo.GetTransmogOutfitSlotFromInventorySlot, inventorySlotEnum)
 end
 
 local function GetLinkedWeaponSlotContext(outfitSlot)
@@ -1313,9 +1322,15 @@ local function GetBlizzardWeaponCategoryPermission(slotName, categoryID)
     local options, equippedOption, slotContext = GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)
     local checked = {}
     for _, optionInfo in ipairs(options) do
+        -- Blizzard's linked secondary weapon is edited through the primary
+        -- slot's weapon-option channel. The secondary slot is used when reading
+        -- or applying its chosen appearance, but collection-category permission
+        -- belongs to the linked primary slot.
+        local permissionSlot = slotContext and slotContext.isSecondary
+            and slotContext.primarySlot or outfitSlot
         local collectionInfo = SafeCall(
             C_TransmogOutfitInfo.GetCollectionInfoForSlotAndOption,
-            outfitSlot,
+            permissionSlot,
             optionInfo.weaponOption,
             categoryID
         )
@@ -1330,6 +1345,7 @@ local function GetBlizzardWeaponCategoryPermission(slotName, categoryID)
         if collectionInfo ~= nil and collectionInfo.isWeapon == true then
             return true, {
                 outfitSlot = outfitSlot,
+                permissionSlot = permissionSlot,
                 weaponOption = optionInfo.weaponOption,
                 weaponOptionName = optionInfo.name,
                 equippedWeaponOption = equippedOption,
@@ -1346,6 +1362,7 @@ local function GetBlizzardWeaponCategoryPermission(slotName, categoryID)
 
     return false, {
         outfitSlot = outfitSlot,
+        permissionSlot = slotContext and slotContext.isSecondary and slotContext.primarySlot or outfitSlot,
         equippedWeaponOption = equippedOption,
         method = slotContext and slotContext.isLinked and "LINKED_OUTFIT_SLOT_OPTION_MATRIX" or "OUTFIT_SLOT_OPTION_MATRIX",
         optionOwnerSlot = slotContext and slotContext.optionOwnerSlot or outfitSlot,
@@ -1408,6 +1425,7 @@ local function BuildWeaponHandCapability(handKey, itemInfo, slotName, allowWitho
             available = available,
             permissionMethod = permissionDetails and permissionDetails.method or nil,
             outfitSlot = permissionDetails and permissionDetails.outfitSlot or nil,
+            permissionSlot = permissionDetails and permissionDetails.permissionSlot or nil,
             weaponOption = permissionDetails and permissionDetails.weaponOption or nil,
             weaponOptionName = permissionDetails and permissionDetails.weaponOptionName or nil,
             equippedWeaponOption = permissionDetails and permissionDetails.equippedWeaponOption or nil,
@@ -1434,6 +1452,59 @@ local function BuildWeaponHandCapability(handKey, itemInfo, slotName, allowWitho
         capability.families[subtype.familyKey].available = capability.families[subtype.familyKey].available or available
     end
     return capability
+end
+
+function Wardrobe.GetWeaponRuleDiagnostics()
+    local topology = Wardrobe.GetWeaponTopology()
+    local mainInventorySlotID = SafeCall(GetInventorySlotInfo, "MAINHANDSLOT")
+    local offInventorySlotID = SafeCall(GetInventorySlotInfo, "SECONDARYHANDSLOT")
+    local mainOutfitSlot = GetTransmogOutfitSlotForInventorySlotName("MAINHANDSLOT")
+    local offOutfitSlot = GetTransmogOutfitSlotForInventorySlotName("SECONDARYHANDSLOT")
+    local mainLinked = GetLinkedWeaponSlotContext(mainOutfitSlot)
+    local offLinked = GetLinkedWeaponSlotContext(offOutfitSlot)
+    local capabilities = Wardrobe.GetWeaponAppearanceCapabilities()
+    local state = EnsurePreviewState()
+
+    local function SelectedSubtypeSummary(hand)
+        local values = {}
+        for _, subtypeKey in ipairs(Wardrobe.WEAPON_SUBTYPE_ORDER) do
+            local capability = hand and hand.subtypes and hand.subtypes[subtypeKey]
+            if capability and capability.available then
+                table.insert(values, subtypeKey .. "@" .. tostring(capability.permissionSlot or capability.outfitSlot or "?"))
+            end
+        end
+        return #values > 0 and table.concat(values, ", ") or "none"
+    end
+
+    return {
+        topology = topology.label,
+        mainInventorySlotID = mainInventorySlotID,
+        offInventorySlotID = offInventorySlotID,
+        mainInventoryEnum = mainInventorySlotID and (mainInventorySlotID - 1) or nil,
+        offInventoryEnum = offInventorySlotID and (offInventorySlotID - 1) or nil,
+        mainOutfitSlot = mainOutfitSlot,
+        offOutfitSlot = offOutfitSlot,
+        mainOptionOwner = mainLinked and mainLinked.optionOwnerSlot or nil,
+        offOptionOwner = offLinked and offLinked.optionOwnerSlot or nil,
+        mainAvailable = SelectedSubtypeSummary(capabilities.main),
+        offAvailable = SelectedSubtypeSummary(capabilities.off),
+        mainSelection = state.selections and (state.selections.ONE_HAND or state.selections.TWO_HAND or state.selections.RANGED) or nil,
+        offSelection = state.selections and state.selections.OFF_HAND or nil,
+        linked = state.linkWeaponHands ~= false,
+    }
+end
+
+function Wardrobe.PrintWeaponRuleDiagnostics()
+    local d = Wardrobe.GetWeaponRuleDiagnostics()
+    local printLine = QC.Print or print
+    printLine("Weapon rule diagnostics:")
+    printLine(string.format("Topology: %s", tostring(d.topology)))
+    printLine(string.format("Inventory slots: MH %s -> enum %s | OH %s -> enum %s", tostring(d.mainInventorySlotID), tostring(d.mainInventoryEnum), tostring(d.offInventorySlotID), tostring(d.offInventoryEnum)))
+    printLine(string.format("Outfit slots: MH %s (owner %s) | OH %s (owner %s)", tostring(d.mainOutfitSlot), tostring(d.mainOptionOwner), tostring(d.offOutfitSlot), tostring(d.offOptionOwner)))
+    printLine(string.format("Available MH: %s", tostring(d.mainAvailable)))
+    printLine(string.format("Available OH: %s", tostring(d.offAvailable)))
+    printLine(string.format("Selections: MH %s | OH %s | linked %s", tostring(d.mainSelection), tostring(d.offSelection), tostring(d.linked)))
+    return d
 end
 
 function Wardrobe.GetWeaponAppearanceCapabilities()

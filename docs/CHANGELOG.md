@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.8 - 2026-08-01
+
+### Fixed
+
+- Corrected the one-based `INVSLOT_*` to zero-based `InventorySlots` conversion used by the Transmog Outfit API.
+- Prevented Main Hand native-rule queries from addressing Off Hand and Off Hand queries from addressing Ranged.
+- Resolved linked-secondary collection permissions through the linked primary slot.
+- Added `/qc weapon debug` live diagnostics for slot mapping, option ownership, capabilities, and selections.
+- Preserved the stable synchronous preview path.
+
 ## 1.6.7 - 2026-08-01
 
 ### Fixed

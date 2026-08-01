@@ -16,7 +16,7 @@ local questSyncToken = 0
 
 local SCHEMA_VERSION = 2
 local COURIER_FORMAT_VERSION = 1
-local ADDON_VERSION = "1.6.7"
+local ADDON_VERSION = "1.6.8"
 local PREFIX = "|cffd9b36cQuest Chronicle:|r "
 local OBJECTIVE_SYNC_DELAY = 0.35
 local REMOVAL_CLASSIFY_DELAY = 0.45
@@ -1227,6 +1227,7 @@ local function PrintHelp()
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc objectives on|off|r - toggle objective progress events")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc removals on|off|r - toggle abandonment and removal events")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc minimap show|hide|toggle|reset|r - manage the minimap button")
+    DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc weapon debug|r - print weapon slot, option, and selection diagnostics")
 end
 
 local function HandleSlashCommand(message)
@@ -1281,6 +1282,13 @@ local function HandleSlashCommand(message)
         SetTrackingSetting("objectiveTracking", string.lower(rest), "Objectives")
     elseif command == "removals" then
         SetTrackingSetting("removalTracking", string.lower(rest), "Removals")
+    elseif command == "weapon" then
+        local subcommand = string.lower(rest:match("^(%S*)") or "")
+        if subcommand == "debug" and QC.Wardrobe and QC.Wardrobe.PrintWeaponRuleDiagnostics then
+            QC.Wardrobe.PrintWeaponRuleDiagnostics()
+        else
+            Print("Usage: /qc weapon debug")
+        end
     elseif command == "minimap" then
         local value = string.lower(rest or "")
         if value == "show" or value == "on" then

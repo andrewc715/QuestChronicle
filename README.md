@@ -1,8 +1,8 @@
-# Quest Chronicle v1.6.7
+# Quest Chronicle v1.6.8
 
-> **Linked weapon option-owner repair:** v1.6.7 follows Blizzard's linked-slot model: the primary weapon slot owns the appearance-option list, and that same option is used to resolve the linked secondary hand.
+> **Inventory-slot enum repair:** v1.6.8 corrects the boundary between WoW's traditional 1-based inventory slot IDs and the zero-based `Enum.InventorySlots` values required by the Transmog Outfit API. Main Hand and Secondary Hand now resolve to their intended native outfit slots before linked weapon permissions are evaluated.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.6.7 preserves physical dual-two-hand topology while correctly generating linked one-hand appearances for both Fury weapon hands.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.6.8 preserves physical dual-two-hand topology while correcting the native slot mapping used to discover and commit linked Fury one-hand appearances for both weapon hands.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

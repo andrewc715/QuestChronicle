@@ -1,55 +1,25 @@
-# Quest Chronicle v1.6.7: Linked Weapon Option-Owner Repair
+# Quest Chronicle v1.6.8: Inventory Slot Enum Repair
 
-Version 1.6.7 fixes the remaining Fury Warrior case where Quest Chronicle correctly recognized **Dual two-handed weapons equipped**, allowed one-handed appearances, and generated a one-handed Main Hand, but left the Secondary Hand on its physically equipped two-handed weapon.
-
-## What the live evidence proved
-
-The topology label was already correct. Quest Chronicle knew that both physical weapon hands contained two-handed weapons.
-
-The decisive evidence was the Current Preview manifest:
-
-- `One-Hand` was `Selected`;
-- `Off-Hand` remained `Equipped`.
-
-That means the problem occurred before model rendering. Quest Chronicle never committed a generated `OFF_HAND` selection.
+Version 1.6.8 repairs the weapon-rule lookup at the boundary between WoW's traditional inventory slot IDs and the new Transmog Outfit API.
 
 ## Root cause
 
-Blizzard models certain weapon slots as a linked primary/secondary pair.
+`GetInventorySlotInfo()` returns 1-based equipment slot IDs such as Main Hand 16 and Off Hand 17. `C_TransmogOutfitInfo.GetTransmogOutfitSlotFromInventorySlot()` accepts the zero-based `Enum.InventorySlots` values, where Main Hand is 15 and Off Hand is 16.
 
-The primary slot owns the weapon-option dropdown. Blizzard then uses the option selected on the primary slot when it resolves the linked secondary appearance. The secondary slot does not necessarily expose the complete option list independently.
+Quest Chronicle passed 16 and 17 directly. Its native rule queries were therefore shifted one equipment slot:
 
-Quest Chronicle v1.6.6 asked each hand for its own option list. In the live Fury case:
+- the Main Hand query addressed the Off Hand slot;
+- the Off Hand query addressed the Ranged slot.
 
-- Main Hand exposed the one-handed appearance option;
-- Secondary Hand independently exposed only the equipped two-handed option;
-- the one-handed secondary appearance was rejected before linked generation ran.
+Physical topology still displayed correctly because it uses the ordinary equipped-item APIs. The shifted native slot lookup only affected appearance permission and selection, which is why the UI correctly said `Dual two-handed weapons equipped` while linked one-hand generation never wrote `OFF_HAND`.
 
 ## Changes
 
-- Uses `C_TransmogOutfitInfo.GetLinkedSlotInfo()` to identify linked primary and secondary weapon slots.
-- Fetches equipped, standard, and artifact weapon options from the linked **primary** slot.
-- Tests those shared options against the actual requested target slot through `GetCollectionInfoForSlotAndOption()`.
-- Records the primary option-owner slot and linked-secondary target in capability diagnostics.
-- Treats Blizzard's linked slot-and-option permission as authoritative during generated-source validation.
-- Improves subtype tooltips so a linked secondary permission explains that it was granted through the primary hand's weapon option.
-- Preserves strict linked generation:
-  - exact same visual first;
-  - same exact subtype second;
-  - no unrelated weapon fallback.
-- Does not modify the stable synchronous character-preview path restored in v1.6.5.
-
-## Expected Fury behavior
-
-With two physical two-handed weapons equipped, One-Hand enabled, Two-Hand disabled, One-Handed Sword selected, and Link weapon hands enabled:
-
-- topology remains `Dual two-handed weapons equipped`;
-- Main Hand and Secondary Hand both resolve the one-handed option owned by the linked primary slot;
-- generation writes both `ONE_HAND` and `OFF_HAND` selections;
-- Current Preview lists both weapon entries as `Selected`;
-- the embedded model receives targeted Main Hand and Secondary Hand preview calls.
-
-A character whose linked primary slot exposes only a two-handed option remains restricted to Two-Hand appearances.
+- Converts the 1-based `INVSLOT_*` value to the zero-based `InventorySlots` enum before resolving a Transmog Outfit slot.
+- Uses the linked primary outfit slot when checking collection-category permission for a linked secondary weapon.
+- Keeps the secondary outfit slot for its actual selected appearance and manifest entry.
+- Adds `/qc weapon debug` to print the live inventory-slot conversion, resolved outfit slots, option owners, available subtypes, and current weapon selections.
+- Leaves the stable synchronous preview code from v1.6.5 untouched.
 
 ## Compatibility
 
@@ -57,4 +27,3 @@ A character whose linked primary slot exposes only a two-handed option remains r
 - Courier format remains 1.
 - Wardrobe cache format remains 6.
 - No wardrobe rescan, concept migration, or Custom Set rebuild is required.
-- Existing concepts, Custom Set links, Chronicle records, RP notes, settings, and Courier data remain intact.
