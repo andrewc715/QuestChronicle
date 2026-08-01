@@ -1,8 +1,8 @@
-# Quest Chronicle v1.5.1
+# Quest Chronicle v1.6.0
 
-> **Weapon Topology Fix:** v1.5.1 makes the equipped item's inventory location authoritative, preventing two-handed swords from being mistaken for one-hand weapons while preserving the v1.5.0 weapon-family controls.
+> **Weapon Appearance Rules:** v1.6.0 separates physical weapon topology from Blizzard's live appearance permissions, moves weapon controls into the Equipment Slot panel, and adds exact weapon-type filters with per-hand validation.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.5.1 fixes equipped weapon topology detection while preserving the complete lifecycle, journal, Courier, Custom Set, and outfit-design toolset.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 1.6.0 adds Blizzard-driven weapon appearance rules while preserving the complete lifecycle, journal, Courier, Custom Set, and outfit-design toolset.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -99,7 +99,6 @@ Settings include:
 - Remember window position and size
 - Lock window position and size
 - Restrict generated outfits to the zone's expansion
-- Refresh the wardrobe after collection changes
 - Recover changed appearance sources
 - Announce wardrobe maintenance in chat
 - High-contrast outfit states
@@ -232,18 +231,33 @@ Manual browsing remains unrestricted. Promotional rows say **Promo excluded**, a
 
 For visual coherence, the generator establishes the outfit from major armor silhouettes first. It strongly favors pieces belonging to the same Blizzard transmog set, rewards shared motifs such as fire, frost, shadow, radiant, nature, arcane, storm, fel, necrotic, mechanical, rustic, or regal, and rejects isolated dramatic accents that conflict with the established outfit. Weapons are chosen afterward so they reinforce the armor while still passing every equipped-item transmog rule. Individual rerolls build their profile from the rest of the visible preview.
 
-### Weapon generation families
+### Weapon Appearance Rules
 
-The Outfits workbench exposes independent checkboxes for **One-Hand**, **Two-Hand**, **Ranged**, and **Off-Hand**. Checked families form the generation pool, but the equipped hand layout remains the final authority:
+The Equipment Slot panel now owns every weapon-generation control. Armor remains a normal slot list, followed by a dedicated **Weapon Appearances** section containing independent family checkboxes and type-configuration arrows:
 
-- a two-handed weapon permits Two-Hand only;
-- a bow, crossbow, or gun permits Ranged only;
-- a lone one-hand weapon permits One-Hand only;
-- a one-hand weapon with a shield or focus permits One-Hand with optional Off-Hand generation;
-- dual wielding uses One-Hand for both equipped weapon hands;
-- with no main-hand weapon equipped, any cached family may be selected for preview generation.
+- **One-Hand**: wand, one-handed axe, sword, mace, dagger, fist weapon, warglaive, and paired artifact.
+- **Two-Hand**: two-handed axe, sword, mace, staff, and polearm.
+- **Ranged**: bow, gun, and crossbow.
+- **Off-Hand**: shield and holdable/focus.
 
-Unavailable choices stay visible with explanatory tooltips. At least one available main family must remain checked. Weapon-family choices are saved with outfit concepts and recomputed whenever equipped weapons change.
+The equipped item's inventory location determines physical topology only: single two-hand, dual two-hand, dual one-hand, mixed dual weapons, weapon plus shield/focus, ranged, or unarmed. Quest Chronicle then asks Blizzard whether each exact appearance category is valid for the equipped item in each hand. This preserves unusual class, specialization, talent, artifact, and patch-specific rules without hardcoding a growing class exception table.
+
+For example, a Fury warrior can physically dual-wield two-handed weapons while Blizzard may permit both one-handed and two-handed appearance categories on those items. Both families become available when Blizzard reports them as valid. Ranged and shield/focus remain unavailable unless Blizzard permits those categories for the corresponding equipped hand.
+
+Clicking a weapon family row browses its filtered collection. Its checkbox includes or excludes the family from generation, while the **>** button opens an anchored type flyout containing:
+
+- one checkbox per exact weapon type;
+- collected previewable counts;
+- **All Compatible**;
+- **Equipped Type**;
+- **Clear**;
+- **Done**.
+
+Only types checked by the player and currently permitted by Blizzard appear in the weapon browser or generation pool. Quest Chronicle chooses a type before choosing an appearance so categories with enormous collections do not automatically drown out smaller selected categories.
+
+When two weapon hands are equipped, **Link weapon hands** prefers the same family and exact type in both hands. Disabling it lets each hand generate independently from its own Blizzard capability matrix. Equipment, specialization, active talent group, and trait-configuration changes refresh those permissions without rescanning the wardrobe.
+
+Weapon-family choices, exact type filters, and the linked-hands preference are stored with every outfit concept. Loading a concept restores its preferences, then intersects them with Blizzard's current permissions. Dormant preferences remain saved rather than being deleted. Custom Sets continue to receive only the finished appearance recipe.
 
 ### Current Look
 

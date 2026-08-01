@@ -14,6 +14,33 @@ Wardrobe.weaponFamilyDefinitions = {
     OFF_HAND = { key = "OFF_HAND", label = "Off-Hand", shortLabel = "Off-Hand" },
 }
 
+Wardrobe.WEAPON_SUBTYPE_ORDER = {
+    "ONE_HAND_WAND", "ONE_HAND_AXE", "ONE_HAND_SWORD", "ONE_HAND_MACE", "ONE_HAND_DAGGER", "ONE_HAND_FIST", "ONE_HAND_WARGLAIVE", "ONE_HAND_PAIRED",
+    "TWO_HAND_AXE", "TWO_HAND_SWORD", "TWO_HAND_MACE", "TWO_HAND_STAFF", "TWO_HAND_POLEARM",
+    "RANGED_BOW", "RANGED_GUN", "RANGED_CROSSBOW",
+    "OFF_HAND_SHIELD", "OFF_HAND_HOLDABLE",
+}
+Wardrobe.weaponSubtypeDefinitions = {
+    ONE_HAND_WAND = { key = "ONE_HAND_WAND", familyKey = "ONE_HAND", label = "Wand", shortLabel = "Wand", categoryName = "Wand", fallbackCategoryID = 12 },
+    ONE_HAND_AXE = { key = "ONE_HAND_AXE", familyKey = "ONE_HAND", label = "One-Handed Axe", shortLabel = "1H Axe", categoryName = "OneHAxe", fallbackCategoryID = 13 },
+    ONE_HAND_SWORD = { key = "ONE_HAND_SWORD", familyKey = "ONE_HAND", label = "One-Handed Sword", shortLabel = "1H Sword", categoryName = "OneHSword", fallbackCategoryID = 14 },
+    ONE_HAND_MACE = { key = "ONE_HAND_MACE", familyKey = "ONE_HAND", label = "One-Handed Mace", shortLabel = "1H Mace", categoryName = "OneHMace", fallbackCategoryID = 15 },
+    ONE_HAND_DAGGER = { key = "ONE_HAND_DAGGER", familyKey = "ONE_HAND", label = "Dagger", shortLabel = "Dagger", categoryName = "Dagger", fallbackCategoryID = 16 },
+    ONE_HAND_FIST = { key = "ONE_HAND_FIST", familyKey = "ONE_HAND", label = "Fist Weapon", shortLabel = "Fist", categoryName = "Fist", fallbackCategoryID = 17 },
+    ONE_HAND_WARGLAIVE = { key = "ONE_HAND_WARGLAIVE", familyKey = "ONE_HAND", label = "Warglaive", shortLabel = "Warglaive", categoryName = "Warglaives", fallbackCategoryID = 28 },
+    ONE_HAND_PAIRED = { key = "ONE_HAND_PAIRED", familyKey = "ONE_HAND", label = "Paired Artifact", shortLabel = "Paired", categoryName = "Paired", fallbackCategoryID = 29 },
+    TWO_HAND_AXE = { key = "TWO_HAND_AXE", familyKey = "TWO_HAND", label = "Two-Handed Axe", shortLabel = "2H Axe", categoryName = "TwoHAxe", fallbackCategoryID = 20 },
+    TWO_HAND_SWORD = { key = "TWO_HAND_SWORD", familyKey = "TWO_HAND", label = "Two-Handed Sword", shortLabel = "2H Sword", categoryName = "TwoHSword", fallbackCategoryID = 21 },
+    TWO_HAND_MACE = { key = "TWO_HAND_MACE", familyKey = "TWO_HAND", label = "Two-Handed Mace", shortLabel = "2H Mace", categoryName = "TwoHMace", fallbackCategoryID = 22 },
+    TWO_HAND_STAFF = { key = "TWO_HAND_STAFF", familyKey = "TWO_HAND", label = "Staff", shortLabel = "Staff", categoryName = "Staff", fallbackCategoryID = 23 },
+    TWO_HAND_POLEARM = { key = "TWO_HAND_POLEARM", familyKey = "TWO_HAND", label = "Polearm", shortLabel = "Polearm", categoryName = "Polearm", fallbackCategoryID = 24 },
+    RANGED_BOW = { key = "RANGED_BOW", familyKey = "RANGED", label = "Bow", shortLabel = "Bow", categoryName = "Bow", fallbackCategoryID = 25 },
+    RANGED_GUN = { key = "RANGED_GUN", familyKey = "RANGED", label = "Gun", shortLabel = "Gun", categoryName = "Gun", fallbackCategoryID = 26 },
+    RANGED_CROSSBOW = { key = "RANGED_CROSSBOW", familyKey = "RANGED", label = "Crossbow", shortLabel = "Crossbow", categoryName = "Crossbow", fallbackCategoryID = 27 },
+    OFF_HAND_SHIELD = { key = "OFF_HAND_SHIELD", familyKey = "OFF_HAND", label = "Shield", shortLabel = "Shield", categoryName = "Shield", fallbackCategoryID = 18 },
+    OFF_HAND_HOLDABLE = { key = "OFF_HAND_HOLDABLE", familyKey = "OFF_HAND", label = "Holdable / Focus", shortLabel = "Focus", categoryName = "Holdable", fallbackCategoryID = 19 },
+}
+
 local LOGIN_REFRESH_DELAY = 3.0
 local LOGIN_REFRESH_RETRY_DELAY = 2.0
 local LOGIN_REFRESH_MAX_ATTEMPTS = 15
@@ -140,6 +167,13 @@ local function EnsurePreviewState()
             state.outfits.weaponFamilies[familyKey] = true
         end
     end
+    state.outfits.weaponSubtypes = state.outfits.weaponSubtypes or {}
+    for _, subtypeKey in ipairs(Wardrobe.WEAPON_SUBTYPE_ORDER) do
+        if state.outfits.weaponSubtypes[subtypeKey] == nil then
+            state.outfits.weaponSubtypes[subtypeKey] = true
+        end
+    end
+    state.outfits.linkWeaponHands = state.outfits.linkWeaponHands ~= false
     return state.outfits
 end
 
@@ -179,6 +213,11 @@ local function EnsureConceptStore()
         concept.weaponFamilies = concept.weaponFamilies or {
             ONE_HAND = true, TWO_HAND = true, RANGED = true, OFF_HAND = true,
         }
+        concept.weaponSubtypes = concept.weaponSubtypes or {}
+        for _, subtypeKey in ipairs(Wardrobe.WEAPON_SUBTYPE_ORDER) do
+            if concept.weaponSubtypes[subtypeKey] == nil then concept.weaponSubtypes[subtypeKey] = true end
+        end
+        if concept.linkWeaponHands == nil then concept.linkWeaponHands = true end
     end
     return store, characterKey
 end
@@ -248,6 +287,42 @@ local function ResolveCategoryIDs(definition)
     end
     definition.categoryIDs = categoryIDs
     return categoryIDs
+end
+
+local weaponSubtypeByCategoryID = {}
+
+local function ResolveWeaponSubtypeCategoryID(definition)
+    if not definition then return nil end
+    local categoryID
+    if Enum and Enum.TransmogCollectionType then
+        categoryID = Enum.TransmogCollectionType[definition.categoryName]
+    end
+    categoryID = categoryID or definition.fallbackCategoryID
+    definition.categoryID = categoryID
+    if categoryID then weaponSubtypeByCategoryID[tonumber(categoryID)] = definition.key end
+    return categoryID
+end
+
+local function RefreshWeaponSubtypeCategoryMap()
+    for _, subtypeKey in ipairs(Wardrobe.WEAPON_SUBTYPE_ORDER) do
+        ResolveWeaponSubtypeCategoryID(Wardrobe.weaponSubtypeDefinitions[subtypeKey])
+    end
+end
+
+local function GetWeaponSubtypeKeyForCategoryID(categoryID)
+    categoryID = tonumber(categoryID)
+    if not categoryID then return nil end
+    if not weaponSubtypeByCategoryID[categoryID] then RefreshWeaponSubtypeCategoryMap() end
+    return weaponSubtypeByCategoryID[categoryID]
+end
+
+local function GetWeaponSubtypeKeysForFamily(familyKey)
+    local keys = {}
+    for _, subtypeKey in ipairs(Wardrobe.WEAPON_SUBTYPE_ORDER) do
+        local definition = Wardrobe.weaponSubtypeDefinitions[subtypeKey]
+        if definition and definition.familyKey == familyKey then table.insert(keys, subtypeKey) end
+    end
+    return keys
 end
 
 local function GetTransmogLocation(definition)
@@ -627,9 +702,11 @@ local function GetSourceByID(slotKey, sourceID)
     -- hand. Reuse that cache without duplicating or invalidating format 5, then
     -- validate it against SECONDARYHANDSLOT before generation or preview.
     if slotKey == "OFF_HAND" then
-        for _, source in ipairs(Wardrobe.GetSlotSources("ONE_HAND")) do
-            if source.sourceID == sourceID then
-                return CopySourceForSlot(source, "OFF_HAND")
+        for _, familyKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+            for _, source in ipairs(Wardrobe.GetSlotSources(familyKey)) do
+                if source.sourceID == sourceID then
+                    return CopySourceForSlot(source, "OFF_HAND")
+                end
             end
         end
     end
@@ -642,8 +719,10 @@ local function FindSourceByVisualID(slotKey, visualID)
         if source.visualID == visualID then return source end
     end
     if slotKey == "OFF_HAND" then
-        for _, source in ipairs(Wardrobe.GetSlotSources("ONE_HAND")) do
-            if source.visualID == visualID then return CopySourceForSlot(source, "OFF_HAND") end
+        for _, familyKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+            for _, source in ipairs(Wardrobe.GetSlotSources(familyKey)) do
+                if source.visualID == visualID then return CopySourceForSlot(source, "OFF_HAND") end
+            end
         end
     end
     return nil
@@ -841,20 +920,12 @@ local function ClearWeaponSlot(state, slotKey)
 end
 
 local function ApplyWeaponSelectionRules(state, slotKey)
-    if slotKey == "ONE_HAND" then
-        ClearWeaponSlot(state, "TWO_HAND")
-        ClearWeaponSlot(state, "RANGED")
-    elseif slotKey == "TWO_HAND" then
-        ClearWeaponSlot(state, "ONE_HAND")
-        ClearWeaponSlot(state, "RANGED")
-        ClearWeaponSlot(state, "OFF_HAND")
-    elseif slotKey == "RANGED" then
-        ClearWeaponSlot(state, "ONE_HAND")
-        ClearWeaponSlot(state, "TWO_HAND")
-        ClearWeaponSlot(state, "OFF_HAND")
-    elseif slotKey == "OFF_HAND" then
-        ClearWeaponSlot(state, "TWO_HAND")
-        ClearWeaponSlot(state, "RANGED")
+    if slotKey == "ONE_HAND" or slotKey == "TWO_HAND" or slotKey == "RANGED" then
+        for _, familyKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+            if familyKey ~= slotKey then ClearWeaponSlot(state, familyKey) end
+        end
+        local topology = Wardrobe.GetWeaponTopology()
+        if not topology.offItem then ClearWeaponSlot(state, "OFF_HAND") end
     end
 end
 
@@ -1010,161 +1081,339 @@ local function ItemSupportsWeaponFamily(itemInfo, familyKey)
     return false
 end
 
+local function CountCachedWeaponSubtype(subtypeKey)
+    local subtype = Wardrobe.weaponSubtypeDefinitions[subtypeKey]
+    if not subtype then return 0 end
+    local categoryID = ResolveWeaponSubtypeCategoryID(subtype)
+    local count = 0
+    for _, source in ipairs(Wardrobe.GetSlotSources(subtype.familyKey)) do
+        if tonumber(source.categoryID) == tonumber(categoryID) then count = count + 1 end
+    end
+    return count
+end
+
 local function HasCachedWeaponFamily(familyKey)
-    return #(Wardrobe.GetSlotSources(familyKey) or {}) > 0
+    for _, subtypeKey in ipairs(GetWeaponSubtypeKeysForFamily(familyKey)) do
+        if CountCachedWeaponSubtype(subtypeKey) > 0 then return true end
+    end
+    return false
+end
+
+local function GetPhysicalWeaponKind(equipLoc)
+    if equipLoc == "INVTYPE_2HWEAPON" then return "TWO_HAND" end
+    if equipLoc == "INVTYPE_RANGED" or equipLoc == "INVTYPE_RANGEDRIGHT" or equipLoc == "INVTYPE_THROWN" then return "RANGED" end
+    if equipLoc == "INVTYPE_WEAPON" or equipLoc == "INVTYPE_WEAPONMAINHAND" or equipLoc == "INVTYPE_WEAPONOFFHAND" then return "ONE_HAND" end
+    if equipLoc == "INVTYPE_SHIELD" or equipLoc == "INVTYPE_HOLDABLE" then return "OFF_HAND" end
+    return equipLoc and "UNKNOWN" or "NONE"
+end
+
+local function GetEquippedWeaponSubtype(itemInfo)
+    if not itemInfo or not C_TransmogCollection then return nil end
+    local _, sourceID = SafeCall(C_TransmogCollection.GetItemInfo, itemInfo)
+    if sourceID and C_TransmogCollection.GetCategoryForItem then
+        local categoryID = SafeCall(C_TransmogCollection.GetCategoryForItem, sourceID)
+        local subtypeKey = GetWeaponSubtypeKeyForCategoryID(categoryID)
+        if subtypeKey then return subtypeKey end
+    end
+    return nil
 end
 
 function Wardrobe.GetWeaponTopology()
     local mainItem = GetEquippedItemInfo("MAINHANDSLOT")
     local offItem = GetEquippedItemInfo("SECONDARYHANDSLOT")
+    local mainEquipLoc = GetItemEquipLocation(mainItem)
+    local offEquipLoc = GetItemEquipLocation(offItem)
+    local mainKind = GetPhysicalWeaponKind(mainEquipLoc)
+    local offKind = GetPhysicalWeaponKind(offEquipLoc)
     local topology = {
         mainItem = mainItem,
         offItem = offItem,
-        mainEquipLoc = GetItemEquipLocation(mainItem),
-        offEquipLoc = GetItemEquipLocation(offItem),
-        available = {},
-        reasons = {},
+        mainEquipLoc = mainEquipLoc,
+        offEquipLoc = offEquipLoc,
+        mainHandKind = mainKind,
+        offHandKind = offKind,
+        mainPhysicalSubtype = GetEquippedWeaponSubtype(mainItem),
+        offPhysicalSubtype = GetEquippedWeaponSubtype(offItem),
         mode = "NONE",
         label = "No weapon equipped",
         offHandPolicy = "NONE",
+        hasWeaponOffHand = offKind == "ONE_HAND" or offKind == "TWO_HAND" or offKind == "RANGED",
     }
 
     if not mainItem then
         topology.mode = "UNARMED"
         topology.label = "No main-hand weapon equipped"
-        topology.available.ONE_HAND = HasCachedWeaponFamily("ONE_HAND")
-        topology.available.TWO_HAND = HasCachedWeaponFamily("TWO_HAND")
-        topology.available.RANGED = HasCachedWeaponFamily("RANGED")
-        topology.available.OFF_HAND = topology.available.ONE_HAND and HasCachedWeaponFamily("OFF_HAND")
-        topology.offHandPolicy = topology.available.OFF_HAND and "OPTIONAL" or "NONE"
-        topology.reasons.ONE_HAND = topology.available.ONE_HAND and "Available from the cached collection." or "No cached one-hand appearances are available."
-        topology.reasons.TWO_HAND = topology.available.TWO_HAND and "Available from the cached collection." or "No cached two-hand appearances are available."
-        topology.reasons.RANGED = topology.available.RANGED and "Available from the cached collection." or "No cached ranged appearances are available."
-        topology.reasons.OFF_HAND = topology.available.OFF_HAND and "Available only when One-Hand is also selected." or "Off-Hand requires One-Hand and a cached off-hand appearance."
+        topology.offHandPolicy = offKind == "OFF_HAND" and "OPTIONAL" or "NONE"
         return topology
     end
 
-    local mainOne = ItemSupportsWeaponFamily(mainItem, "ONE_HAND")
-    local mainTwo = ItemSupportsWeaponFamily(mainItem, "TWO_HAND")
-    local mainRanged = ItemSupportsWeaponFamily(mainItem, "RANGED")
-
-    if mainRanged and not mainOne then
+    if topology.hasWeaponOffHand then
+        topology.offHandPolicy = "WEAPON"
+        if mainKind == "TWO_HAND" and offKind == "TWO_HAND" then
+            topology.mode = "DUAL_TWO_HAND"
+            topology.label = "Dual two-handed weapons equipped"
+        elseif mainKind == "ONE_HAND" and offKind == "ONE_HAND" then
+            topology.mode = "DUAL_ONE_HAND"
+            topology.label = "Dual one-handed weapons equipped"
+        else
+            topology.mode = "DUAL_WEAPON"
+            topology.label = "Two weapon hands equipped"
+        end
+    elseif offKind == "OFF_HAND" then
+        topology.mode = "ONE_HAND_OFF_HAND"
+        topology.label = "Weapon and shield/focus equipped"
+        topology.offHandPolicy = "OPTIONAL"
+    elseif mainKind == "RANGED" then
         topology.mode = "RANGED"
         topology.label = "Ranged weapon equipped"
-        topology.available.RANGED = true
-    elseif mainTwo and not mainOne then
+    elseif mainKind == "TWO_HAND" then
         topology.mode = "TWO_HAND"
         topology.label = "Two-handed weapon equipped"
-        topology.available.TWO_HAND = true
-    else
+    elseif mainKind == "ONE_HAND" then
         topology.mode = "ONE_HAND"
-        topology.label = "One-hand weapon equipped"
-        topology.available.ONE_HAND = true
-        if offItem then
-            if ItemSupportsWeaponFamily(offItem, "ONE_HAND") then
-                topology.mode = "DUAL_WIELD"
-                topology.label = "Dual-wield weapons equipped"
-                topology.offHandPolicy = "DUAL_WIELD"
-            elseif ItemSupportsWeaponFamily(offItem, "OFF_HAND") then
-                topology.mode = "ONE_HAND_OFF_HAND"
-                topology.label = "One-hand and off-hand equipped"
-                topology.available.OFF_HAND = true
-                topology.offHandPolicy = "OPTIONAL"
-            end
-        end
-    end
-
-    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
-        if topology.available[familyKey] then
-            if familyKey == "OFF_HAND" then
-                topology.reasons[familyKey] = "Generate the equipped shield or focus alongside One-Hand."
-            elseif topology.mode == "DUAL_WIELD" and familyKey == "ONE_HAND" then
-                topology.reasons[familyKey] = "One-Hand generates both equipped weapon hands."
-            else
-                topology.reasons[familyKey] = "Compatible with the currently equipped weapon layout."
-            end
-        elseif familyKey == "OFF_HAND" and topology.mode == "DUAL_WIELD" then
-            topology.reasons[familyKey] = "Dual wielding uses the One-Hand pool for both hands."
-        elseif familyKey == "OFF_HAND" then
-            topology.reasons[familyKey] = "Off-Hand requires an equipped shield or focus with a one-hand weapon."
-        else
-            topology.reasons[familyKey] = string.format("%s is unavailable for the currently equipped weapon layout.", Wardrobe.weaponFamilyDefinitions[familyKey].label)
-        end
+        topology.label = "One-handed weapon equipped"
+    else
+        topology.mode = "UNKNOWN"
+        topology.label = "Unusual weapon layout"
     end
     return topology
 end
 
-local function NormalizeWeaponFamilyChoices(state, topology)
-    topology = topology or Wardrobe.GetWeaponTopology()
+local function BuildWeaponHandCapability(handKey, itemInfo, slotName, allowWithoutItem)
+    local capability = {
+        handKey = handKey,
+        itemInfo = itemInfo,
+        slotName = slotName,
+        physicalSubtype = GetEquippedWeaponSubtype(itemInfo),
+        subtypes = {},
+        families = {},
+    }
+    for _, subtypeKey in ipairs(Wardrobe.WEAPON_SUBTYPE_ORDER) do
+        local subtype = Wardrobe.weaponSubtypeDefinitions[subtypeKey]
+        local categoryID = ResolveWeaponSubtypeCategoryID(subtype)
+        local count = CountCachedWeaponSubtype(subtypeKey)
+        local blizzardAllowed = false
+        if itemInfo then
+            blizzardAllowed = categoryID and SafeCall(C_TransmogCollection and C_TransmogCollection.IsCategoryValidForItem, categoryID, itemInfo) == true
+        elseif allowWithoutItem then
+            blizzardAllowed = true
+        end
+        local available = blizzardAllowed and count > 0
+        capability.subtypes[subtypeKey] = {
+            key = subtypeKey,
+            familyKey = subtype.familyKey,
+            label = subtype.label,
+            shortLabel = subtype.shortLabel,
+            categoryID = categoryID,
+            count = count,
+            blizzardAllowed = blizzardAllowed,
+            available = available,
+            reason = available and "Blizzard permits this appearance category for the equipped hand."
+                or (count == 0 and "No collected previewable appearances are cached for this type."
+                or (itemInfo and "Blizzard does not permit this appearance category for the equipped hand."
+                or "No equipped item is available for Blizzard compatibility validation.")),
+        }
+        capability.families[subtype.familyKey] = capability.families[subtype.familyKey] or { available = false, count = 0 }
+        capability.families[subtype.familyKey].count = capability.families[subtype.familyKey].count + (available and count or 0)
+        capability.families[subtype.familyKey].available = capability.families[subtype.familyKey].available or available
+    end
+    return capability
+end
+
+function Wardrobe.GetWeaponAppearanceCapabilities()
+    local topology = Wardrobe.GetWeaponTopology()
+    local unarmed = topology.mode == "UNARMED"
+    local main = BuildWeaponHandCapability("MAIN", topology.mainItem, "MAINHANDSLOT", unarmed)
+    local off = BuildWeaponHandCapability("OFF", topology.offItem, "SECONDARYHANDSLOT", unarmed)
+    local capabilities = {
+        topology = topology,
+        main = main,
+        off = off,
+        availableFamilies = {},
+        reasons = {},
+    }
+    for _, familyKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+        local available = main.families[familyKey] and main.families[familyKey].available == true
+        capabilities.availableFamilies[familyKey] = available
+        capabilities.reasons[familyKey] = available
+            and "Blizzard permits at least one selected appearance type in this family for the equipped main hand."
+            or "No collected appearance type in this family is permitted for the equipped main hand."
+    end
+    local offAvailable = off.families.OFF_HAND and off.families.OFF_HAND.available == true
+    capabilities.availableFamilies.OFF_HAND = offAvailable
+    capabilities.reasons.OFF_HAND = offAvailable
+        and "Blizzard permits a shield or holdable appearance for the equipped off hand."
+        or (topology.hasWeaponOffHand and "The equipped off hand is a weapon; use One-Hand or Two-Hand appearance families instead."
+        or "No collected shield or holdable appearance is permitted for the equipped off hand.")
+    return capabilities
+end
+
+local function NormalizeWeaponFamilyChoices(state, capabilities)
+    capabilities = capabilities or Wardrobe.GetWeaponAppearanceCapabilities()
     state.weaponFamilies = state.weaponFamilies or {}
+    state.weaponSubtypes = state.weaponSubtypes or {}
     for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
         if state.weaponFamilies[familyKey] == nil then state.weaponFamilies[familyKey] = true end
     end
-    if topology.available.OFF_HAND and state.weaponFamilies.OFF_HAND and not state.weaponFamilies.ONE_HAND then
+    for _, subtypeKey in ipairs(Wardrobe.WEAPON_SUBTYPE_ORDER) do
+        if state.weaponSubtypes[subtypeKey] == nil then state.weaponSubtypes[subtypeKey] = true end
+    end
+    if capabilities.availableFamilies.OFF_HAND and state.weaponFamilies.OFF_HAND and not state.weaponFamilies.ONE_HAND then
         state.weaponFamilies.ONE_HAND = true
     end
     local anyMain = false
     for _, familyKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
-        if topology.available[familyKey] and state.weaponFamilies[familyKey] then anyMain = true break end
+        if capabilities.availableFamilies[familyKey] and state.weaponFamilies[familyKey] then anyMain = true break end
     end
     if not anyMain then
         for _, familyKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
-            if topology.available[familyKey] then
+            if capabilities.availableFamilies[familyKey] then
                 state.weaponFamilies[familyKey] = true
-                anyMain = true
                 break
             end
         end
     end
-    if not topology.available.OFF_HAND then
-        -- Preserve the preference internally, but it remains ineffective while unavailable.
-    end
-    return topology
+    return capabilities
 end
 
 function Wardrobe.GetWeaponGenerationOptions()
     local state = EnsurePreviewState()
-    local topology = NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponTopology())
+    local capabilities = NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponAppearanceCapabilities())
     local options = {}
     for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
-        local available = topology.available[familyKey] == true
+        local available = capabilities.availableFamilies[familyKey] == true
         table.insert(options, {
             key = familyKey,
             label = Wardrobe.weaponFamilyDefinitions[familyKey].label,
             available = available,
             checked = available and state.weaponFamilies[familyKey] == true,
-            reason = topology.reasons[familyKey],
+            reason = capabilities.reasons[familyKey],
         })
     end
-    return options, topology
+    return options, capabilities.topology, capabilities
+end
+
+function Wardrobe.GetWeaponSubtypeOptions(familyKey)
+    local state = EnsurePreviewState()
+    local capabilities = NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponAppearanceCapabilities())
+    local hand = familyKey == "OFF_HAND" and capabilities.off or capabilities.main
+    local options = {}
+    for _, subtypeKey in ipairs(GetWeaponSubtypeKeysForFamily(familyKey)) do
+        local capability = hand.subtypes[subtypeKey]
+        table.insert(options, {
+            key = subtypeKey,
+            familyKey = familyKey,
+            label = Wardrobe.weaponSubtypeDefinitions[subtypeKey].label,
+            shortLabel = Wardrobe.weaponSubtypeDefinitions[subtypeKey].shortLabel,
+            count = capability and capability.count or 0,
+            available = capability and capability.available == true,
+            checked = capability and capability.available == true and state.weaponSubtypes[subtypeKey] == true,
+            reason = capability and capability.reason or "Weapon appearance capability is unavailable.",
+            physical = subtypeKey == hand.physicalSubtype,
+        })
+    end
+    return options, capabilities
 end
 
 function Wardrobe.SetWeaponFamilyEnabled(familyKey, enabled)
     local definition = Wardrobe.weaponFamilyDefinitions[familyKey]
     if not definition then return false, "Unknown weapon family." end
     local state = EnsurePreviewState()
-    local topology = NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponTopology())
-    if not topology.available[familyKey] then
-        return false, topology.reasons[familyKey] or (definition.label .. " is unavailable.")
+    local capabilities = NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponAppearanceCapabilities())
+    if not capabilities.availableFamilies[familyKey] then
+        return false, capabilities.reasons[familyKey] or (definition.label .. " is unavailable.")
     end
     enabled = enabled == true
     local previous = state.weaponFamilies[familyKey]
     state.weaponFamilies[familyKey] = enabled
+    if enabled then
+        local anySubtype = false
+        for _, subtypeKey in ipairs(GetWeaponSubtypeKeysForFamily(familyKey)) do
+            local hand = familyKey == "OFF_HAND" and capabilities.off or capabilities.main
+            if hand.subtypes[subtypeKey] and hand.subtypes[subtypeKey].available and state.weaponSubtypes[subtypeKey] then anySubtype = true break end
+        end
+        if not anySubtype then
+            for _, subtypeKey in ipairs(GetWeaponSubtypeKeysForFamily(familyKey)) do
+                local hand = familyKey == "OFF_HAND" and capabilities.off or capabilities.main
+                if hand.subtypes[subtypeKey] and hand.subtypes[subtypeKey].available then state.weaponSubtypes[subtypeKey] = true end
+            end
+        end
+    end
     if familyKey == "OFF_HAND" and enabled then state.weaponFamilies.ONE_HAND = true end
     if familyKey == "ONE_HAND" and not enabled then state.weaponFamilies.OFF_HAND = false end
-
     local anyMain = false
     for _, key in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
-        if topology.available[key] and state.weaponFamilies[key] then anyMain = true break end
+        if capabilities.availableFamilies[key] and state.weaponFamilies[key] then anyMain = true break end
     end
     if not anyMain then
         state.weaponFamilies[familyKey] = previous
-        if familyKey == "ONE_HAND" and previous then state.weaponFamilies.OFF_HAND = state.weaponFamilies.OFF_HAND or false end
-        return false, "At least one available main weapon family must remain selected."
+        return false, "At least one Blizzard-compatible main weapon family must remain selected."
     end
     state.selectedConceptID = nil
-    if QC.Notify then QC.Notify("WARDROBE_WEAPON_OPTIONS_CHANGED", familyKey, enabled, topology) end
+    if QC.Notify then QC.Notify("WARDROBE_WEAPON_OPTIONS_CHANGED", familyKey, enabled, capabilities) end
     return true, string.format("%s generation %s.", definition.label, enabled and "enabled" or "disabled")
+end
+
+function Wardrobe.SetWeaponSubtypeEnabled(subtypeKey, enabled)
+    local subtype = Wardrobe.weaponSubtypeDefinitions[subtypeKey]
+    if not subtype then return false, "Unknown weapon appearance type." end
+    local state = EnsurePreviewState()
+    local options = Wardrobe.GetWeaponSubtypeOptions(subtype.familyKey)
+    local option
+    for _, candidate in ipairs(options) do if candidate.key == subtypeKey then option = candidate break end end
+    if enabled and (not option or not option.available) then
+        return false, option and option.reason or "That weapon appearance type is unavailable."
+    end
+    state.weaponSubtypes[subtypeKey] = enabled == true
+    if enabled then state.weaponFamilies[subtype.familyKey] = true end
+    state.selectedConceptID = nil
+    if QC.Notify then QC.Notify("WARDROBE_WEAPON_SUBTYPES_CHANGED", subtypeKey, enabled == true) end
+    return true, string.format("%s generation %s.", subtype.label, enabled and "enabled" or "disabled")
+end
+
+function Wardrobe.SetAllCompatibleWeaponSubtypes(familyKey, enabled)
+    local state = EnsurePreviewState()
+    local options = Wardrobe.GetWeaponSubtypeOptions(familyKey)
+    local changed = 0
+    for _, option in ipairs(options) do
+        if option.available then
+            state.weaponSubtypes[option.key] = enabled ~= false
+            changed = changed + 1
+        end
+    end
+    if enabled ~= false and changed > 0 then state.weaponFamilies[familyKey] = true end
+    state.selectedConceptID = nil
+    if QC.Notify then QC.Notify("WARDROBE_WEAPON_SUBTYPES_CHANGED", familyKey, enabled ~= false) end
+    return changed > 0, changed > 0 and string.format("Updated %d compatible %s type%s.", changed, Wardrobe.weaponFamilyDefinitions[familyKey].label, changed == 1 and "" or "s") or "No compatible types are available."
+end
+
+function Wardrobe.SetEquippedWeaponSubtypeOnly(familyKey)
+    local state = EnsurePreviewState()
+    local options, capabilities = Wardrobe.GetWeaponSubtypeOptions(familyKey)
+    local hand = familyKey == "OFF_HAND" and capabilities.off or capabilities.main
+    local physicalSubtype = hand.physicalSubtype
+    if not physicalSubtype or not Wardrobe.weaponSubtypeDefinitions[physicalSubtype] or Wardrobe.weaponSubtypeDefinitions[physicalSubtype].familyKey ~= familyKey then
+        return false, "The physically equipped item is not a " .. Wardrobe.weaponFamilyDefinitions[familyKey].label .. " type."
+    end
+    local available = hand.subtypes[physicalSubtype] and hand.subtypes[physicalSubtype].available
+    if not available then return false, "The equipped physical type is not currently available for generation." end
+    for _, option in ipairs(options) do state.weaponSubtypes[option.key] = option.key == physicalSubtype end
+    state.weaponFamilies[familyKey] = true
+    state.selectedConceptID = nil
+    if QC.Notify then QC.Notify("WARDROBE_WEAPON_SUBTYPES_CHANGED", physicalSubtype, true) end
+    return true, "Selected the equipped physical weapon type: " .. Wardrobe.weaponSubtypeDefinitions[physicalSubtype].label .. "."
+end
+
+function Wardrobe.SetLinkWeaponHands(enabled)
+    local state = EnsurePreviewState()
+    state.linkWeaponHands = enabled ~= false
+    state.selectedConceptID = nil
+    if QC.Notify then QC.Notify("WARDROBE_WEAPON_OPTIONS_CHANGED", "LINK_HANDS", state.linkWeaponHands) end
+    return true, state.linkWeaponHands and "Weapon hands will use coordinated families and types." or "Weapon hands may generate independently."
+end
+
+function Wardrobe.GetLinkWeaponHands()
+    return EnsurePreviewState().linkWeaponHands ~= false
 end
 
 function Wardrobe.GetWeaponFamilySummary(families)
@@ -1176,17 +1425,96 @@ function Wardrobe.GetWeaponFamilySummary(families)
     return #labels > 0 and table.concat(labels, ", ") or "None"
 end
 
+function Wardrobe.GetWeaponSubtypeSummary(familyKey, subtypeChoices, onlyEffective)
+    subtypeChoices = subtypeChoices or EnsurePreviewState().weaponSubtypes
+    local options = Wardrobe.GetWeaponSubtypeOptions(familyKey)
+    local labels = {}
+    for _, option in ipairs(options) do
+        if subtypeChoices[option.key] and (not onlyEffective or option.available) then table.insert(labels, option.shortLabel) end
+    end
+    return #labels > 0 and table.concat(labels, ", ") or "None"
+end
+
+function Wardrobe.GetWeaponFilterSummary()
+    local state = EnsurePreviewState()
+    local pieces = {}
+    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+        if state.weaponFamilies[familyKey] then
+            local summary = Wardrobe.GetWeaponSubtypeSummary(familyKey, state.weaponSubtypes, true)
+            if summary ~= "None" then table.insert(pieces, summary) end
+        end
+    end
+    return #pieces > 0 and table.concat(pieces, ", ") or "No compatible weapon types selected"
+end
+
+function Wardrobe.GetWeaponConceptSummary(families, subtypes, linked)
+    families = families or {}
+    subtypes = subtypes or {}
+    local labels = {}
+    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+        if families[familyKey] then
+            local count = 0
+            for _, subtypeKey in ipairs(GetWeaponSubtypeKeysForFamily(familyKey)) do
+                if subtypes[subtypeKey] then count = count + 1 end
+            end
+            if count > 0 then table.insert(labels, string.format("%s %d", Wardrobe.weaponFamilyDefinitions[familyKey].shortLabel, count)) end
+        end
+    end
+    local summary = #labels > 0 and table.concat(labels, ", ") or Wardrobe.GetWeaponFamilySummary(families)
+    if linked == true then summary = summary .. " • linked" end
+    return summary
+end
+
+function Wardrobe.GetWeaponFilterCountSummary()
+    local state = EnsurePreviewState()
+    local labels = {}
+    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+        if state.weaponFamilies[familyKey] then
+            local options = Wardrobe.GetWeaponSubtypeOptions(familyKey)
+            local selected, available = 0, 0
+            for _, option in ipairs(options) do
+                if option.available then available = available + 1 end
+                if option.checked then selected = selected + 1 end
+            end
+            if available > 0 then table.insert(labels, string.format("%s %d/%d", Wardrobe.weaponFamilyDefinitions[familyKey].shortLabel, selected, available)) end
+        end
+    end
+    local summary = #labels > 0 and table.concat(labels, " • ") or "No weapon types selected"
+    if state.linkWeaponHands ~= false then summary = summary .. " • linked" end
+    return summary
+end
+
+function Wardrobe.GetFilteredSlotSources(slotKey)
+    local sources = Wardrobe.GetSlotSources(slotKey)
+    local definition = slotByKey[slotKey]
+    if not definition or not definition.weaponRole then return sources end
+    local state = EnsurePreviewState()
+    local capabilities = Wardrobe.GetWeaponAppearanceCapabilities()
+    local hand = slotKey == "OFF_HAND" and capabilities.off or capabilities.main
+    local filtered = {}
+    for _, source in ipairs(sources) do
+        local subtypeKey = GetWeaponSubtypeKeyForCategoryID(source.categoryID)
+        local subtype = subtypeKey and hand.subtypes[subtypeKey]
+        if subtypeKey and state.weaponSubtypes[subtypeKey] and subtype and subtype.available then
+            table.insert(filtered, source)
+        end
+    end
+    return filtered
+end
+
 local function CreateWeaponGenerationContext()
     local now = GetTime and GetTime()
     internalUsabilityUpdateUntil = now and (now + 1.0) or nil
     SafeCall(C_TransmogCollection and C_TransmogCollection.UpdateUsableAppearances)
+    local capabilities = Wardrobe.GetWeaponAppearanceCapabilities()
     return {
-        mainItem = GetEquippedItemInfo("MAINHANDSLOT"),
-        offItem = GetEquippedItemInfo("SECONDARYHANDSLOT"),
+        mainItem = capabilities.topology.mainItem,
+        offItem = capabilities.topology.offItem,
         appearancesByCategory = {},
         locationsBySlot = {},
         validation = {},
-        topology = Wardrobe.GetWeaponTopology(),
+        topology = capabilities.topology,
+        capabilities = capabilities,
     }
 end
 
@@ -1298,43 +1626,78 @@ local function Shuffle(values)
     end
 end
 
-local function ChooseGeneratedWeaponSource(slotKeys, equippedItem, context, excludedBySlot, targetSlotKey, styleMode, styleContext)
-    local candidates = {}
-    for _, slotKey in ipairs(slotKeys) do
-        for _, source in ipairs(Wardrobe.GetSlotSources(slotKey)) do
-            local validationSlotKey = targetSlotKey or slotKey
-            local candidateSource = CopySourceForSlot(source, validationSlotKey)
-            local basicValid = Wardrobe.ValidateSource(candidateSource, validationSlotKey)
-            local categoryValid = candidateSource.categoryID and (not equippedItem or SafeCall(
-                C_TransmogCollection and C_TransmogCollection.IsCategoryValidForItem,
-                candidateSource.categoryID,
-                equippedItem
-            ) == true)
-            if basicValid and categoryValid then
-                table.insert(candidates, { source = candidateSource, slotKey = validationSlotKey })
+local function GetEnabledSubtypeKeys(state, familyKeys, handCapability, preferredSubtypeKey)
+    local keys = {}
+    local seen = {}
+    if preferredSubtypeKey then
+        local preferred = Wardrobe.weaponSubtypeDefinitions[preferredSubtypeKey]
+        if preferred and handCapability.subtypes[preferredSubtypeKey] and handCapability.subtypes[preferredSubtypeKey].available
+            and state.weaponSubtypes[preferredSubtypeKey] and state.weaponFamilies[preferred.familyKey]
+        then
+            table.insert(keys, preferredSubtypeKey)
+            seen[preferredSubtypeKey] = true
+        end
+    end
+    for _, familyKey in ipairs(familyKeys or {}) do
+        if state.weaponFamilies[familyKey] then
+            for _, subtypeKey in ipairs(GetWeaponSubtypeKeysForFamily(familyKey)) do
+                local capability = handCapability.subtypes[subtypeKey]
+                if not seen[subtypeKey] and state.weaponSubtypes[subtypeKey] and capability and capability.available then
+                    table.insert(keys, subtypeKey)
+                    seen[subtypeKey] = true
+                end
             end
         end
     end
-    if QC.ZoneStyle and QC.ZoneStyle.OrderWeaponCandidates then
-        QC.ZoneStyle.OrderWeaponCandidates(candidates, styleMode, styleContext)
-    else
-        Shuffle(candidates)
+    if #keys > 1 then
+        local first = preferredSubtypeKey and keys[1] or nil
+        local tail = {}
+        for index = first and 2 or 1, #keys do table.insert(tail, keys[index]) end
+        Shuffle(tail)
+        keys = {}
+        if first then table.insert(keys, first) end
+        for _, value in ipairs(tail) do table.insert(keys, value) end
     end
+    return keys
+end
+
+local function ChooseGeneratedWeaponSource(familyKeys, equippedItem, context, excludedBySlot, targetSlotKey, styleMode, styleContext, handCapability, preferredSubtypeKey, requirePreferred)
+    local state = EnsurePreviewState()
+    handCapability = handCapability or context.capabilities.main
+    local subtypeKeys = GetEnabledSubtypeKeys(state, familyKeys, handCapability, preferredSubtypeKey)
+    if requirePreferred and preferredSubtypeKey then subtypeKeys = subtypeKeys[1] == preferredSubtypeKey and { preferredSubtypeKey } or {} end
 
     local fallback
-    for _, candidate in ipairs(candidates) do
-        local valid = ValidateGeneratedWeaponSource(candidate.source, candidate.slotKey, equippedItem, context)
-        if valid then
-            if excludedBySlot and excludedBySlot[candidate.slotKey] == candidate.source.sourceID then
-                fallback = fallback or candidate
-            else
-                return candidate.source, candidate.slotKey
+    for _, subtypeKey in ipairs(subtypeKeys) do
+        local subtype = Wardrobe.weaponSubtypeDefinitions[subtypeKey]
+        local categoryID = ResolveWeaponSubtypeCategoryID(subtype)
+        local candidates = {}
+        for _, source in ipairs(Wardrobe.GetSlotSources(subtype.familyKey)) do
+            if tonumber(source.categoryID) == tonumber(categoryID) then
+                local validationSlotKey = targetSlotKey or subtype.familyKey
+                local candidateSource = CopySourceForSlot(source, validationSlotKey)
+                local basicValid = Wardrobe.ValidateSource(candidateSource, validationSlotKey)
+                if basicValid then table.insert(candidates, { source = candidateSource, slotKey = validationSlotKey, familyKey = subtype.familyKey, subtypeKey = subtypeKey }) end
+            end
+        end
+        if QC.ZoneStyle and QC.ZoneStyle.OrderWeaponCandidates then
+            QC.ZoneStyle.OrderWeaponCandidates(candidates, styleMode, styleContext)
+        else
+            Shuffle(candidates)
+        end
+        for _, candidate in ipairs(candidates) do
+            local valid = ValidateGeneratedWeaponSource(candidate.source, candidate.slotKey, equippedItem, context)
+            if valid then
+                local excludedID = excludedBySlot and (excludedBySlot[candidate.slotKey] or excludedBySlot[candidate.familyKey])
+                if excludedID == candidate.source.sourceID then
+                    fallback = fallback or candidate
+                else
+                    return candidate.source, candidate.familyKey, candidate.subtypeKey
+                end
             end
         end
     end
-    if fallback then
-        return fallback.source, fallback.slotKey
-    end
+    if fallback then return fallback.source, fallback.familyKey, fallback.subtypeKey end
     return nil
 end
 
@@ -1348,12 +1711,9 @@ local function GetLockedWeaponMode(state)
             lockedMode = slotKey
         end
     end
-    if state.locks.OFF_HAND and state.selections.OFF_HAND then
-        if lockedMode and lockedMode ~= "ONE_HAND" then
-            return nil, "The locked off-hand conflicts with the locked two-hand or ranged weapon."
-        end
-        lockedMode = "ONE_HAND"
-    end
+    -- A locked off-hand no longer dictates the main-hand appearance family.
+    -- Fury and other Blizzard exceptions may permit two-handed or one-handed
+    -- visuals independently in each occupied weapon hand.
     return lockedMode
 end
 
@@ -1362,47 +1722,53 @@ local function GenerateWeapons(state, reroll, styleMode, styleContext)
     if errorMessage then return false, errorMessage end
 
     local context = CreateWeaponGenerationContext()
-    local topology = NormalizeWeaponFamilyChoices(state, context.topology)
+    local capabilities = NormalizeWeaponFamilyChoices(state, context.capabilities)
+    local topology = capabilities.topology
     local enabledMain = {}
     for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
-        if topology.available[familyKey] and state.weaponFamilies[familyKey] then
-            table.insert(enabledMain, familyKey)
+        if capabilities.availableFamilies[familyKey] and state.weaponFamilies[familyKey] then
+            local hasSubtype = false
+            for _, subtypeKey in ipairs(GetWeaponSubtypeKeysForFamily(familyKey)) do
+                local subtype = capabilities.main.subtypes[subtypeKey]
+                if subtype and subtype.available and state.weaponSubtypes[subtypeKey] then hasSubtype = true break end
+            end
+            if hasSubtype then table.insert(enabledMain, familyKey) end
         end
     end
     if #enabledMain == 0 then
-        return false, "Select at least one available main weapon family before generating."
+        return false, "Select at least one Blizzard-compatible main weapon type before generating."
     end
 
     if lockedMode and not state.weaponFamilies[lockedMode] then
         return false, string.format("The locked %s appearance is excluded by the weapon-family checkboxes. Enable it or unlock the slot.", slotByKey[lockedMode].label)
     end
 
-    local lockedMainSource
+    local lockedMainSource, lockedSubtype
     if lockedMode and state.locks[lockedMode] and state.selections[lockedMode] then
         lockedMainSource = GetSourceByID(lockedMode, state.selections[lockedMode])
+        lockedSubtype = lockedMainSource and GetWeaponSubtypeKeyForCategoryID(lockedMainSource.categoryID)
+        if not lockedSubtype or not state.weaponSubtypes[lockedSubtype] then
+            return false, "The locked weapon appearance type is excluded by the current type filters."
+        end
+        local capability = capabilities.main.subtypes[lockedSubtype]
+        if not capability or not capability.available then
+            return false, "The locked weapon appearance type is not permitted for the equipped main hand."
+        end
         local valid, reason = ValidateGeneratedWeaponSource(lockedMainSource, lockedMode, context.mainItem, context)
         if not valid then
             return false, string.format("The locked %s appearance is not valid for the equipped main-hand item: %s", slotByKey[lockedMode].label, reason or "incompatible")
         end
     end
 
-    if state.locks.OFF_HAND and state.selections.OFF_HAND then
-        if topology.offHandPolicy ~= "OPTIONAL" and topology.offHandPolicy ~= "DUAL_WIELD" and topology.mode ~= "UNARMED" then
-            return false, "The locked Off-Hand appearance conflicts with the current equipped weapon layout."
-        end
-        local lockedOff = GetSourceByID("OFF_HAND", state.selections.OFF_HAND)
-        local valid, reason = ValidateGeneratedWeaponSource(lockedOff, "OFF_HAND", context.offItem, context)
-        if not valid then return false, "The locked Off-Hand appearance is not valid: " .. tostring(reason or "incompatible") end
-    end
-
     local mode = lockedMode
     local selectedMain = lockedMainSource
+    local mainSubtype = lockedSubtype
     if not selectedMain then
         local excluded = {}
         if reroll then
             for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do excluded[familyKey] = state.selections[familyKey] end
         end
-        selectedMain, mode = ChooseGeneratedWeaponSource(enabledMain, context.mainItem, context, excluded, nil, styleMode, styleContext)
+        selectedMain, mode, mainSubtype = ChooseGeneratedWeaponSource(enabledMain, context.mainItem, context, excluded, nil, styleMode, styleContext, capabilities.main)
         if selectedMain then SetSelectedSource(state, mode, selectedMain) end
     end
 
@@ -1411,46 +1777,57 @@ local function GenerateWeapons(state, reroll, styleMode, styleContext)
     end
     if not selectedMain then
         if not state.locks.OFF_HAND then SetSelectedSource(state, "OFF_HAND", nil) end
-        return true, 0, "No cached weapon visual matched the selected weapon families; armor was generated and equipped weapons were left unchanged."
+        return true, 0, "No cached weapon visual matched the selected Blizzard-compatible types; armor was generated and equipped weapons were left unchanged."
     end
 
-    if QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then
-        QC.ZoneStyle.AddSourceToGenerationContext(styleContext, selectedMain)
-    end
+    if QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then QC.ZoneStyle.AddSourceToGenerationContext(styleContext, selectedMain) end
 
     local selectedWeapons = 1
     local notice
-    local generateOffHand = false
-    local offHandSourceSlots
-    local offHandItem = context.offItem
-    if mode == "ONE_HAND" then
-        if topology.offHandPolicy == "DUAL_WIELD" then
-            generateOffHand = true
-            offHandSourceSlots = { "ONE_HAND" }
-        elseif topology.offHandPolicy == "OPTIONAL" and state.weaponFamilies.OFF_HAND then
-            generateOffHand = true
-            offHandSourceSlots = { "OFF_HAND" }
-        elseif topology.mode == "UNARMED" and state.weaponFamilies.OFF_HAND then
-            generateOffHand = true
-            offHandSourceSlots = { "OFF_HAND" }
-            offHandItem = nil
-        end
-    end
-
+    local generateOffHand = topology.offItem ~= nil
     if generateOffHand then
         if state.locks.OFF_HAND and state.selections.OFF_HAND then
+            local lockedOff = GetSourceByID("OFF_HAND", state.selections.OFF_HAND)
+            local offSubtype = lockedOff and GetWeaponSubtypeKeyForCategoryID(lockedOff.categoryID)
+            local capability = offSubtype and capabilities.off.subtypes[offSubtype]
+            if not capability or not capability.available or not state.weaponSubtypes[offSubtype] then
+                return false, "The locked off-hand appearance conflicts with the current Blizzard weapon rules or type filters."
+            end
+            local valid, reason = ValidateGeneratedWeaponSource(lockedOff, "OFF_HAND", context.offItem, context)
+            if not valid then return false, "The locked off-hand appearance is not valid: " .. tostring(reason or "incompatible") end
             selectedWeapons = selectedWeapons + 1
-        elseif not state.locks.OFF_HAND then
-            local excluded = reroll and { OFF_HAND = state.selections.OFF_HAND } or nil
-            local offHand = ChooseGeneratedWeaponSource(offHandSourceSlots, offHandItem, context, excluded, "OFF_HAND", styleMode, styleContext)
-            SetSelectedSource(state, "OFF_HAND", offHand)
-            if offHand then
-                if QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then QC.ZoneStyle.AddSourceToGenerationContext(styleContext, offHand) end
-                selectedWeapons = selectedWeapons + 1
+        else
+            local offFamilies = {}
+            if topology.offHandKind == "OFF_HAND" then
+                if state.weaponFamilies.OFF_HAND and capabilities.availableFamilies.OFF_HAND then table.insert(offFamilies, "OFF_HAND") end
             else
-                notice = topology.offHandPolicy == "DUAL_WIELD"
-                    and "No valid one-hand visual was found for the equipped off-hand weapon."
-                    or "No valid Off-Hand visual was found, so its current appearance was left unchanged."
+                if state.linkWeaponHands and mode and capabilities.off.families[mode] and capabilities.off.families[mode].available then
+                    table.insert(offFamilies, mode)
+                else
+                    for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
+                        if state.weaponFamilies[familyKey] and capabilities.off.families[familyKey] and capabilities.off.families[familyKey].available then
+                            table.insert(offFamilies, familyKey)
+                        end
+                    end
+                end
+            end
+            if #offFamilies > 0 then
+                local excluded = reroll and { OFF_HAND = state.selections.OFF_HAND } or nil
+                local requirePreferred = state.linkWeaponHands and topology.offHandKind ~= "OFF_HAND" and mainSubtype ~= nil
+                local offHand, _, offSubtype = ChooseGeneratedWeaponSource(offFamilies, context.offItem, context, excluded, "OFF_HAND", styleMode, styleContext, capabilities.off, requirePreferred and mainSubtype or nil, requirePreferred)
+                if not offHand and requirePreferred then
+                    offHand = ChooseGeneratedWeaponSource(offFamilies, context.offItem, context, excluded, "OFF_HAND", styleMode, styleContext, capabilities.off)
+                    notice = "The off-hand could not use the linked weapon type, so Quest Chronicle chose another permitted type."
+                end
+                SetSelectedSource(state, "OFF_HAND", offHand)
+                if offHand then
+                    if QC.ZoneStyle and QC.ZoneStyle.AddSourceToGenerationContext then QC.ZoneStyle.AddSourceToGenerationContext(styleContext, offHand) end
+                    selectedWeapons = selectedWeapons + 1
+                else
+                    notice = notice or "No valid appearance matched the equipped off-hand and selected type filters."
+                end
+            elseif not state.locks.OFF_HAND then
+                SetSelectedSource(state, "OFF_HAND", nil)
             end
         end
     elseif not state.locks.OFF_HAND then
@@ -1536,12 +1913,8 @@ end
 
 function Wardrobe.RerollSlot(slotKey)
     local definition = slotByKey[slotKey]
-    if not definition then
-        return false, "Unknown equipment slot."
-    end
-    if Wardrobe.IsSlotLocked(slotKey) then
-        return false, "Unlock this slot before rerolling it."
-    end
+    if not definition then return false, "Unknown equipment slot." end
+    if Wardrobe.IsSlotLocked(slotKey) then return false, "Unlock this slot before rerolling it." end
 
     local state = EnsurePreviewState()
     local styleEngine = QC.ZoneStyle
@@ -1549,52 +1922,49 @@ function Wardrobe.RerollSlot(slotKey)
     local styleContext = styleEngine and CreateStyleGenerationContext(state, styleEngine, styleEngine.GetCurrentContext(), slotKey, false) or nil
     if definition.weaponRole then
         local context = CreateWeaponGenerationContext()
-        local topology = NormalizeWeaponFamilyChoices(state, context.topology)
-        local equippedItem = slotKey == "OFF_HAND" and context.offItem or context.mainItem
-        local sourceSlots
+        local capabilities = NormalizeWeaponFamilyChoices(state, context.capabilities)
+        local sourceFamilies = {}
+        local equippedItem
+        local handCapability
+        local preferredSubtype
         if slotKey == "OFF_HAND" then
-            if topology.offHandPolicy == "DUAL_WIELD" and state.weaponFamilies.ONE_HAND then
-                sourceSlots = { "ONE_HAND" }
-            elseif (topology.offHandPolicy == "OPTIONAL" or topology.mode == "UNARMED") and topology.available.OFF_HAND and state.weaponFamilies.OFF_HAND then
-                sourceSlots = { "OFF_HAND" }
+            if not context.topology.offItem then return false, "No off-hand item is equipped." end
+            equippedItem = context.offItem
+            handCapability = capabilities.off
+            if context.topology.offHandKind == "OFF_HAND" then
+                if not state.weaponFamilies.OFF_HAND then return false, "Enable Off-Hand generation before rerolling this slot." end
+                sourceFamilies = { "OFF_HAND" }
             else
-                return false, topology.reasons.OFF_HAND or "Off-Hand generation is unavailable for the current weapon layout."
-            end
-        else
-            if not topology.available[slotKey] then
-                return false, topology.reasons[slotKey] or "That weapon family is unavailable for the current weapon layout."
-            end
-            if not state.weaponFamilies[slotKey] then
-                return false, string.format("Enable %s in Weapon Generation before rerolling this slot.", definition.label)
-            end
-            sourceSlots = { slotKey }
-        end
-        local source = ChooseGeneratedWeaponSource(sourceSlots, equippedItem, context, { [slotKey] = state.selections[slotKey] }, slotKey, styleMode, styleContext)
-        if not source then
-            return false, "No cached appearance in this enabled weapon family is valid for the current weapon layout."
-        end
-        SetSelectedSource(state, slotKey, source)
-        if styleEngine and styleEngine.AddSourceToGenerationContext then
-            styleEngine.AddSourceToGenerationContext(styleContext, source)
-        end
-        ApplyWeaponSelectionRules(state, slotKey)
-        if slotKey == "OFF_HAND" and not state.selections.ONE_HAND then
-            local mainHand = ChooseGeneratedWeaponSource({ "ONE_HAND" }, context.mainItem, context, nil, nil, styleMode, styleContext)
-            if mainHand then
-                SetSelectedSource(state, "ONE_HAND", mainHand)
-                if styleEngine and styleEngine.AddSourceToGenerationContext then
-                    styleEngine.AddSourceToGenerationContext(styleContext, mainHand)
+                for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
+                    if state.weaponFamilies[familyKey] and handCapability.families[familyKey] and handCapability.families[familyKey].available then
+                        table.insert(sourceFamilies, familyKey)
+                    end
+                end
+                if state.linkWeaponHands then
+                    for _, familyKey in ipairs(MAIN_WEAPON_SLOT_KEYS) do
+                        local selected = state.selections[familyKey] and GetSourceByID(familyKey, state.selections[familyKey])
+                        if selected then preferredSubtype = GetWeaponSubtypeKeyForCategoryID(selected.categoryID) break end
+                    end
                 end
             end
+        else
+            equippedItem = context.mainItem
+            handCapability = capabilities.main
+            if not capabilities.availableFamilies[slotKey] then return false, capabilities.reasons[slotKey] or "That weapon family is unavailable." end
+            if not state.weaponFamilies[slotKey] then return false, string.format("Enable %s before rerolling this slot.", definition.label) end
+            sourceFamilies = { slotKey }
         end
+        local source = ChooseGeneratedWeaponSource(sourceFamilies, equippedItem, context, { [slotKey] = state.selections[slotKey] }, slotKey, styleMode, styleContext, handCapability, preferredSubtype, false)
+        if not source then return false, "No cached appearance in the selected Blizzard-compatible weapon types is valid for this hand." end
+        SetSelectedSource(state, slotKey, source)
+        if styleEngine and styleEngine.AddSourceToGenerationContext then styleEngine.AddSourceToGenerationContext(styleContext, source) end
+        ApplyWeaponSelectionRules(state, slotKey)
     elseif not SetRandomSelection(state, slotKey, true, styleMode, styleContext) then
         return false, "No compatible appearance is cached for this slot."
     end
     state.selectedConceptID = nil
     local generatedName = RefreshGeneratedOutfitName(state, styleEngine, styleMode, styleContext)
-    if QC.Notify then
-        QC.Notify("WARDROBE_WORKBENCH_CHANGED", slotKey)
-    end
+    if QC.Notify then QC.Notify("WARDROBE_WORKBENCH_CHANGED", slotKey) end
     return true, string.format("%s rerolled%s.", definition.label, generatedName and ("; the current look is now " .. generatedName) or "")
 end
 
@@ -1661,6 +2031,8 @@ function Wardrobe.SaveConcept(name)
     concept.locks = CopyPrimitiveMap(state.locks)
     concept.hidden = CopyPrimitiveMap(state.hidden)
     concept.weaponFamilies = CopyPrimitiveMap(state.weaponFamilies)
+    concept.weaponSubtypes = CopyPrimitiveMap(state.weaponSubtypes)
+    concept.linkWeaponHands = state.linkWeaponHands ~= false
     concept.styleMode = QC.ZoneStyle and QC.ZoneStyle.NormalizeMode(state.styleMode) or state.styleMode
     concept.generatedName = state.generatedName
     concept.generatedAt = state.generatedAt
@@ -1685,7 +2057,12 @@ function Wardrobe.LoadConcept(conceptID)
     state.locks = CopyPrimitiveMap(concept.locks)
     state.hidden = CopyPrimitiveMap(concept.hidden)
     state.weaponFamilies = CopyPrimitiveMap(concept.weaponFamilies or { ONE_HAND = true, TWO_HAND = true, RANGED = true, OFF_HAND = true })
-    NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponTopology())
+    state.weaponSubtypes = CopyPrimitiveMap(concept.weaponSubtypes or {})
+    for _, subtypeKey in ipairs(Wardrobe.WEAPON_SUBTYPE_ORDER) do
+        if state.weaponSubtypes[subtypeKey] == nil then state.weaponSubtypes[subtypeKey] = true end
+    end
+    state.linkWeaponHands = concept.linkWeaponHands ~= false
+    NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponAppearanceCapabilities())
     state.generatedName = concept.generatedName
     state.generatedAt = concept.generatedAt
     if QC.ZoneStyle then
@@ -1799,10 +2176,13 @@ local function CategoryAllowedForDefinition(definition, categoryID)
     if not definition or not categoryID then return true end
     local allowed = {}
     for _, value in ipairs(ResolveCategoryIDs(definition)) do allowed[tonumber(value)] = true end
-    -- A dual-wield off hand may use the same one-hand categories as MAINHANDSLOT.
+    -- Blizzard may allow one-hand or two-hand weapon appearances in the
+    -- secondary weapon slot (for example Fury). Accept every weapon family here;
+    -- the concept was already validated against the equipped hand before saving.
     if definition.key == "OFF_HAND" then
-        local oneHand = slotByKey.ONE_HAND
-        for _, value in ipairs(ResolveCategoryIDs(oneHand)) do allowed[tonumber(value)] = true end
+        for _, familyKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+            for _, value in ipairs(ResolveCategoryIDs(slotByKey[familyKey])) do allowed[tonumber(value)] = true end
+        end
     end
     return allowed[tonumber(categoryID)] == true
 end
@@ -1867,7 +2247,9 @@ local function ResolveCollectedConceptSource(concept, definition)
         local categories = {}
         for _, categoryID in ipairs(ResolveCategoryIDs(definition)) do table.insert(categories, categoryID) end
         if definition.key == "OFF_HAND" then
-            for _, categoryID in ipairs(ResolveCategoryIDs(slotByKey.ONE_HAND)) do table.insert(categories, categoryID) end
+            for _, familyKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+                for _, categoryID in ipairs(ResolveCategoryIDs(slotByKey[familyKey])) do table.insert(categories, categoryID) end
+            end
         end
         for _, categoryID in ipairs(categories) do
             local appearance = { visualID = visualID, isCollected = true }
@@ -2909,9 +3291,6 @@ function Wardrobe.SelectSource(slotKey, sourceID)
             state.generatedName = nil
             state.generatedAt = nil
             ApplyWeaponSelectionRules(state, slotKey)
-            if slotKey == "OFF_HAND" and not state.selections.ONE_HAND then
-                SetRandomSelection(state, "ONE_HAND", false)
-            end
             if QC.Notify then
                 QC.Notify("WARDROBE_SELECTION_CHANGED", slotKey, source)
             end
@@ -2998,6 +3377,9 @@ eventFrame:RegisterEvent("TRANSMOG_COSMETIC_COLLECTION_SOURCE_ADDED")
 pcall(eventFrame.RegisterEvent, eventFrame, "TRANSMOG_CUSTOM_SETS_CHANGED")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 pcall(eventFrame.RegisterEvent, eventFrame, "PLAYER_EQUIPMENT_CHANGED")
+pcall(eventFrame.RegisterEvent, eventFrame, "PLAYER_SPECIALIZATION_CHANGED")
+pcall(eventFrame.RegisterEvent, eventFrame, "ACTIVE_TALENT_GROUP_CHANGED")
+pcall(eventFrame.RegisterEvent, eventFrame, "TRAIT_CONFIG_UPDATED")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_ENTERING_WORLD" then
         local cache = EnsureCache()
@@ -3011,10 +3393,25 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
             cache.dirtyReason = "CHARACTER_CHANGED"
         end
         ScheduleLoginRefresh()
-    elseif event == "PLAYER_EQUIPMENT_CHANGED" then
-        local state = EnsurePreviewState()
-        local topology = NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponTopology())
-        if QC.Notify then QC.Notify("WARDROBE_WEAPON_TOPOLOGY_CHANGED", topology, ...) end
+    elseif event == "PLAYER_EQUIPMENT_CHANGED"
+        or event == "PLAYER_SPECIALIZATION_CHANGED"
+        or event == "ACTIVE_TALENT_GROUP_CHANGED"
+        or event == "TRAIT_CONFIG_UPDATED"
+    then
+        local eventArg1 = select(1, ...)
+        local now = GetTime and GetTime()
+        internalUsabilityUpdateUntil = now and (now + 1.0) or nil
+        SafeCall(C_TransmogCollection and C_TransmogCollection.UpdateUsableAppearances)
+        local function NotifyCapabilities()
+            local state = EnsurePreviewState()
+            local capabilities = NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponAppearanceCapabilities())
+            if QC.Notify then
+                QC.Notify("WARDROBE_WEAPON_TOPOLOGY_CHANGED", capabilities.topology, eventArg1)
+                QC.Notify("WARDROBE_WEAPON_CAPABILITIES_CHANGED", capabilities, event)
+            end
+        end
+        NotifyCapabilities()
+        if C_Timer and C_Timer.After then C_Timer.After(0.25, NotifyCapabilities) end
     elseif event == "TRANSMOG_CUSTOM_SETS_CHANGED" then
         local request = pendingCustomSetSync
         local resolved = TryVerifyPendingCustomSet(false)

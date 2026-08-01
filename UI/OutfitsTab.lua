@@ -17,6 +17,13 @@ local function GetCurrentSlot()
     return GetState().selectedSlot or "HEAD"
 end
 
+local function GetDisplayedSources(slotKey)
+    if Wardrobe.GetFilteredSlotSources then
+        return Wardrobe.GetFilteredSlotSources(slotKey)
+    end
+    return Wardrobe.GetSlotSources(slotKey)
+end
+
 local function GetPage(slotKey)
     return math.max(1, tonumber(GetState().pages[slotKey]) or 1)
 end
@@ -80,7 +87,7 @@ local function ConceptDetail(concept)
         CountMap(concept.locks),
         CountMap(concept.hidden),
         mode and mode.label or "Current mode",
-        Wardrobe.GetWeaponFamilySummary(concept.weaponFamilies),
+        Wardrobe.GetWeaponConceptSummary(concept.weaponFamilies, concept.weaponSubtypes, concept.linkWeaponHands),
         nativeStatus,
         updated
     )
@@ -253,7 +260,7 @@ function UI.CreateOutfitsTab(parent)
     local slotPanel = UI.CreateInsetPanel(pane)
     slotPanel:SetPoint("TOPLEFT", pane, "TOPLEFT", 12, -56)
     slotPanel:SetPoint("BOTTOMLEFT", pane, "BOTTOMLEFT", 12, 12)
-    slotPanel:SetWidth(128)
+    slotPanel:SetWidth(148)
 
     local modelPanel = UI.CreateInsetPanel(pane)
     modelPanel:SetPoint("TOPLEFT", slotPanel, "TOPRIGHT", 8, 0)
@@ -270,46 +277,277 @@ function UI.CreateOutfitsTab(parent)
     slotTitle:SetText("Equipment Slot")
 
     pane.slotButtons = {}
+    pane.weaponFamilyRows = {}
     local previous
     for _, definition in ipairs(Wardrobe.slotDefinitions) do
-        local button = UI.CreateButton(slotPanel, definition.label, 108, 22)
-        CreateLockedSlotVisual(button)
-        if previous then
-            button:SetPoint("TOP", previous, "BOTTOM", 0, -3)
-        else
-            button:SetPoint("TOP", slotTitle, "BOTTOM", 0, -9)
+        if not definition.weaponRole then
+            local button = UI.CreateButton(slotPanel, definition.label, 128, 22)
+            CreateLockedSlotVisual(button)
+            if previous then
+                button:SetPoint("TOP", previous, "BOTTOM", 0, -3)
+            else
+                button:SetPoint("TOP", slotTitle, "BOTTOM", 0, -9)
+            end
+            button.slotKey = definition.key
+            button:SetScript("OnClick", function(self)
+                GetState().selectedSlot = self.slotKey
+                if pane.weaponTypePanel then pane.weaponTypePanel:Hide() end
+                pane:Refresh()
+            end)
+            button:SetScript("OnEnter", function(self)
+                local entry = self.previewEntry
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                local slotDefinition = Wardrobe.GetSlotDefinition(self.slotKey)
+                GameTooltip:SetText((slotDefinition and slotDefinition.label or self.slotKey) .. " Slot", 1, 0.82, 0)
+                if entry then
+                    GameTooltip:AddLine(entry.name or "Empty", 1, 1, 1, true)
+                    local stateText = entry.kind or "Preview"
+                    if entry.locked then stateText = stateText .. " • Locked" end
+                    if entry.hidden then stateText = stateText .. " • Hidden" end
+                    GameTooltip:AddLine(stateText, entry.hidden and 0.65 or 0.2, entry.hidden and 0.65 or 1, entry.hidden and 0.65 or 0.2)
+                else
+                    GameTooltip:AddLine("Not active in the current preview.", 0.65, 0.65, 0.65, true)
+                end
+                GameTooltip:AddLine(string.format("%s cached appearances", UI.FormatNumber(#(Wardrobe.GetSlotSources(self.slotKey) or {}))), 0.65, 0.65, 0.65)
+                GameTooltip:AddLine("Click to browse this slot.", 1, 1, 1, true)
+                GameTooltip:Show()
+            end)
+            button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            pane.slotButtons[definition.key] = button
+            previous = button
         end
-        button.slotKey = definition.key
-        button:SetScript("OnClick", function(self)
+    end
+
+    local weaponSectionTitle = slotPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    weaponSectionTitle:SetPoint("TOP", previous, "BOTTOM", 0, -8)
+    weaponSectionTitle:SetText("Weapon Appearances")
+    pane.weaponSectionTitle = weaponSectionTitle
+
+    local previousWeapon
+    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+        local family = Wardrobe.weaponFamilyDefinitions[familyKey]
+        local row = UI.CreateButton(slotPanel, "", 128, 24)
+        row.isWeaponFamilyRow = true
+        row.slotKey = familyKey
+        if previousWeapon then
+            row:SetPoint("TOP", previousWeapon, "BOTTOM", 0, -3)
+        else
+            row:SetPoint("TOP", weaponSectionTitle, "BOTTOM", 0, -6)
+        end
+
+        local check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+        check:SetSize(20, 20)
+        check:SetPoint("LEFT", row, "LEFT", 1, 0)
+        check.familyKey = familyKey
+        row.check = check
+
+        local previewBackground = row:CreateTexture(nil, "BORDER")
+        previewBackground:SetSize(18, 18)
+        previewBackground:SetPoint("LEFT", row, "LEFT", 23, 0)
+        previewBackground:SetColorTexture(0.02, 0.02, 0.02, 0.9)
+        previewBackground:Hide()
+        row.previewIconBackground = previewBackground
+        local previewIcon = row:CreateTexture(nil, "ARTWORK")
+        previewIcon:SetSize(16, 16)
+        previewIcon:SetPoint("CENTER", previewBackground, "CENTER")
+        previewIcon:Hide()
+        row.previewIcon = previewIcon
+
+        local label = row:GetFontString()
+        label:ClearAllPoints()
+        label:SetPoint("LEFT", row, "LEFT", 42, 0)
+        label:SetPoint("RIGHT", row, "RIGHT", -20, 0)
+        label:SetJustifyH("CENTER")
+        label:SetText(family.label)
+        row.familyLabel = label
+
+        local lockIcon = row:CreateTexture(nil, "OVERLAY")
+        lockIcon:SetSize(12, 12)
+        lockIcon:SetPoint("RIGHT", row, "RIGHT", -17, 0)
+        lockIcon:SetTexture("Interface\\Buttons\\LockButton-Locked-Up")
+        lockIcon:SetVertexColor(1, 0.82, 0.12)
+        lockIcon:Hide()
+        row.lockIcon = lockIcon
+
+        local arrow = CreateFrame("Button", nil, row)
+        arrow:SetSize(18, 22)
+        arrow:SetPoint("RIGHT", row, "RIGHT", -1, 0)
+        local arrowText = arrow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        arrowText:SetAllPoints(arrow)
+        arrowText:SetText(">")
+        arrow.arrowText = arrowText
+        row.arrow = arrow
+
+        row:SetScript("OnClick", function(self)
             GetState().selectedSlot = self.slotKey
             pane:Refresh()
         end)
-        button:SetScript("OnEnter", function(self)
-            local entry = self.previewEntry
+        check:SetScript("OnClick", function(self)
+            local ok, message = Wardrobe.SetWeaponFamilyEnabled(self.familyKey, self:GetChecked() == true)
+            if not ok and UIErrorsFrame then UIErrorsFrame:AddMessage(message or "That weapon family is unavailable.", 1, 0.25, 0.25) end
+            pane:Refresh(message)
+        end)
+        row:SetScript("OnEnter", function(self)
+            local options, topology = Wardrobe.GetWeaponGenerationOptions()
+            local option
+            for _, candidate in ipairs(options) do if candidate.key == self.slotKey then option = candidate break end end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            local slotDefinition = Wardrobe.GetSlotDefinition(self.slotKey)
-            GameTooltip:SetText((slotDefinition and slotDefinition.label or self.slotKey) .. " Slot", 1, 0.82, 0)
-            if entry then
-                GameTooltip:AddLine(entry.name or "Empty", 1, 1, 1, true)
-                local stateText = entry.kind or "Preview"
-                if entry.locked then stateText = stateText .. " • Locked" end
-                if entry.hidden then stateText = stateText .. " • Hidden" end
-                GameTooltip:AddLine(stateText, entry.hidden and 0.65 or 0.2, entry.hidden and 0.65 or 1, entry.hidden and 0.65 or 0.2)
-            else
-                GameTooltip:AddLine("Not active in the current preview.", 0.65, 0.65, 0.65, true)
-            end
-            GameTooltip:AddLine(string.format("%s cached appearances", UI.FormatNumber(#(Wardrobe.GetSlotSources(self.slotKey) or {}))), 0.65, 0.65, 0.65)
-            GameTooltip:AddLine("Click to browse this slot.", 1, 1, 1, true)
+            GameTooltip:SetText((option and option.label or family.label) .. " Appearances", 1, 0.82, 0)
+            GameTooltip:AddLine(option and option.reason or "Weapon appearance family.", 1, 1, 1, true)
+            GameTooltip:AddLine("Current physical layout: " .. tostring(topology and topology.label or "Unknown"), 0.65, 0.65, 0.65, true)
+            GameTooltip:AddLine("Click the row to browse. Use the checkbox to include this family in generation. Use > to configure exact weapon types.", 0.8, 0.8, 0.8, true)
             GameTooltip:Show()
         end)
-        button:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        pane.slotButtons[definition.key] = button
-        previous = button
+        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        check:SetScript("OnEnter", function()
+            local handler = row:GetScript("OnEnter")
+            if handler then handler(row) end
+        end)
+        check:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        arrow:SetScript("OnClick", function()
+            pane:ShowWeaponTypeFlyout(familyKey)
+        end)
+        UI.SetTooltip(arrow, family.label .. " Types", "Choose the exact Blizzard-compatible weapon types available to Generate Outfit and Reroll Unlocked.", "ANCHOR_RIGHT")
+
+        pane.slotButtons[familyKey] = row
+        pane.weaponFamilyRows[familyKey] = row
+        previousWeapon = row
     end
 
-    local currentLookButton = UI.CreateButton(slotPanel, "Current Look", 108, 24)
+    local linkHands = CreateFrame("CheckButton", nil, slotPanel, "UICheckButtonTemplate")
+    linkHands:SetSize(20, 20)
+    linkHands:SetPoint("TOPLEFT", previousWeapon, "BOTTOMLEFT", 1, -5)
+    local linkLabel = slotPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    linkLabel:SetPoint("LEFT", linkHands, "RIGHT", 1, 0)
+    linkLabel:SetText("Link weapon hands")
+    linkHands.label = linkLabel
+    linkHands:SetScript("OnClick", function(self)
+        local ok, message = Wardrobe.SetLinkWeaponHands(self:GetChecked() == true)
+        if not ok and UIErrorsFrame then UIErrorsFrame:AddMessage(message or "Unable to change hand linking.", 1, 0.25, 0.25) end
+        pane:Refresh(message)
+    end)
+    UI.SetTooltip(linkHands, "Link Weapon Hands", "When two weapon hands are equipped, prefer the same appearance family and exact weapon type in both hands. Disable this to let each hand generate independently.", "ANCHOR_RIGHT")
+    pane.linkWeaponHands = linkHands
+
+    local currentLookButton = UI.CreateButton(slotPanel, "Current Look", 128, 24)
     currentLookButton:SetPoint("BOTTOM", slotPanel, "BOTTOM", 0, 10)
     UI.SetTooltip(currentLookButton, "Current Character Preview", "Show every selected, equipped, hidden, and locked layer currently represented by the embedded model.")
+
+    local weaponTypePanel = UI.CreateInsetPanel(pane)
+    weaponTypePanel:SetSize(330, 340)
+    weaponTypePanel:SetPoint("TOPLEFT", slotPanel, "TOPRIGHT", 6, -292)
+    weaponTypePanel:SetFrameLevel(pane:GetFrameLevel() + 35)
+    weaponTypePanel:EnableMouse(true)
+    weaponTypePanel:Hide()
+    pane.weaponTypePanel = weaponTypePanel
+
+    local flyoutTitle = weaponTypePanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    flyoutTitle:SetPoint("TOPLEFT", weaponTypePanel, "TOPLEFT", 12, -12)
+    flyoutTitle:SetPoint("RIGHT", weaponTypePanel, "RIGHT", -38, 0)
+    flyoutTitle:SetJustifyH("LEFT")
+    pane.weaponTypeTitle = flyoutTitle
+
+    local flyoutClose = UI.CreateButton(weaponTypePanel, "X", 28, 24)
+    flyoutClose:SetPoint("TOPRIGHT", weaponTypePanel, "TOPRIGHT", -8, -8)
+    flyoutClose:SetScript("OnClick", function() weaponTypePanel:Hide() end)
+
+    local flyoutSubtitle = weaponTypePanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    flyoutSubtitle:SetPoint("TOPLEFT", weaponTypePanel, "TOPLEFT", 12, -38)
+    flyoutSubtitle:SetPoint("RIGHT", weaponTypePanel, "RIGHT", -12, 0)
+    flyoutSubtitle:SetHeight(30)
+    flyoutSubtitle:SetJustifyH("LEFT")
+    flyoutSubtitle:SetWordWrap(true)
+    pane.weaponTypeSubtitle = flyoutSubtitle
+
+    pane.weaponSubtypeChecks = {}
+    for index = 1, 8 do
+        local check = CreateFrame("CheckButton", nil, weaponTypePanel, "UICheckButtonTemplate")
+        check:SetSize(21, 21)
+        check:SetPoint("TOPLEFT", weaponTypePanel, "TOPLEFT", 10, -66 - ((index - 1) * 24))
+        local label = weaponTypePanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        label:SetPoint("LEFT", check, "RIGHT", 2, 0)
+        label:SetWidth(190)
+        label:SetJustifyH("LEFT")
+        local count = weaponTypePanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        count:SetPoint("RIGHT", weaponTypePanel, "RIGHT", -12, 0)
+        count:SetPoint("CENTER", check, "CENTER", 0, 0)
+        count:SetJustifyH("RIGHT")
+        check.label = label
+        check.count = count
+        check:SetScript("OnClick", function(self)
+            local ok, message = Wardrobe.SetWeaponSubtypeEnabled(self.subtypeKey, self:GetChecked() == true)
+            if not ok and UIErrorsFrame then UIErrorsFrame:AddMessage(message or "That weapon type is unavailable.", 1, 0.25, 0.25) end
+            pane:Refresh(message)
+            pane:RefreshWeaponTypeFlyout()
+        end)
+        check:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(self.option and self.option.label or "Weapon Type", 1, 0.82, 0)
+            GameTooltip:AddLine(self.option and self.option.reason or "Weapon type option.", 1, 1, 1, true)
+            if self.option and self.option.physical then GameTooltip:AddLine("This is the physically equipped item type.", 0.4, 0.8, 1, true) end
+            GameTooltip:Show()
+        end)
+        check:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        pane.weaponSubtypeChecks[index] = check
+    end
+
+    local allTypes = UI.CreateButton(weaponTypePanel, "All Compatible", 112, 23)
+    allTypes:SetPoint("BOTTOMLEFT", weaponTypePanel, "BOTTOMLEFT", 10, 38)
+    local equippedType = UI.CreateButton(weaponTypePanel, "Equipped Type", 112, 23)
+    equippedType:SetPoint("LEFT", allTypes, "RIGHT", 6, 0)
+    local clearTypes = UI.CreateButton(weaponTypePanel, "Clear", 58, 23)
+    clearTypes:SetPoint("LEFT", equippedType, "RIGHT", 6, 0)
+    local doneTypes = UI.CreateButton(weaponTypePanel, "Done", 72, 23)
+    doneTypes:SetPoint("BOTTOMRIGHT", weaponTypePanel, "BOTTOMRIGHT", -10, 9)
+    pane.equippedTypeButton = equippedType
+
+    allTypes:SetScript("OnClick", function()
+        local ok, message = Wardrobe.SetAllCompatibleWeaponSubtypes(pane.activeWeaponFamily, true)
+        pane:Refresh(message)
+        pane:RefreshWeaponTypeFlyout()
+    end)
+    equippedType:SetScript("OnClick", function()
+        local ok, message = Wardrobe.SetEquippedWeaponSubtypeOnly(pane.activeWeaponFamily)
+        if not ok and UIErrorsFrame then UIErrorsFrame:AddMessage(message or "Equipped type unavailable.", 1, 0.25, 0.25) end
+        pane:Refresh(message)
+        pane:RefreshWeaponTypeFlyout()
+    end)
+    clearTypes:SetScript("OnClick", function()
+        local ok, message = Wardrobe.SetAllCompatibleWeaponSubtypes(pane.activeWeaponFamily, false)
+        pane:Refresh(message)
+        pane:RefreshWeaponTypeFlyout()
+    end)
+    doneTypes:SetScript("OnClick", function() weaponTypePanel:Hide() end)
+
+    function pane:RefreshWeaponTypeFlyout()
+        if not weaponTypePanel:IsShown() or not self.activeWeaponFamily then return end
+        local family = Wardrobe.weaponFamilyDefinitions[self.activeWeaponFamily]
+        local options, capabilities = Wardrobe.GetWeaponSubtypeOptions(self.activeWeaponFamily)
+        flyoutTitle:SetText((family and family.label or self.activeWeaponFamily) .. " Types")
+        flyoutSubtitle:SetText("Blizzard decides which types the equipped hand may display. Checked types form the generation and browser pool.")
+        local physicalAvailable = false
+        for index, check in ipairs(self.weaponSubtypeChecks) do
+            local option = options[index]
+            check.option = option
+            check.subtypeKey = option and option.key or nil
+            check:SetShown(option ~= nil)
+            if option then
+                check:SetChecked(option.checked == true)
+                check:SetAlpha(option.available and 1 or 0.42)
+                check.label:SetText(option.label .. (option.physical and "  |cff66ccff(Equipped)|r" or ""))
+                check.label:SetTextColor(option.available and 1 or 0.55, option.available and 1 or 0.55, option.available and 1 or 0.55)
+                check.count:SetText(tostring(option.count or 0))
+                if option.physical and option.available then physicalAvailable = true end
+            end
+        end
+        equippedType:SetEnabled(physicalAvailable)
+    end
+
+    function pane:ShowWeaponTypeFlyout(familyKey)
+        self.activeWeaponFamily = familyKey
+        weaponTypePanel:Show()
+        self:RefreshWeaponTypeFlyout()
+    end
 
     local modelTitle = modelPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     modelTitle:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -10)
@@ -345,55 +583,18 @@ function UI.CreateOutfitsTab(parent)
     styleInfo:SetWordWrap(true)
     pane.styleInfo = styleInfo
 
-    local weaponHeader = modelPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-    weaponHeader:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 10, -96)
-    weaponHeader:SetPoint("RIGHT", modelPanel, "RIGHT", -10, 0)
-    weaponHeader:SetJustifyH("CENTER")
-    weaponHeader:SetText("Weapon Generation")
-    pane.weaponHeader = weaponHeader
-
-    pane.weaponFamilyChecks = {}
-    local weaponPositions = {
-        ONE_HAND = { 9, -108 }, TWO_HAND = { 148, -108 },
-        RANGED = { 9, -132 }, OFF_HAND = { 148, -132 },
-    }
-    for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
-        local definition = Wardrobe.weaponFamilyDefinitions[familyKey]
-        local check = CreateFrame("CheckButton", nil, modelPanel, "UICheckButtonTemplate")
-        check:SetSize(22, 22)
-        check:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", weaponPositions[familyKey][1], weaponPositions[familyKey][2])
-        check.familyKey = familyKey
-        local label = modelPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-        label:SetPoint("LEFT", check, "RIGHT", 1, 0)
-        label:SetText(definition.label)
-        check.label = label
-        check:SetScript("OnClick", function(self)
-            local desired = self:GetChecked() == true
-            local ok, message = Wardrobe.SetWeaponFamilyEnabled(self.familyKey, desired)
-            if not ok and UIErrorsFrame then UIErrorsFrame:AddMessage(message or "That weapon family is unavailable.", 1, 0.25, 0.25) end
-            pane:Refresh(message)
-        end)
-        check:SetScript("OnEnter", function(self)
-            local options, topology = Wardrobe.GetWeaponGenerationOptions()
-            local option
-            for _, candidate in ipairs(options) do if candidate.key == self.familyKey then option = candidate break end end
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText((option and option.label or definition.label) .. " Generation", 1, 0.82, 0)
-            GameTooltip:AddLine(option and option.reason or "Weapon generation option.", 1, 1, 1, true)
-            GameTooltip:AddLine("Current layout: " .. tostring(topology and topology.label or "Unknown"), 0.65, 0.65, 0.65, true)
-            if self.familyKey == "OFF_HAND" then
-                GameTooltip:AddLine("Off-Hand requires One-Hand. Dual wielding uses the One-Hand pool for both weapon hands.", 0.8, 0.8, 0.8, true)
-            else
-                GameTooltip:AddLine("Checked families form the pool Quest Chronicle may choose during Generate Outfit and Reroll Unlocked.", 0.8, 0.8, 0.8, true)
-            end
-            GameTooltip:Show()
-        end)
-        check:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        pane.weaponFamilyChecks[familyKey] = check
-    end
+    local weaponSummary = modelPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    weaponSummary:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 10, -96)
+    weaponSummary:SetPoint("RIGHT", modelPanel, "RIGHT", -10, 0)
+    weaponSummary:SetHeight(28)
+    weaponSummary:SetJustifyH("CENTER")
+    weaponSummary:SetJustifyV("TOP")
+    weaponSummary:SetWordWrap(true)
+    weaponSummary:SetText("Weapons")
+    pane.weaponSummary = weaponSummary
 
     local model = CreateFrame("DressUpModel", nil, modelPanel)
-    model:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -158)
+    model:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -126)
     model:SetPoint("BOTTOMRIGHT", modelPanel, "BOTTOMRIGHT", -8, 112)
     model:SetUnit("player")
     if model.SetFacing then model:SetFacing(0) end
@@ -901,7 +1102,7 @@ function UI.CreateOutfitsTab(parent)
         local cache = Wardrobe.GetCache()
         local slotKey = GetCurrentSlot()
         local diagnostics = Wardrobe.GetSlotDiagnostics(slotKey)
-        local sources = Wardrobe.GetSlotSources(slotKey)
+        local sources = GetDisplayedSources(slotKey)
         local selected = Wardrobe.GetSelectedSource(slotKey)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:SetText("Wardrobe Scan Details", 1, 0.82, 0)
@@ -1165,7 +1366,7 @@ function UI.CreateOutfitsTab(parent)
     sourcePanel:EnableMouseWheel(true)
     sourcePanel:SetScript("OnMouseWheel", function(_, delta)
         local slotKey = GetCurrentSlot()
-        local sources = Wardrobe.GetSlotSources(slotKey)
+        local sources = GetDisplayedSources(slotKey)
         local pageCount = math.max(1, math.ceil(#sources / SOURCE_ROWS))
         local page = GetPage(slotKey)
         if delta > 0 and page > 1 then
@@ -1223,7 +1424,7 @@ function UI.CreateOutfitsTab(parent)
         local cache = Wardrobe.GetCache()
         local slotKey = GetCurrentSlot()
         local definition = Wardrobe.GetSlotDefinition(slotKey) or Wardrobe.slotDefinitions[1]
-        local sources = Wardrobe.GetSlotSources(slotKey)
+        local sources = GetDisplayedSources(slotKey)
         local pageCount = math.max(1, math.ceil(#sources / SOURCE_ROWS))
         local page = math.min(GetPage(slotKey), pageCount)
         SetPage(slotKey, page)
@@ -1263,28 +1464,39 @@ function UI.CreateOutfitsTab(parent)
             exclusionCount
         ))
 
-        local weaponOptions, weaponTopology = Wardrobe.GetWeaponGenerationOptions()
-        weaponHeader:SetText("Weapon Generation • " .. tostring(weaponTopology.label or "Unknown layout"))
-        for _, option in ipairs(weaponOptions) do
-            local check = self.weaponFamilyChecks[option.key]
-            if check then
-                check:SetChecked(option.checked == true)
-                check.available = option.available
-                check:SetAlpha(option.available and 1.0 or 0.42)
-                if check.label then check.label:SetTextColor(option.available and 1 or 0.55, option.available and 1 or 0.55, option.available and 1 or 0.55) end
+        local weaponOptions, weaponTopology, weaponCapabilities = Wardrobe.GetWeaponGenerationOptions()
+        weaponSummary:SetText(string.format("%s\nAllowed: %s", tostring(weaponTopology.label or "Unknown layout"), Wardrobe.GetWeaponFilterCountSummary()))
+        local optionByFamily = {}
+        for _, option in ipairs(weaponOptions) do optionByFamily[option.key] = option end
+        for _, familyKey in ipairs(Wardrobe.WEAPON_FAMILY_ORDER) do
+            local row = self.weaponFamilyRows[familyKey]
+            local option = optionByFamily[familyKey]
+            local subtypeOptions = Wardrobe.GetWeaponSubtypeOptions(familyKey)
+            local selectedTypes, availableTypes = 0, 0
+            for _, subtypeOption in ipairs(subtypeOptions) do
+                if subtypeOption.available then availableTypes = availableTypes + 1 end
+                if subtypeOption.checked then selectedTypes = selectedTypes + 1 end
+            end
+            if row and option then
+                row.check:SetChecked(option.checked == true)
+                row.check.available = option.available
+                row.check:SetAlpha(option.available and 1.0 or 0.42)
+                row:SetAlpha(option.available and 1.0 or 0.62)
+                row.familyLabel:SetText(string.format("%s (%d/%d)", option.label, selectedTypes, availableTypes))
+                row.arrow.arrowText:SetTextColor(1, 0.82, 0)
             end
         end
+        self.linkWeaponHands:SetChecked(Wardrobe.GetLinkWeaponHands())
+        local canLinkHands = weaponTopology.hasWeaponOffHand == true
+        self.linkWeaponHands:SetAlpha(canLinkHands and 1.0 or 0.42)
+        self.linkWeaponHands.label:SetTextColor(canLinkHands and 1 or 0.55, canLinkHands and 1 or 0.55, canLinkHands and 1 or 0.55)
 
         local manifest = self:RefreshCurrentLook()
         local manifestBySlot = {}
         for _, entry in ipairs(manifest) do manifestBySlot[entry.slotKey] = entry end
         currentLookButton:SetText(string.format("Current Look (%d)", #manifest))
         for key, button in pairs(self.slotButtons) do
-            button:SetEnabled(key ~= slotKey)
             local lockedSlot = Wardrobe.IsSlotLocked(key)
-            local markers = ""
-            if Wardrobe.IsSlotHidden(key) then markers = markers .. " H" end
-            button:SetText(string.format("%s%s", Wardrobe.GetSlotDefinition(key).label, markers))
             local previewEntry = manifestBySlot[key]
             button.previewEntry = previewEntry
             local hasIcon = previewEntry and previewEntry.icon ~= nil
@@ -1294,10 +1506,33 @@ function UI.CreateOutfitsTab(parent)
                 button.previewIcon:SetTexture(previewEntry.icon)
                 if button.previewIcon.SetDesaturated then button.previewIcon:SetDesaturated(previewEntry.hidden == true) end
             end
-            SetLockedSlotVisual(button, lockedSlot)
+            if button.isWeaponFamilyRow then
+                button:SetEnabled(true)
+                button.lockIcon:SetShown(lockedSlot)
+                if key == slotKey then
+                    if button.LockHighlight then button:LockHighlight() end
+                else
+                    if button.UnlockHighlight then button:UnlockHighlight() end
+                end
+            else
+                button:SetEnabled(key ~= slotKey)
+                local markers = Wardrobe.IsSlotHidden(key) and " H" or ""
+                button:SetText(string.format("%s%s", Wardrobe.GetSlotDefinition(key).label, markers))
+                SetLockedSlotVisual(button, lockedSlot)
+            end
         end
 
-        sourceTitle:SetText((definition and definition.label or "Appearance") .. " Appearances")
+        if definition and definition.weaponRole then
+            local subtypeOptions = Wardrobe.GetWeaponSubtypeOptions(slotKey)
+            local selectedTypes, availableTypes = 0, 0
+            for _, subtypeOption in ipairs(subtypeOptions) do
+                if subtypeOption.available then availableTypes = availableTypes + 1 end
+                if subtypeOption.checked then selectedTypes = selectedTypes + 1 end
+            end
+            sourceTitle:SetText(string.format("%s Appearances • %d of %d Types", definition.label, selectedTypes, availableTypes))
+        else
+            sourceTitle:SetText((definition and definition.label or "Appearance") .. " Appearances")
+        end
         scanButton:SetEnabled(not Wardrobe.IsScanning())
         scanButton:SetText(Wardrobe.IsScanning() and "Scanning..." or "Scan Collection")
         staleHitbox:SetShown(cache.dirty == true and not Wardrobe.IsScanning())
@@ -1414,7 +1649,22 @@ function UI.CreateOutfitsTab(parent)
         if pane:IsShown() then pane:Refresh() end
     end)
     QC.RegisterCallback("WARDROBE_WEAPON_OPTIONS_CHANGED", pane, function()
-        if pane:IsShown() then pane:Refresh() end
+        if pane:IsShown() then
+            pane:Refresh()
+            pane:RefreshWeaponTypeFlyout()
+        end
+    end)
+    QC.RegisterCallback("WARDROBE_WEAPON_SUBTYPES_CHANGED", pane, function()
+        if pane:IsShown() then
+            pane:Refresh()
+            pane:RefreshWeaponTypeFlyout()
+        end
+    end)
+    QC.RegisterCallback("WARDROBE_WEAPON_CAPABILITIES_CHANGED", pane, function()
+        if pane:IsShown() then
+            pane:Refresh("Blizzard weapon appearance permissions updated.")
+            pane:RefreshWeaponTypeFlyout()
+        end
     end)
     QC.RegisterCallback("WARDROBE_WEAPON_TOPOLOGY_CHANGED", pane, function(topology)
         if pane:IsShown() then pane:Refresh("Weapon layout changed: " .. tostring(topology and topology.label or "equipment updated") .. ".") end

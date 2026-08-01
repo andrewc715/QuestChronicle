@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.6.0 - 2026-07-31
+
+### Added
+
+- Blizzard-driven weapon appearance capability matrices for the main hand and off hand.
+- Exact weapon-type filters for one-hand, two-hand, ranged, and off-hand families.
+- Equipment Slot panel weapon rows with generation checkboxes, browse behavior, and subtype flyouts.
+- All Compatible, Equipped Type, Clear, and Done flyout actions.
+- Linked or independent dual-weapon generation.
+- Spec, talent-group, trait, and equipment change permission refreshes.
+- Concept persistence for subtype filters and linked-hands preference.
+
+### Changed
+
+- Physical topology and visual transmog permission are now separate systems.
+- Weapon browsing, generation, unlocked rerolls, and slot rerolls use the same effective type filters.
+- Weapon generation chooses an exact type before an appearance, preventing large categories from automatically dominating smaller selected categories.
+- Secondary weapon Custom Set validation accepts Blizzard-permitted one-hand, two-hand, and ranged sources.
+- Weapon controls moved from the character-preview panel into the Equipment Slot panel.
+
 ## 1.5.1 - 2026-07-31
 
 ### Fixed
