@@ -30,6 +30,8 @@
         "PanelTemplates_SelectTab",
         "PanelTemplates_DeselectTab",
         "DEFAULT_CHAT_FRAME",
-        "SlashCmdList"
+        "SlashCmdList",
+        "SAVE",
+        "CANCEL"
     ]
 }

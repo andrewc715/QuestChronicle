@@ -1,8 +1,8 @@
-# Quest Chronicle v0.5.6
+# Quest Chronicle v0.6.0
 
-> **Embedded preview repair:** v0.5.6 applies cached transmog source IDs directly to the character model, including explicit hand-slot routing for weapons.
+> **Outfit Workbench:** v0.6.0 generates complete random outfit concepts, rerolls and locks slots, hides optional pieces, enforces weapon combinations, and saves named concepts per character.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.5.6 preserves the corrected native-scale wardrobe index and repairs manual appearance application on the embedded model.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.6.0 turns the corrected native-scale wardrobe index and embedded preview into a practical outfit design workbench.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

@@ -3,8 +3,43 @@ local UI = QC.UI
 local Wardrobe = QC.Wardrobe
 
 local SOURCE_ROWS = 7
-local SOURCE_ROW_HEIGHT = 40
+local SOURCE_ROW_HEIGHT = 37
 local SOURCE_ROW_SPACING = 2
+
+local SAVE_CONCEPT_DIALOG = "QUEST_CHRONICLE_SAVE_OUTFIT_CONCEPT"
+if StaticPopupDialogs and not StaticPopupDialogs[SAVE_CONCEPT_DIALOG] then
+    StaticPopupDialogs[SAVE_CONCEPT_DIALOG] = {
+        text = "Name this Quest Chronicle outfit concept:",
+        button1 = SAVE,
+        button2 = CANCEL,
+        hasEditBox = true,
+        maxLetters = 48,
+        OnShow = function(self, pane)
+            local suggested = pane and pane.GetSuggestedConceptName and pane:GetSuggestedConceptName() or "Outfit Concept"
+            self.editBox:SetText(suggested)
+            self.editBox:HighlightText()
+            self.editBox:SetFocus()
+        end,
+        OnAccept = function(self, pane)
+            if pane and pane.SaveConcept then
+                pane:SaveConcept(self.editBox:GetText())
+            end
+        end,
+        EditBoxOnEnterPressed = function(self)
+            local dialog = self:GetParent()
+            if dialog and dialog.button1 then
+                dialog.button1:Click()
+            end
+        end,
+        EditBoxOnEscapePressed = function(self)
+            self:GetParent():Hide()
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+end
 
 local function GetState()
     return Wardrobe.GetPreviewState()
@@ -26,6 +61,31 @@ local function SourceLabel(source)
     local qualityColor = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[source.quality or 1]
     local color = qualityColor and qualityColor.hex or UI.white
     return string.format("%s%s|r", color, source.name or ("Appearance " .. tostring(source.sourceID or 0)))
+end
+
+local function ShowConceptMenu(button, pane)
+    local concepts = Wardrobe.GetConcepts()
+    if #concepts == 0 then
+        pane:Refresh("No outfit concepts have been saved yet.")
+        return
+    end
+
+    if MenuUtil and type(MenuUtil.CreateContextMenu) == "function" then
+        MenuUtil.CreateContextMenu(button, function(_, rootDescription)
+            if rootDescription.CreateTitle then
+                rootDescription:CreateTitle("Load Outfit Concept")
+            end
+            for _, concept in ipairs(concepts) do
+                local label = concept.name or "Unnamed Concept"
+                local conceptID = concept.id
+                rootDescription:CreateButton(label, function()
+                    pane:LoadConcept(conceptID)
+                end)
+            end
+        end)
+    else
+        pane:LoadConcept(concepts[1].id)
+    end
 end
 
 local function CacheSummary(cache, diagnostics, sourceCount)
@@ -128,9 +188,9 @@ function UI.CreateOutfitsTab(parent)
     pane.slotButtons = {}
     local previous
     for _, definition in ipairs(Wardrobe.slotDefinitions) do
-        local button = UI.CreateButton(slotPanel, definition.label, 108, 23)
+        local button = UI.CreateButton(slotPanel, definition.label, 108, 22)
         if previous then
-            button:SetPoint("TOP", previous, "BOTTOM", 0, -5)
+            button:SetPoint("TOP", previous, "BOTTOM", 0, -3)
         else
             button:SetPoint("TOP", slotTitle, "BOTTOM", 0, -9)
         end
@@ -149,13 +209,13 @@ function UI.CreateOutfitsTab(parent)
 
     local model = CreateFrame("DressUpModel", nil, modelPanel)
     model:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 8, -32)
-    model:SetPoint("BOTTOMRIGHT", modelPanel, "BOTTOMRIGHT", -8, 74)
+    model:SetPoint("BOTTOMRIGHT", modelPanel, "BOTTOMRIGHT", -8, 112)
     model:SetUnit("player")
     if model.SetFacing then model:SetFacing(0) end
     pane.model = model
 
     local rotateLeft = UI.CreateButton(modelPanel, "Rotate Left", 88, 23)
-    rotateLeft:SetPoint("BOTTOMLEFT", modelPanel, "BOTTOMLEFT", 8, 40)
+    rotateLeft:SetPoint("BOTTOMLEFT", modelPanel, "BOTTOMLEFT", 8, 78)
     local rotateRight = UI.CreateButton(modelPanel, "Rotate Right", 88, 23)
     rotateRight:SetPoint("LEFT", rotateLeft, "RIGHT", 6, 0)
     local resetModel = UI.CreateButton(modelPanel, "Reset View", 88, 23)
@@ -172,12 +232,46 @@ function UI.CreateOutfitsTab(parent)
         Wardrobe.ApplyPreview(model)
     end)
 
-    local clearAll = UI.CreateButton(modelPanel, "Clear Selections", 140, 24)
-    clearAll:SetPoint("BOTTOM", modelPanel, "BOTTOM", 0, 10)
+    local generateButton = UI.CreateButton(modelPanel, "Generate Outfit", 128, 24)
+    generateButton:SetPoint("BOTTOMLEFT", modelPanel, "BOTTOMLEFT", 18, 44)
+    local rerollUnlocked = UI.CreateButton(modelPanel, "Reroll Unlocked", 128, 24)
+    rerollUnlocked:SetPoint("BOTTOMRIGHT", modelPanel, "BOTTOMRIGHT", -18, 44)
+
+    local saveConcept = UI.CreateButton(modelPanel, "Save Concept", 88, 24)
+    saveConcept:SetPoint("BOTTOMLEFT", modelPanel, "BOTTOMLEFT", 8, 10)
+    local loadConcept = UI.CreateButton(modelPanel, "Load Concept", 88, 24)
+    loadConcept:SetPoint("LEFT", saveConcept, "RIGHT", 4, 0)
+    local clearAll = UI.CreateButton(modelPanel, "Reset Outfit", 100, 24)
+    clearAll:SetPoint("LEFT", loadConcept, "RIGHT", 4, 0)
+
+    UI.SetTooltip(generateButton, "Generate Outfit", "Build a complete random outfit from cached appearances. Locked slots and hidden helm, cloak, shirt, or tabard choices are preserved.")
+    UI.SetTooltip(rerollUnlocked, "Reroll Unlocked", "Replace every unlocked armor and weapon choice while preserving locked slots and visibility choices.")
+    UI.SetTooltip(saveConcept, "Save Concept", "Save the current selections, locks, hidden slots, and weapon configuration for this character.")
+    UI.SetTooltip(loadConcept, "Load Concept", "Choose one of this character's saved outfit concepts.")
+    UI.SetTooltip(clearAll, "Reset Outfit", "Clear selections, locks, and hidden-slot choices, returning the preview to currently equipped gear.")
+
+    generateButton:SetScript("OnClick", function()
+        local ok, message = Wardrobe.GenerateOutfit(false)
+        if ok then Wardrobe.ApplyPreview(model) end
+        pane:Refresh(message)
+    end)
+    rerollUnlocked:SetScript("OnClick", function()
+        local ok, message = Wardrobe.GenerateOutfit(true)
+        if ok then Wardrobe.ApplyPreview(model) end
+        pane:Refresh(message)
+    end)
+    saveConcept:SetScript("OnClick", function()
+        if StaticPopup_Show then
+            StaticPopup_Show(SAVE_CONCEPT_DIALOG, nil, nil, pane)
+        end
+    end)
+    loadConcept:SetScript("OnClick", function(self)
+        ShowConceptMenu(self, pane)
+    end)
     clearAll:SetScript("OnClick", function()
         Wardrobe.ClearAllSelections()
         Wardrobe.ApplyPreview(model)
-        pane:Refresh()
+        pane:Refresh("Outfit preview reset to currently equipped gear.")
     end)
 
     local scanButton = UI.CreateButton(sourcePanel, "Scan Collection", 125, 24)
@@ -203,7 +297,7 @@ function UI.CreateOutfitsTab(parent)
     pane.selectedText = selectedText
 
     local statusText = sourcePanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    statusText:SetPoint("TOPLEFT", sourcePanel, "TOPLEFT", 10, -62)
+    statusText:SetPoint("TOPLEFT", sourcePanel, "TOPLEFT", 10, -91)
     statusText:SetPoint("RIGHT", sourcePanel, "RIGHT", -10, 0)
     statusText:SetHeight(28)
     statusText:SetJustifyH("LEFT")
@@ -230,6 +324,37 @@ function UI.CreateOutfitsTab(parent)
     statusHitbox:SetScript("OnLeave", function() GameTooltip:Hide() end)
     pane.statusHitbox = statusHitbox
 
+    local rerollSlot = UI.CreateButton(sourcePanel, "Reroll Slot", 90, 22)
+    rerollSlot:SetPoint("TOPLEFT", sourcePanel, "TOPLEFT", 10, -63)
+    local lockSlot = UI.CreateButton(sourcePanel, "Lock Slot", 82, 22)
+    lockSlot:SetPoint("LEFT", rerollSlot, "RIGHT", 5, 0)
+    local hideSlot = UI.CreateButton(sourcePanel, "Hide Slot", 82, 22)
+    hideSlot:SetPoint("LEFT", lockSlot, "RIGHT", 5, 0)
+    pane.rerollSlot = rerollSlot
+    pane.lockSlot = lockSlot
+    pane.hideSlot = hideSlot
+
+    UI.SetTooltip(rerollSlot, "Reroll Selected Slot", "Choose another cached appearance for the active equipment slot.")
+    UI.SetTooltip(lockSlot, "Lock Selected Slot", "Locked slots survive Generate Outfit and Reroll Unlocked.")
+    UI.SetTooltip(hideSlot, "Toggle Slot Visibility", "Hide or show helm, cloak, shirt, or tabard while preserving its selected appearance.")
+
+    rerollSlot:SetScript("OnClick", function()
+        local slotKey = GetCurrentSlot()
+        local ok, message = Wardrobe.RerollSlot(slotKey)
+        if ok then Wardrobe.ApplyPreview(model) end
+        pane:Refresh(message)
+    end)
+    lockSlot:SetScript("OnClick", function()
+        local ok, message = Wardrobe.ToggleSlotLocked(GetCurrentSlot())
+        if ok then Wardrobe.ApplyPreview(model) end
+        pane:Refresh(message)
+    end)
+    hideSlot:SetScript("OnClick", function()
+        local ok, message = Wardrobe.ToggleSlotHidden(GetCurrentSlot())
+        if ok then Wardrobe.ApplyPreview(model) end
+        pane:Refresh(message)
+    end)
+
     pane.sourceRows = {}
     for index = 1, SOURCE_ROWS do
         local row = CreateFrame("Button", nil, sourcePanel)
@@ -237,7 +362,7 @@ function UI.CreateOutfitsTab(parent)
         row:SetPoint("LEFT", sourcePanel, "LEFT", 10, 0)
         row:SetPoint("RIGHT", sourcePanel, "RIGHT", -10, 0)
         if index == 1 then
-            row:SetPoint("TOP", sourcePanel, "TOP", 0, -96)
+            row:SetPoint("TOP", sourcePanel, "TOP", 0, -122)
         else
             row:SetPoint("TOP", pane.sourceRows[index - 1], "BOTTOM", 0, -SOURCE_ROW_SPACING)
         end
@@ -248,7 +373,7 @@ function UI.CreateOutfitsTab(parent)
         row.background = background
 
         local icon = row:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(30, 30)
+        icon:SetSize(28, 28)
         icon:SetPoint("LEFT", row, "LEFT", 5, 0)
         icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
         row.icon = icon
@@ -355,6 +480,32 @@ function UI.CreateOutfitsTab(parent)
         pane:Refresh()
     end)
 
+    function pane:GetSuggestedConceptName()
+        local concept = Wardrobe.GetCurrentConcept()
+        if concept and concept.name then
+            return concept.name
+        end
+        return "Outfit Concept " .. tostring(#Wardrobe.GetConcepts() + 1)
+    end
+
+    function pane:SaveConcept(name)
+        local ok, message = Wardrobe.SaveConcept(name)
+        self:Refresh(message)
+        if not ok and UIErrorsFrame then
+            UIErrorsFrame:AddMessage(message or "Unable to save outfit concept.", 1, 0.25, 0.25)
+        end
+    end
+
+    function pane:LoadConcept(conceptID)
+        local ok, message = Wardrobe.LoadConcept(conceptID)
+        if ok then
+            Wardrobe.ApplyPreview(model)
+        elseif UIErrorsFrame then
+            UIErrorsFrame:AddMessage(message or "Unable to load outfit concept.", 1, 0.25, 0.25)
+        end
+        self:Refresh(message)
+    end
+
     function pane:Refresh(message)
         local cache = Wardrobe.GetCache()
         local slotKey = GetCurrentSlot()
@@ -367,7 +518,10 @@ function UI.CreateOutfitsTab(parent)
         for key, button in pairs(self.slotButtons) do
             button:SetEnabled(key ~= slotKey)
             local count = #(Wardrobe.GetSlotSources(key) or {})
-            button:SetText(string.format("%s (%d)", Wardrobe.GetSlotDefinition(key).label, count))
+            local markers = ""
+            if Wardrobe.IsSlotLocked(key) then markers = markers .. " L" end
+            if Wardrobe.IsSlotHidden(key) then markers = markers .. " H" end
+            button:SetText(string.format("%s (%d)%s", Wardrobe.GetSlotDefinition(key).label, count, markers))
         end
 
         sourceTitle:SetText((definition and definition.label or "Appearance") .. " Appearances")
@@ -375,12 +529,26 @@ function UI.CreateOutfitsTab(parent)
         scanButton:SetText(Wardrobe.IsScanning() and "Scanning..." or (cache.dirty and "Rescan Collection" or "Scan Collection"))
 
         local selected = Wardrobe.GetSelectedSource(slotKey)
-        selectedText:SetText(selected and ("Selected: " .. tostring(selected.name or selected.sourceID)) or "Selected: currently equipped appearance")
-        clearSlot:SetEnabled(selected ~= nil)
-        clearSlot:SetText(selected and "Clear Slot" or "No Selection")
+        local hidden = Wardrobe.IsSlotHidden(slotKey)
+        local locked = Wardrobe.IsSlotLocked(slotKey)
+        local selectedLabel = selected and tostring(selected.name or selected.sourceID) or "currently equipped appearance"
+        selectedText:SetText(string.format("Selected: %s%s%s", selectedLabel, locked and " • Locked" or "", hidden and " • Hidden" or ""))
+        clearSlot:SetEnabled(selected ~= nil or hidden or locked)
+        clearSlot:SetText((selected or hidden or locked) and "Clear Slot" or "No Selection")
+        rerollSlot:SetEnabled(not locked and #sources > 0)
+        lockSlot:SetText(locked and "Unlock Slot" or "Lock Slot")
+        lockSlot:SetEnabled(true)
+        hideSlot:SetShown(Wardrobe.IsSlotHideable(slotKey))
+        hideSlot:SetText(hidden and "Show Slot" or "Hide Slot")
 
         local diagnostics = Wardrobe.GetSlotDiagnostics(slotKey)
         statusText:SetText(message or CacheSummary(cache, diagnostics, #sources))
+
+        local canGenerate = not Wardrobe.IsScanning() and cache.totalVisuals > 0
+        generateButton:SetEnabled(canGenerate)
+        rerollUnlocked:SetEnabled(canGenerate)
+        saveConcept:SetEnabled(next(GetState().selections) ~= nil or next(GetState().hidden) ~= nil)
+        loadConcept:SetEnabled(#Wardrobe.GetConcepts() > 0)
 
         local startIndex = ((page - 1) * SOURCE_ROWS) + 1
         for rowIndex, row in ipairs(self.sourceRows) do
@@ -402,7 +570,9 @@ function UI.CreateOutfitsTab(parent)
         pageText:SetText(string.format("Page %d of %d", page, pageCount))
         previousPage:SetEnabled(page > 1)
         nextPage:SetEnabled(page < pageCount)
-        subtitle:SetText(string.format("%s collected appearances cached for %s. Manual preview only; no outfit is applied to the character.", UI.FormatNumber(#sources), definition and definition.label or slotKey))
+        local concept = Wardrobe.GetCurrentConcept()
+        local conceptText = concept and (" • Concept: " .. tostring(concept.name or "Unnamed")) or ""
+        subtitle:SetText(string.format("%s collected appearances cached for %s%s. Preview only; no outfit is applied.", UI.FormatNumber(#sources), definition and definition.label or slotKey, conceptText))
     end
 
     QC.RegisterCallback("WARDROBE_SCAN_PROGRESS", pane, function(index, total, slotKey, count, diagnostics)
@@ -421,6 +591,12 @@ function UI.CreateOutfitsTab(parent)
         if pane:IsShown() then pane:Refresh() end
     end)
     QC.RegisterCallback("WARDROBE_SELECTION_CHANGED", pane, function()
+        if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("WARDROBE_WORKBENCH_CHANGED", pane, function()
+        if pane:IsShown() then pane:Refresh() end
+    end)
+    QC.RegisterCallback("WARDROBE_CONCEPTS_CHANGED", pane, function()
         if pane:IsShown() then pane:Refresh() end
     end)
     QC.RegisterCallback("PLAYER_READY", pane, function()

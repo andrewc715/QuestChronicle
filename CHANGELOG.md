@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.6.0 - 2026-07-31
+
+### Added
+
+- Generates complete random armor and weapon outfit previews from the format 5 wardrobe cache.
+- Rerolls the active slot or every unlocked slot.
+- Locks individual slots so generation and bulk rerolls preserve them.
+- Hides and restores helm, cloak, shirt, and tabard without discarding their selected appearances.
+- Enforces mutually compatible One-Hand, Two-Hand, Ranged, and Off-Hand combinations.
+- Automatically supplies a One-Hand selection when an Off-Hand appearance is chosen by itself.
+- Saves and loads named concepts per character, including selections, locks, hidden slots, and weapon configuration.
+- Adds workbench controls while retaining the seven-row paged appearance browser.
+- Replaces the five wide navigation push-buttons with native `PanelTopTabButtonTemplate` tabs connected to the content panel.
+
+### Preserved
+
+- Wardrobe cache format 5 and the successful v0.5.5 collection scan.
+- SavedVariables schema 2 and Courier format 1.
+- Preview-only behavior; no transmog is applied and no Blizzard outfit slot is changed.
+
 ## 0.5.6 - 2026-07-31
 
 ### Fixed

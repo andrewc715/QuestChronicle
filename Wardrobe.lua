@@ -9,34 +9,34 @@ Wardrobe.PAGE_SIZE = 7
 -- Resolve collection enum values when the scan runs instead of when this file loads.
 -- Some Blizzard enum tables are not ready during early addon loading.
 Wardrobe.slotDefinitions = {
-    { key = "HEAD", label = "Head", slotName = "HEADSLOT", categoryNames = { "Head" }, fallbackCategoryIDs = { 1 } },
+    { key = "HEAD", label = "Head", slotName = "HEADSLOT", hideable = true, categoryNames = { "Head" }, fallbackCategoryIDs = { 1 } },
     { key = "SHOULDER", label = "Shoulders", slotName = "SHOULDERSLOT", categoryNames = { "Shoulder" }, fallbackCategoryIDs = { 2 } },
-    { key = "BACK", label = "Back", slotName = "BACKSLOT", categoryNames = { "Back" }, fallbackCategoryIDs = { 3 } },
+    { key = "BACK", label = "Back", slotName = "BACKSLOT", hideable = true, categoryNames = { "Back" }, fallbackCategoryIDs = { 3 } },
     { key = "CHEST", label = "Chest", slotName = "CHESTSLOT", categoryNames = { "Chest" }, fallbackCategoryIDs = { 4 } },
-    { key = "SHIRT", label = "Shirt", slotName = "SHIRTSLOT", categoryNames = { "Shirt" }, fallbackCategoryIDs = { 5 } },
-    { key = "TABARD", label = "Tabard", slotName = "TABARDSLOT", categoryNames = { "Tabard" }, fallbackCategoryIDs = { 6 } },
+    { key = "SHIRT", label = "Shirt", slotName = "SHIRTSLOT", hideable = true, categoryNames = { "Shirt" }, fallbackCategoryIDs = { 5 } },
+    { key = "TABARD", label = "Tabard", slotName = "TABARDSLOT", hideable = true, categoryNames = { "Tabard" }, fallbackCategoryIDs = { 6 } },
     { key = "WRIST", label = "Wrists", slotName = "WRISTSLOT", categoryNames = { "Wrist" }, fallbackCategoryIDs = { 7 } },
     { key = "HANDS", label = "Hands", slotName = "HANDSSLOT", categoryNames = { "Hands" }, fallbackCategoryIDs = { 8 } },
     { key = "WAIST", label = "Waist", slotName = "WAISTSLOT", categoryNames = { "Waist" }, fallbackCategoryIDs = { 9 } },
     { key = "LEGS", label = "Legs", slotName = "LEGSSLOT", categoryNames = { "Legs" }, fallbackCategoryIDs = { 10 } },
     { key = "FEET", label = "Feet", slotName = "FEETSLOT", categoryNames = { "Feet" }, fallbackCategoryIDs = { 11 } },
     {
-        key = "ONE_HAND", label = "One-Hand", slotName = "MAINHANDSLOT",
+        key = "ONE_HAND", label = "One-Hand", slotName = "MAINHANDSLOT", weaponRole = "ONE_HAND",
         categoryNames = { "Wand", "OneHAxe", "OneHSword", "OneHMace", "Dagger", "Fist", "Warglaives", "Paired" },
         fallbackCategoryIDs = { 12, 13, 14, 15, 16, 17, 28, 29 },
     },
     {
-        key = "TWO_HAND", label = "Two-Hand", slotName = "MAINHANDSLOT",
+        key = "TWO_HAND", label = "Two-Hand", slotName = "MAINHANDSLOT", weaponRole = "TWO_HAND",
         categoryNames = { "TwoHAxe", "TwoHSword", "TwoHMace", "Staff", "Polearm" },
         fallbackCategoryIDs = { 20, 21, 22, 23, 24 },
     },
     {
-        key = "RANGED", label = "Ranged", slotName = "MAINHANDSLOT",
+        key = "RANGED", label = "Ranged", slotName = "MAINHANDSLOT", weaponRole = "RANGED",
         categoryNames = { "Bow", "Gun", "Crossbow" },
         fallbackCategoryIDs = { 25, 26, 27 },
     },
     {
-        key = "OFF_HAND", label = "Off-Hand", slotName = "SECONDARYHANDSLOT",
+        key = "OFF_HAND", label = "Off-Hand", slotName = "SECONDARYHANDSLOT", weaponRole = "OFF_HAND",
         categoryNames = { "Shield", "Holdable" },
         fallbackCategoryIDs = { 18, 19 },
     },
@@ -97,7 +97,28 @@ local function EnsurePreviewState()
     state.outfits.selections = state.outfits.selections or {}
     state.outfits.selectedSlot = state.outfits.selectedSlot or "HEAD"
     state.outfits.pages = state.outfits.pages or {}
+    state.outfits.locks = state.outfits.locks or {}
+    state.outfits.hidden = state.outfits.hidden or {}
     return state.outfits
+end
+
+local function CopyPrimitiveMap(source)
+    local copy = {}
+    for key, value in pairs(source or {}) do
+        if type(value) == "string" or type(value) == "number" or type(value) == "boolean" then
+            copy[key] = value
+        end
+    end
+    return copy
+end
+
+local function EnsureConceptStore()
+    local cache = EnsureCache()
+    cache.conceptsByCharacter = cache.conceptsByCharacter or {}
+    local character = QC.GetCurrentCharacter and QC.GetCurrentCharacter()
+    local characterKey = character and character.key or "UNKNOWN"
+    cache.conceptsByCharacter[characterKey] = cache.conceptsByCharacter[characterKey] or {}
+    return cache.conceptsByCharacter[characterKey], characterKey
 end
 
 local function LoadTransmogSupport()
@@ -433,6 +454,326 @@ end
 function Wardrobe.GetSlotDiagnostics(slotKey)
     local cache = EnsureCache()
     return cache.slotDiagnostics[slotKey]
+end
+
+function Wardrobe.IsSlotLocked(slotKey)
+    return EnsurePreviewState().locks[slotKey] == true
+end
+
+function Wardrobe.IsSlotHideable(slotKey)
+    local definition = slotByKey[slotKey]
+    return definition and definition.hideable == true or false
+end
+
+function Wardrobe.IsSlotHidden(slotKey)
+    return Wardrobe.IsSlotHideable(slotKey) and EnsurePreviewState().hidden[slotKey] == true
+end
+
+function Wardrobe.SetSlotLocked(slotKey, locked)
+    if not slotByKey[slotKey] then
+        return false, "Unknown equipment slot."
+    end
+    local state = EnsurePreviewState()
+    state.locks[slotKey] = locked == true or nil
+    state.selectedConceptID = nil
+    if QC.Notify then
+        QC.Notify("WARDROBE_WORKBENCH_CHANGED", slotKey)
+    end
+    return true, state.locks[slotKey] and "Slot locked." or "Slot unlocked."
+end
+
+function Wardrobe.ToggleSlotLocked(slotKey)
+    return Wardrobe.SetSlotLocked(slotKey, not Wardrobe.IsSlotLocked(slotKey))
+end
+
+function Wardrobe.SetSlotHidden(slotKey, hidden)
+    if not Wardrobe.IsSlotHideable(slotKey) then
+        return false, "Only helm, cloak, shirt, and tabard can be hidden."
+    end
+    local state = EnsurePreviewState()
+    state.hidden[slotKey] = hidden == true or nil
+    state.selectedConceptID = nil
+    if QC.Notify then
+        QC.Notify("WARDROBE_WORKBENCH_CHANGED", slotKey)
+    end
+    return true, state.hidden[slotKey] and "Slot hidden in the preview." or "Slot shown in the preview."
+end
+
+function Wardrobe.ToggleSlotHidden(slotKey)
+    return Wardrobe.SetSlotHidden(slotKey, not Wardrobe.IsSlotHidden(slotKey))
+end
+
+local function GetSourceByID(slotKey, sourceID)
+    if not sourceID then
+        return nil
+    end
+    for _, source in ipairs(Wardrobe.GetSlotSources(slotKey)) do
+        if source.sourceID == sourceID then
+            return source
+        end
+    end
+    return nil
+end
+
+local function ClearWeaponSlot(state, slotKey)
+    state.selections[slotKey] = nil
+    state.locks[slotKey] = nil
+    state.hidden[slotKey] = nil
+end
+
+local function ApplyWeaponSelectionRules(state, slotKey)
+    if slotKey == "ONE_HAND" then
+        ClearWeaponSlot(state, "TWO_HAND")
+        ClearWeaponSlot(state, "RANGED")
+    elseif slotKey == "TWO_HAND" then
+        ClearWeaponSlot(state, "ONE_HAND")
+        ClearWeaponSlot(state, "RANGED")
+        ClearWeaponSlot(state, "OFF_HAND")
+    elseif slotKey == "RANGED" then
+        ClearWeaponSlot(state, "ONE_HAND")
+        ClearWeaponSlot(state, "TWO_HAND")
+        ClearWeaponSlot(state, "OFF_HAND")
+    elseif slotKey == "OFF_HAND" then
+        ClearWeaponSlot(state, "TWO_HAND")
+        ClearWeaponSlot(state, "RANGED")
+    end
+end
+
+local function ChooseRandomSource(slotKey, excludeSourceID)
+    local candidates = {}
+    for _, source in ipairs(Wardrobe.GetSlotSources(slotKey)) do
+        local valid = Wardrobe.ValidateSource(source, slotKey)
+        if valid and source.sourceID ~= excludeSourceID then
+            table.insert(candidates, source)
+        end
+    end
+    if #candidates == 0 and excludeSourceID then
+        return GetSourceByID(slotKey, excludeSourceID)
+    end
+    if #candidates == 0 then
+        return nil
+    end
+    return candidates[math.random(1, #candidates)]
+end
+
+local function SetRandomSelection(state, slotKey, reroll)
+    local current = reroll and state.selections[slotKey] or nil
+    local source = ChooseRandomSource(slotKey, current)
+    if not source then
+        state.selections[slotKey] = nil
+        return false
+    end
+    state.selections[slotKey] = source.sourceID
+    return true
+end
+
+local function GetLockedWeaponMode(state)
+    local lockedMode
+    for _, slotKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+        if state.locks[slotKey] and state.selections[slotKey] then
+            if lockedMode then
+                return nil, "Unlock one of the conflicting main-hand weapon slots first."
+            end
+            lockedMode = slotKey
+        end
+    end
+    if state.locks.OFF_HAND and state.selections.OFF_HAND then
+        if lockedMode and lockedMode ~= "ONE_HAND" then
+            return nil, "The locked off-hand conflicts with the locked two-hand or ranged weapon."
+        end
+        lockedMode = "ONE_HAND"
+    end
+    return lockedMode
+end
+
+local function GenerateWeapons(state, reroll)
+    local mode, errorMessage = GetLockedWeaponMode(state)
+    if errorMessage then
+        return false, errorMessage
+    end
+
+    if not mode then
+        local availableModes = {}
+        for _, slotKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+            if #Wardrobe.GetSlotSources(slotKey) > 0 then
+                table.insert(availableModes, slotKey)
+            end
+        end
+        if #availableModes == 0 then
+            return true
+        end
+        mode = availableModes[math.random(1, #availableModes)]
+    end
+
+    for _, slotKey in ipairs({ "ONE_HAND", "TWO_HAND", "RANGED" }) do
+        if slotKey == mode then
+            if not state.locks[slotKey] then
+                SetRandomSelection(state, slotKey, reroll)
+            end
+        elseif not state.locks[slotKey] then
+            state.selections[slotKey] = nil
+        end
+    end
+
+    if mode == "ONE_HAND" then
+        if not state.locks.OFF_HAND then
+            if #Wardrobe.GetSlotSources("OFF_HAND") > 0 and math.random(1, 100) <= 75 then
+                SetRandomSelection(state, "OFF_HAND", reroll)
+            else
+                state.selections.OFF_HAND = nil
+            end
+        end
+    elseif not state.locks.OFF_HAND then
+        state.selections.OFF_HAND = nil
+    end
+    return true
+end
+
+function Wardrobe.GenerateOutfit(reroll)
+    local cache = EnsureCache()
+    if cache.scanState ~= "COMPLETE" and cache.scanState ~= "COMPLETE_WITH_WARNINGS" then
+        return false, "Scan the wardrobe collection before generating an outfit."
+    end
+
+    local state = EnsurePreviewState()
+    local selected = 0
+    for _, definition in ipairs(Wardrobe.slotDefinitions) do
+        if not definition.weaponRole and not state.locks[definition.key] then
+            if SetRandomSelection(state, definition.key, reroll == true) then
+                selected = selected + 1
+            end
+        end
+    end
+
+    local weaponsOK, weaponError = GenerateWeapons(state, reroll == true)
+    if not weaponsOK then
+        return false, weaponError
+    end
+    state.selectedConceptID = nil
+    if QC.Notify then
+        QC.Notify("WARDROBE_WORKBENCH_CHANGED")
+    end
+    return true, string.format("Generated a valid outfit across %d armor slots; locked and hidden choices were preserved.", selected)
+end
+
+function Wardrobe.RerollSlot(slotKey)
+    local definition = slotByKey[slotKey]
+    if not definition then
+        return false, "Unknown equipment slot."
+    end
+    if Wardrobe.IsSlotLocked(slotKey) then
+        return false, "Unlock this slot before rerolling it."
+    end
+
+    local state = EnsurePreviewState()
+    if not SetRandomSelection(state, slotKey, true) then
+        return false, "No compatible appearance is cached for this slot."
+    end
+    if definition.weaponRole then
+        ApplyWeaponSelectionRules(state, slotKey)
+        if slotKey == "OFF_HAND" and not state.selections.ONE_HAND then
+            SetRandomSelection(state, "ONE_HAND", false)
+        end
+    end
+    state.selectedConceptID = nil
+    if QC.Notify then
+        QC.Notify("WARDROBE_WORKBENCH_CHANGED", slotKey)
+    end
+    return true, definition.label .. " rerolled."
+end
+
+function Wardrobe.GetConcepts()
+    local store = EnsureConceptStore()
+    local concepts = {}
+    for _, concept in pairs(store) do
+        table.insert(concepts, concept)
+    end
+    table.sort(concepts, function(left, right)
+        if (left.updatedAt or 0) == (right.updatedAt or 0) then
+            return string.lower(left.name or "") < string.lower(right.name or "")
+        end
+        return (left.updatedAt or 0) > (right.updatedAt or 0)
+    end)
+    return concepts
+end
+
+function Wardrobe.GetCurrentConcept()
+    local state = EnsurePreviewState()
+    if not state.selectedConceptID then
+        return nil
+    end
+    local store = EnsureConceptStore()
+    return store[state.selectedConceptID]
+end
+
+function Wardrobe.SaveConcept(name)
+    name = tostring(name or ""):match("^%s*(.-)%s*$") or ""
+    if name == "" then
+        return false, "Enter a name for this outfit concept."
+    end
+    if #name > 48 then
+        return false, "Concept names are limited to 48 characters."
+    end
+
+    local store, characterKey = EnsureConceptStore()
+    local state = EnsurePreviewState()
+    local concept
+    local loweredName = string.lower(name)
+    for _, candidate in pairs(store) do
+        if string.lower(candidate.name or "") == loweredName then
+            concept = candidate
+            break
+        end
+    end
+
+    local now = time()
+    if not concept then
+        local identifier = string.format("%s:%d:%d", characterKey, now, #Wardrobe.GetConcepts() + 1)
+        concept = { id = identifier, createdAt = now, characterKey = characterKey }
+        store[identifier] = concept
+    end
+    concept.name = name
+    concept.updatedAt = now
+    concept.selections = CopyPrimitiveMap(state.selections)
+    concept.locks = CopyPrimitiveMap(state.locks)
+    concept.hidden = CopyPrimitiveMap(state.hidden)
+    state.selectedConceptID = concept.id
+    if QC.Notify then
+        QC.Notify("WARDROBE_CONCEPTS_CHANGED", concept)
+    end
+    return true, "Saved outfit concept: " .. name, concept
+end
+
+function Wardrobe.LoadConcept(conceptID)
+    local store = EnsureConceptStore()
+    local concept = store[conceptID]
+    if not concept then
+        return false, "That outfit concept is no longer available."
+    end
+
+    local state = EnsurePreviewState()
+    local selections = {}
+    local missing = 0
+    for slotKey, sourceID in pairs(concept.selections or {}) do
+        local source = GetSourceByID(slotKey, sourceID)
+        local valid = source and Wardrobe.ValidateSource(source, slotKey)
+        if valid then
+            selections[slotKey] = sourceID
+        else
+            missing = missing + 1
+        end
+    end
+    state.selections = selections
+    state.locks = CopyPrimitiveMap(concept.locks)
+    state.hidden = CopyPrimitiveMap(concept.hidden)
+    state.selectedConceptID = concept.id
+    if QC.Notify then
+        QC.Notify("WARDROBE_WORKBENCH_CHANGED")
+    end
+    if missing > 0 then
+        return true, string.format("Loaded %s; %d unavailable appearances were skipped.", concept.name or "concept", missing), concept
+    end
+    return true, "Loaded outfit concept: " .. tostring(concept.name or "Unnamed"), concept
 end
 
 function Wardrobe.GetSelectedSource(slotKey)
@@ -845,7 +1186,14 @@ function Wardrobe.SelectSource(slotKey, sourceID)
             if not valid then
                 return false, reason
             end
-            EnsurePreviewState().selections[slotKey] = sourceID
+            local state = EnsurePreviewState()
+            state.selections[slotKey] = sourceID
+            state.hidden[slotKey] = nil
+            state.selectedConceptID = nil
+            ApplyWeaponSelectionRules(state, slotKey)
+            if slotKey == "OFF_HAND" and not state.selections.ONE_HAND then
+                SetRandomSelection(state, "ONE_HAND", false)
+            end
             if QC.Notify then
                 QC.Notify("WARDROBE_SELECTION_CHANGED", slotKey, source)
             end
@@ -856,14 +1204,22 @@ function Wardrobe.SelectSource(slotKey, sourceID)
 end
 
 function Wardrobe.ClearSelection(slotKey)
-    EnsurePreviewState().selections[slotKey] = nil
+    local state = EnsurePreviewState()
+    state.selections[slotKey] = nil
+    state.locks[slotKey] = nil
+    state.hidden[slotKey] = nil
+    state.selectedConceptID = nil
     if QC.Notify then
         QC.Notify("WARDROBE_SELECTION_CHANGED", slotKey, nil)
     end
 end
 
 function Wardrobe.ClearAllSelections()
-    EnsurePreviewState().selections = {}
+    local state = EnsurePreviewState()
+    state.selections = {}
+    state.locks = {}
+    state.hidden = {}
+    state.selectedConceptID = nil
     if QC.Notify then
         QC.Notify("WARDROBE_SELECTIONS_CLEARED")
     end
@@ -880,7 +1236,12 @@ function Wardrobe.ApplyPreview(model)
     local state = EnsurePreviewState()
     for _, definition in ipairs(Wardrobe.slotDefinitions) do
         local source = Wardrobe.GetSelectedSource(definition.key)
-        if source then
+        if state.hidden[definition.key] and definition.hideable and model.UndressSlot then
+            local slotID = SafeCall(GetInventorySlotInfo, definition.slotName)
+            if slotID then
+                SafeCall(model.UndressSlot, model, slotID)
+            end
+        elseif source then
             local valid = Wardrobe.ValidateSource(source, definition.key)
             if valid and source.sourceID and model.TryOn then
                 -- TryOn accepts an item link or item-modified appearance ID.

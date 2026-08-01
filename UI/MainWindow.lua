@@ -9,11 +9,11 @@ local MAX_WIDTH = 1120
 local MAX_HEIGHT = 880
 
 local TAB_DEFINITIONS = {
-    { key = "chronicle", label = "Chronicle", tooltip = "Browse recorded quests, objectives, state changes, removals, and RP notes.", constructor = UI.CreateChronicleTab },
-    { key = "active", label = "Active Quests", tooltip = "Review the current active quest snapshot and objective progress.", constructor = UI.CreateActiveQuestsTab },
-    { key = "note", label = "Write Note", tooltip = "Record an RP observation with location and character context.", constructor = UI.CreateNoteTab },
-    { key = "status", label = "Status", tooltip = "Review recorder health, Courier readiness, settings, and maintenance tools.", constructor = UI.CreateStatusTab },
-    { key = "outfits", label = "Outfits", tooltip = "Scan collected appearances and manually build a character preview.", constructor = UI.CreateOutfitsTab },
+    { key = "chronicle", label = "Chronicle", width = 122, tooltip = "Browse recorded quests, objectives, state changes, removals, and RP notes.", constructor = UI.CreateChronicleTab },
+    { key = "active", label = "Active Quests", width = 142, tooltip = "Review the current active quest snapshot and objective progress.", constructor = UI.CreateActiveQuestsTab },
+    { key = "note", label = "Write Note", width = 122, tooltip = "Record an RP observation with location and character context.", constructor = UI.CreateNoteTab },
+    { key = "status", label = "Status", width = 102, tooltip = "Review recorder health, Courier readiness, settings, and maintenance tools.", constructor = UI.CreateStatusTab },
+    { key = "outfits", label = "Outfits", width = 102, tooltip = "Generate, refine, preview, save, and load outfit concepts from collected appearances.", constructor = UI.CreateOutfitsTab },
 }
 
 local function Clamp(value, minimum, maximum)
@@ -145,11 +145,11 @@ function QC.InitializeUI()
     local tabBar = CreateFrame("Frame", nil, frame)
     tabBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -58)
     tabBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -12, -58)
-    tabBar:SetHeight(30)
+    tabBar:SetHeight(33)
     frame.tabBar = tabBar
 
     local content = UI.CreateInsetPanel(frame)
-    content:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -92)
+    content:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -89)
     content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, 12)
     frame.content = content
 
@@ -176,11 +176,13 @@ function QC.InitializeUI()
     local previousButton
 
     for _, definition in ipairs(TAB_DEFINITIONS) do
-        local button = UI.CreateButton(tabBar, definition.label, 135, 26)
+        local button = CreateFrame("Button", nil, tabBar, "PanelTopTabButtonTemplate")
+        button:SetSize(definition.width or 120, 32)
+        button:SetText(definition.label)
         if previousButton then
-            button:SetPoint("LEFT", previousButton, "RIGHT", 6, 0)
+            button:SetPoint("LEFT", previousButton, "RIGHT", 1, 0)
         else
-            button:SetPoint("LEFT", tabBar, "LEFT", 0, 0)
+            button:SetPoint("BOTTOMLEFT", tabBar, "BOTTOMLEFT", 0, -1)
         end
         button.key = definition.key
         button:SetScript("OnClick", function(self)
@@ -203,7 +205,22 @@ function QC.InitializeUI()
         for tabKey, pane in pairs(self.panes) do
             local selected = tabKey == key
             pane:SetShown(selected)
-            self.tabs[tabKey]:SetEnabled(not selected)
+            local tab = self.tabs[tabKey]
+            if selected then
+                if PanelTemplates_SelectTab then
+                    PanelTemplates_SelectTab(tab)
+                else
+                    tab:LockHighlight()
+                    tab:SetEnabled(false)
+                end
+            else
+                if PanelTemplates_DeselectTab then
+                    PanelTemplates_DeselectTab(tab)
+                else
+                    tab:UnlockHighlight()
+                    tab:SetEnabled(true)
+                end
+            end
         end
 
         self.selectedTab = key
