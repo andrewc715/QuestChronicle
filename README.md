@@ -1,8 +1,8 @@
-# Quest Chronicle v0.5.1
+# Quest Chronicle v0.5.2
 
-> **Wardrobe scanner hotfix:** v0.5.1 replaces the incomplete v0.5.0 scan with slot-aware account transmog collection queries. The first v0.5.1 scan rebuilds the wardrobe cache automatically.
+> **Wardrobe scanner recovery:** v0.5.2 repairs the empty-cache regression in v0.5.1. It waits for WoW's asynchronous wardrobe search database, queries both supported TransmogLocation forms, uses unfiltered collection counts for diagnostics, and preserves any healthy cache when the API returns an impossible empty result.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.5.1 preserves the polished standalone interface and tested lifecycle recorder while repairing the first live-client Wardrobe Foundation scan.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.5.2 preserves the polished standalone interface and tested lifecycle recorder while hardening the Wardrobe Foundation scanner against Retail collection initialization and API-shape differences.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -154,6 +154,7 @@ QuestChronicle\
 ├── LIVE_TEST_CHECKLIST.md
 ├── UI_FOUNDATION_TEST_CHECKLIST.md
 ├── POLISH_TEST_CHECKLIST.md
+├── WARDROBE_SCANNER_RECOVERY_TEST_CHECKLIST.md
 └── COURIER_CONFIG_PATCH.json
 ```
 

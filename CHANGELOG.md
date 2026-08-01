@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.2 - 2026-07-31
+
+### Fixed
+
+- Repaired the v0.5.1 empty wardrobe-cache regression.
+- Waits for WoW's asynchronous transmog search database before scanning.
+- Queries `GetCategoryAppearances` and source APIs with both the documented `TransmogLocationMixin` and Blizzard's current `GetData()` representation, then uses the richest valid result.
+- Uses unfiltered category collection counts for diagnostics instead of transient filtered counts.
+- Removes per-category search mutation from the scan loop.
+- Scans a broad collected-and-uncollected view and filters collected appearances locally without resetting unrelated native Wardrobe defaults.
+- Retries a slot when WoW reports collected appearances but temporarily returns no rows.
+- Builds into a staging cache so a failed or impossible empty scan cannot erase a healthy cache.
+- Adds explicit Preparing and Failed scanner states with actionable errors.
+- Invalidates v0.5.1 wardrobe data through cache schema 3.
+
 ## 0.5.1 - 2026-07-31
 
 ### Fixed

@@ -3,7 +3,7 @@ local QC = QuestChronicle
 QC.Wardrobe = QC.Wardrobe or {}
 local Wardrobe = QC.Wardrobe
 
-Wardrobe.CACHE_VERSION = 2
+Wardrobe.CACHE_VERSION = 3
 Wardrobe.PAGE_SIZE = 8
 
 -- Resolve collection enum values when the scan runs instead of when this file loads.
@@ -222,8 +222,11 @@ local function CaptureCollectionState()
 end
 
 local function ApplyScanCollectionState()
+    -- Ask WoW for the broadest possible collection view and filter collected
+    -- appearances locally. This avoids an empty result when the native Wardrobe
+    -- has a stale collected-only/search filter that has not finished rebuilding.
     SafeCall(C_TransmogCollection.SetCollectedShown, true)
-    SafeCall(C_TransmogCollection.SetUncollectedShown, false)
+    SafeCall(C_TransmogCollection.SetUncollectedShown, true)
     SafeCall(C_TransmogCollection.SetAllFactionsShown, true)
     SafeCall(C_TransmogCollection.SetAllRacesShown, true)
     local classID = GetCurrentClassID()
@@ -301,19 +304,24 @@ local function GetKnownSources(appearance, categoryID, transmogLocation)
     local locationData = GetLocationData(transmogLocation)
     local sources
 
-    -- Follow Blizzard's own wardrobe helper first when it is available. The
-    -- direct API path below preserves compatibility when the helper is absent.
-    if CollectionWardrobeUtil and type(CollectionWardrobeUtil.GetSortedAppearanceSources) == "function" then
-        sources = SafeCall(CollectionWardrobeUtil.GetSortedAppearanceSources, visualID, categoryID, transmogLocation)
-    end
-    if not sources or #sources == 0 then
+    -- The generated API documentation accepts a TransmogLocationMixin while
+    -- Blizzard's own wardrobe helper also accepts that object. Try the direct,
+    -- least stateful path first, then tolerate clients that prefer GetData().
+    sources = SafeCall(C_TransmogCollection.GetAppearanceSources, visualID, categoryID, transmogLocation)
+    if (not sources or #sources == 0) and locationData then
         sources = SafeCall(C_TransmogCollection.GetAppearanceSources, visualID, categoryID, locationData)
+    end
+    if (not sources or #sources == 0) and CollectionWardrobeUtil and type(CollectionWardrobeUtil.GetSortedAppearanceSources) == "function" then
+        sources = SafeCall(CollectionWardrobeUtil.GetSortedAppearanceSources, visualID, categoryID, transmogLocation)
     end
 
     if (not sources or #sources == 0) and C_TransmogCollection.GetValidAppearanceSourcesForClass then
         local classID = GetCurrentClassID()
         if classID then
-            sources = SafeCall(C_TransmogCollection.GetValidAppearanceSourcesForClass, visualID, classID, categoryID, locationData)
+            sources = SafeCall(C_TransmogCollection.GetValidAppearanceSourcesForClass, visualID, classID, categoryID, transmogLocation)
+            if (not sources or #sources == 0) and locationData then
+                sources = SafeCall(C_TransmogCollection.GetValidAppearanceSourcesForClass, visualID, classID, categoryID, locationData)
+            end
         end
     end
 
@@ -336,6 +344,46 @@ local function GetKnownSources(appearance, categoryID, transmogLocation)
     end
 
     return sources or {}
+end
+
+local function CountCollectedAppearances(appearances)
+    local count = 0
+    for _, appearance in ipairs(appearances or {}) do
+        if appearance.isCollected == true and appearance.isHideVisual ~= true then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+local function GetCategoryAppearancesRobust(categoryID, transmogLocation)
+    local locationData = GetLocationData(transmogLocation)
+    local best = {}
+    local bestMode = "none"
+    local bestCollected = -1
+
+    local function Consider(appearances, mode)
+        if type(appearances) ~= "table" then
+            return
+        end
+        local collected = CountCollectedAppearances(appearances)
+        if collected > bestCollected or (collected == bestCollected and #appearances > #best) then
+            best = appearances
+            bestMode = mode
+            bestCollected = collected
+        end
+    end
+
+    -- Current generated API docs describe a TransmogLocationMixin. Blizzard's
+    -- collection frame currently passes GetData(). Supporting both keeps the
+    -- scanner insulated from that implementation seam.
+    Consider(SafeCall(C_TransmogCollection.GetCategoryAppearances, categoryID, transmogLocation), "location")
+    if locationData then
+        Consider(SafeCall(C_TransmogCollection.GetCategoryAppearances, categoryID, locationData), "location-data")
+    end
+    Consider(SafeCall(C_TransmogCollection.GetCategoryAppearances, categoryID), "category-only")
+
+    return best or {}, bestMode
 end
 
 function Wardrobe.GetCache()
@@ -491,18 +539,15 @@ local function ScanSlot(definition)
     }
 
     local transmogLocation = GetTransmogLocation(definition)
-    local locationData = GetLocationData(transmogLocation)
-    if not transmogLocation or not locationData then
+    if not transmogLocation then
         error("WoW did not provide a transmog location for " .. tostring(definition.slotName))
     end
 
     for _, categoryID in ipairs(ResolveCategoryIDs(definition)) do
-        if C_TransmogCollection.SetSearchAndFilterCategory then
-            SafeCall(C_TransmogCollection.SetSearchAndFilterCategory, categoryID)
-        end
-
-        local expected = tonumber(SafeCall(C_TransmogCollection.GetFilteredCategoryCollectedCount, categoryID)) or 0
-        local appearances = SafeCall(C_TransmogCollection.GetCategoryAppearances, categoryID, locationData) or {}
+        -- Use the unfiltered collection count as the diagnostic baseline. The
+        -- filtered count can temporarily be zero while WoW rebuilds a search.
+        local expected = tonumber(SafeCall(C_TransmogCollection.GetCategoryCollectedCount, categoryID)) or 0
+        local appearances, retrievalMode = GetCategoryAppearancesRobust(categoryID, transmogLocation)
         local categoryDiagnostic = {
             categoryID = categoryID,
             expectedCollected = expected,
@@ -510,6 +555,7 @@ local function ScanSlot(definition)
             collectedAppearances = 0,
             returnedSources = 0,
             compatibleVisuals = 0,
+            retrievalMode = retrievalMode,
         }
         diagnostics.expectedCollected = diagnostics.expectedCollected + expected
         diagnostics.returnedAppearances = diagnostics.returnedAppearances + #appearances
@@ -603,24 +649,67 @@ function Wardrobe.Scan(force)
     ApplyScanCollectionState()
     SafeCall(C_TransmogCollection.UpdateUsableAppearances)
 
-    cache.scanState = "SCANNING"
+    cache.scanState = "PREPARING"
     cache.scanStartedAt = time()
     cache.scanCompletedAt = nil
     cache.scanError = nil
     cache.scanWarning = nil
-    cache.bySlot = {}
-    cache.slotDiagnostics = {}
-    cache.totalSources = 0
-    cache.totalVisuals = 0
-    cache.expectedCollectedVisuals = 0
 
+    -- Build into a staging area. An empty or failed API response must never
+    -- erase a previously healthy wardrobe cache.
+    local pending = {
+        bySlot = {},
+        slotDiagnostics = {},
+        totalSources = 0,
+        totalVisuals = 0,
+        expectedCollectedVisuals = 0,
+        scanError = nil,
+    }
     local index = 1
 
-    local function FinishScan()
+    local function RestoreFilters()
         RestoreCollectionState(Wardrobe.scanCollectionState)
         Wardrobe.scanCollectionState = nil
+    end
+
+    local function FinishFailure(message)
+        RestoreFilters()
         Wardrobe.scanning = false
-        cache.scanState = cache.scanError and "COMPLETE_WITH_WARNINGS" or "COMPLETE"
+        cache.scanState = "FAILED"
+        cache.scanCompletedAt = time()
+        cache.scanError = message
+        cache.scanWarning = nil
+        cache.dirty = true
+        cache.dirtyReason = "SCAN_FAILED"
+        if QC.Notify then
+            QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
+        end
+    end
+
+    local function FinishScan()
+        RestoreFilters()
+        Wardrobe.scanning = false
+
+        if pending.expectedCollectedVisuals > 0 and pending.totalVisuals == 0 then
+            cache.scanState = "FAILED"
+            cache.scanCompletedAt = time()
+            cache.scanError = "WoW reports collected appearances, but every collection query returned an empty usable cache. The previous cache was preserved."
+            cache.scanWarning = nil
+            cache.dirty = true
+            cache.dirtyReason = "EMPTY_COLLECTION_RESPONSE"
+            if QC.Notify then
+                QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
+            end
+            return
+        end
+
+        cache.bySlot = pending.bySlot
+        cache.slotDiagnostics = pending.slotDiagnostics
+        cache.totalSources = pending.totalSources
+        cache.totalVisuals = pending.totalVisuals
+        cache.expectedCollectedVisuals = pending.expectedCollectedVisuals
+        cache.scanError = pending.scanError
+        cache.scanState = pending.scanError and "COMPLETE_WITH_WARNINGS" or "COMPLETE"
         cache.scanCompletedAt = time()
         cache.dirty = false
         cache.dirtyReason = nil
@@ -636,7 +725,7 @@ function Wardrobe.Scan(force)
         end
     end
 
-    local function Step()
+    local function ScanCurrentSlot(retryCount)
         local definition = Wardrobe.slotDefinitions[index]
         if not definition then
             FinishScan()
@@ -644,16 +733,23 @@ function Wardrobe.Scan(force)
         end
 
         local ok, sources, diagnostics = pcall(ScanSlot, definition)
+        if ok and diagnostics and diagnostics.expectedCollected > 0 and diagnostics.returnedAppearances == 0 and (retryCount or 0) < 2 then
+            if C_Timer and C_Timer.After then
+                C_Timer.After(0.25, function() ScanCurrentSlot((retryCount or 0) + 1) end)
+                return
+            end
+        end
+
         if ok then
-            cache.bySlot[definition.key] = sources or {}
-            cache.slotDiagnostics[definition.key] = diagnostics or {}
-            cache.totalSources = cache.totalSources + ((diagnostics and diagnostics.returnedSources) or 0)
-            cache.totalVisuals = cache.totalVisuals + #(sources or {})
-            cache.expectedCollectedVisuals = cache.expectedCollectedVisuals + ((diagnostics and diagnostics.expectedCollected) or 0)
+            pending.bySlot[definition.key] = sources or {}
+            pending.slotDiagnostics[definition.key] = diagnostics or {}
+            pending.totalSources = pending.totalSources + ((diagnostics and diagnostics.returnedSources) or 0)
+            pending.totalVisuals = pending.totalVisuals + #(sources or {})
+            pending.expectedCollectedVisuals = pending.expectedCollectedVisuals + ((diagnostics and diagnostics.expectedCollected) or 0)
         else
-            cache.bySlot[definition.key] = {}
-            cache.slotDiagnostics[definition.key] = { error = tostring(sources) }
-            cache.scanError = tostring(sources)
+            pending.bySlot[definition.key] = {}
+            pending.slotDiagnostics[definition.key] = { error = tostring(sources) }
+            pending.scanError = tostring(sources)
         end
 
         if QC.Notify then
@@ -662,25 +758,49 @@ function Wardrobe.Scan(force)
                 index,
                 #Wardrobe.slotDefinitions,
                 definition.key,
-                #(cache.bySlot[definition.key] or {}),
-                cache.slotDiagnostics[definition.key]
+                #(pending.bySlot[definition.key] or {}),
+                pending.slotDiagnostics[definition.key]
             )
         end
 
         index = index + 1
         if C_Timer and C_Timer.After then
-            C_Timer.After(0, Step)
+            C_Timer.After(0, function() ScanCurrentSlot(0) end)
         else
-            Step()
+            ScanCurrentSlot(0)
+        end
+    end
+
+    local readyStarted = GetTime and GetTime() or 0
+    local function WaitForCollectionReady()
+        local searchType = GetSearchType()
+        local dbLoading = SafeCall(C_TransmogCollection.IsSearchDBLoading) == true
+        local searchRunning = SafeCall(C_TransmogCollection.IsSearchInProgress, searchType) == true
+        if not dbLoading and not searchRunning then
+            cache.scanState = "SCANNING"
+            ScanCurrentSlot(0)
+            return
+        end
+
+        local now = GetTime and GetTime() or readyStarted
+        if now - readyStarted >= 12 then
+            FinishFailure("WoW's wardrobe search database did not become ready within 12 seconds. Open the native Collections Wardrobe once, close it, and scan again.")
+            return
+        end
+
+        if C_Timer and C_Timer.After then
+            C_Timer.After(0.10, WaitForCollectionReady)
+        else
+            FinishFailure("WoW's wardrobe search database is still loading.")
         end
     end
 
     if C_Timer and C_Timer.After then
-        C_Timer.After(0, Step)
+        C_Timer.After(0.10, WaitForCollectionReady)
     else
-        Step()
+        WaitForCollectionReady()
     end
-    return true, "Wardrobe collection scan started."
+    return true, "Preparing WoW's wardrobe collection for scanning..."
 end
 
 function Wardrobe.SelectSource(slotKey, sourceID)

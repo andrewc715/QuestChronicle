@@ -251,8 +251,12 @@ function UI.CreateOutfitsTab(parent)
         local cacheText
         if cache.scanState == "NEVER" or cache.scanState == "STALE" then
             cacheText = "Collection needs a full account wardrobe scan."
+        elseif cache.scanState == "PREPARING" then
+            cacheText = "Waiting for WoW's wardrobe search database to become ready..."
         elseif cache.scanState == "SCANNING" then
             cacheText = "Scanning WoW's collected appearances in small batches..."
+        elseif cache.scanState == "FAILED" then
+            cacheText = "The last collection scan failed. Any previous healthy cache was preserved."
         else
             cacheText = string.format("%s cached visuals • Last scan %s%s", UI.FormatNumber(cache.totalVisuals or 0), cache.scanCompletedAt and UI.FormatShortTimestamp(cache.scanCompletedAt) or "unknown", cache.dirty and " • Collection changed" or "")
         end
@@ -262,7 +266,9 @@ function UI.CreateOutfitsTab(parent)
         elseif diagnostics and diagnostics.error then
             cacheText = cacheText .. "\n" .. UI.red .. tostring(diagnostics.error) .. "|r"
         end
-        if cache.scanWarning then
+        if cache.scanError then
+            cacheText = cacheText .. "\n" .. UI.red .. cache.scanError .. "|r"
+        elseif cache.scanWarning then
             cacheText = cacheText .. "\n" .. UI.red .. cache.scanWarning .. "|r"
         end
         statusText:SetText(message or (selectedText .. "\n" .. cacheText))
