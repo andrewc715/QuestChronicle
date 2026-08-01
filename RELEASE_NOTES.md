@@ -1,37 +1,40 @@
-# Quest Chronicle v0.7.2: Promo-Free, Cohesive Outfits
+# Quest Chronicle v0.7.3: Starter-Origin Provenance
 
-Version 0.7.2 keeps generated outfits grounded in the current adventure while coordinating the pieces as a complete look.
+Version 0.7.3 closes the quest-reward geography gap exposed by **Cord of Grieving**.
 
-## Promotional appearances never generate
+## Why Cord of Grieving slipped into Blade's Edge
 
-Generate Outfit, Reroll Unlocked, and individual slot rerolls now apply a hard promotional gate before any style scoring or weapon validation.
+WoW's cached transmog source identifies Cord of Grieving as a quest source, but that record does not include the rewarding quest or map. Its legacy item-era value can also describe it like an older generic item. Quest Chronicle therefore saw a collected, compatible belt that passed the Classic-through-TBC ceiling and had no conflicting location text.
 
-- Blizzard's native Trading Post source type is always excluded.
-- Legacy reward families that WoW stores without an acquisition source type are recognized by stable item and set metadata.
-- The initial legacy catalog covers Renowned Explorer, Wooly Wendigo, Sprite Darter, Celestial Observer, Eternal Traveler, Fireplume, and the original store helms.
-- Native transmog-set names, labels, and descriptions are checked for shop, subscription, promotion, or Recruit-a-Friend origins.
+The item is actually a reward from **Passing Wisdom** on the Wandering Isle and was added with Mists of Pandaria. v0.7.3 gives that source—and the published Wandering Isle questing sets and weapons—an explicit Mists/Wandering Isle origin.
 
-The full wardrobe browser remains intact. Promotional appearances can still be selected deliberately for a manual preview; their rows now say **Promo excluded** and their tooltip explains the generation-only restriction.
+## General quest-source provenance
 
-## Outfit coherence
+For quest appearances, generation now asks WoW's appearance-tracking system for the best source map. The returned map and parent-map trail are resolved through the same curated provenance engine used for the player's current location.
 
-Quest Chronicle now builds a style profile while it generates:
+- A quest reward tracked to the current source pool remains eligible after the era gate.
+- A quest reward tracked to another starting area or zone is rejected before style scoring.
+- Source ID and collapsed visual ID are both supported because client builds may expose either trackable identity.
+- Pending tracking data is retried; stable failures fall back to the existing conservative metadata rule.
+- Manual wardrobe browsing and deliberate preview selection remain unrestricted.
 
-1. Locked visible selections establish the starting constraints.
-2. Chest, shoulders, legs, and waist establish the major silhouette.
-3. Head and smaller armor layers reinforce that foundation.
-4. Weapons are chosen last and still must pass Blizzard's equipped-item, category, usability, class, display, source, and hand-slot rules.
+## Complete starting-zone regression matrix
 
-Pieces from the same Blizzard transmog set receive the strongest match. When no native set relationship exists, shared material and magic motifs are favored. A dramatic fire, frost, shadow, radiant, arcane, storm, fel, or necrotic accent is rejected when it would become an isolated visual outlier or directly conflict with the established outfit.
+The engine now has deterministic era and provenance coverage for 30 retail starting experiences:
 
-Individual slot rerolls build their profile from the rest of the visible Character Preview. This keeps a rerolled helm, cloak, armor piece, or weapon aligned with the existing concept instead of treating the slot as an isolated random choice.
+- Every core racial start, including shared Dun Morogh and Durotar pools.
+- Worgen, goblin, pandaren, and dracthyr instanced starts.
+- The original and allied/pandaren death-knight openings and the demon-hunter opening.
+- Exile's Reach.
+- Every allied-race arrival area through Earthen and Haranir.
+
+Each case verifies its expected era ceiling and source pool, accepts a representative local quest reward, and rejects that reward from a foreign pool.
 
 ## Safety and compatibility
 
-- A locked weapon incompatibility restores the previous preview instead of leaving a partially regenerated outfit.
 - Wardrobe cache format 5 remains valid; no collection rescan is required.
 - SavedVariables schema 2 is preserved.
 - Courier format 1 and Courier v1.0.0 compatibility are preserved.
-- Existing outfit concepts, selections, locks, hidden slots, style modes, and Current Look data remain compatible.
-- Quest history, active quests, notes, drafts, settings, and Courier snapshots are unchanged.
+- Existing concepts, selections, locks, hidden slots, style modes, Current Look data, and cached appearances remain compatible.
+- Promotional exclusion and complete-outfit coherence from v0.7.2 remain active.
 - Preview only: no transmog is applied, no gold is spent, and no Blizzard outfit slot is changed.

@@ -1,8 +1,8 @@
-# Quest Chronicle v0.7.2
+# Quest Chronicle v0.7.3
 
-> **Cohesive, Promo-Free Generation:** v0.7.2 excludes promotional appearances and coordinates generated pieces through Blizzard set membership and shared visual motifs.
+> **Starter-Origin Provenance:** v0.7.3 uses WoW's appearance-tracking maps plus curated fallbacks to keep quest rewards in their true starting-zone and expansion pools.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.7.2 tightens outfit generation without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.7.3 corrects legacy starter-reward geography without changing the validated wardrobe cache, SavedVariables schema, or Courier format.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -159,6 +159,7 @@ QuestChronicle\
 ├── ZONE_STYLE_ENGINE_V070_TEST_CHECKLIST.md
 ├── ZONE_POOL_CURRENT_LOOK_V071_TEST_CHECKLIST.md
 ├── PROMO_COHERENCE_V072_TEST_CHECKLIST.md
+├── STARTING_ZONE_PROVENANCE_V073_TEST_CHECKLIST.md
 ├── WARDROBE_SCANNER_RECOVERY_TEST_CHECKLIST.md
 └── COURIER_CONFIG_PATCH.json
 ```
@@ -188,7 +189,9 @@ Generated outfits and rerolls now pass two eligibility gates before weighted sco
 - The **era ceiling** admits the current expansion and everything before it. Blade's Edge, for example, admits Classic and The Burning Crusade but rejects Wrath and later items.
 - The **zone provenance gate** admits boss drops whose Blizzard-provided instance or encounter belongs to the current curated zone family. Gruul's Lair is local to Blade's Edge; Sunwell Plateau is not.
 
-Explicit item/source names associated with another curated zone are also rejected. When Blizzard exposes no usable location for a non-boss source, Quest Chronicle admits it only after the era gate and only when its metadata contains no conflicting zone marker.
+Quest rewards now receive a second provenance lookup through WoW's appearance-tracking map. Quest Chronicle resolves that map and its parent trail through the same local-source profiles, accepting rewards tracked to the current pool and rejecting rewards tracked elsewhere. The engine covers every retail racial start, allied-race arrival area, both death-knight openings, Mardum, and Exile's Reach.
+
+Some older starter rewards carry misleading generic item-era values. The published Wandering Isle questing sets and weapons therefore have an exact curated fallback: Cord of Grieving and its family are treated as Mists of Pandaria items from the Wandering Isle even when WoW presents an older era. Explicit item/source names associated with another curated zone are also rejected. When Blizzard exposes no usable location for a non-boss source, Quest Chronicle admits it only after the era gate and only when its metadata contains no conflicting zone marker.
 
 The full collected appearance browser remains available for deliberate manual previews. Rows outside the generated pool say **Not generated**, and their tooltip explains the era or zone exclusion.
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.7.3 - 2026-07-31
+
+### Fixed
+
+- Corrects Cord of Grieving from WoW's misleading legacy item-era value to its Mists of Pandaria / Wandering Isle origin.
+- Applies the same curated fallback to the published Wandering Isle questing armor sets and weapons when their item records present as Classic or TBC.
+- Uses WoW's appearance-tracking map for quest-source provenance when the transmog source itself contains no quest or location.
+- Tries both the item-modified source ID and collapsed visual ID for compatibility across client tracking behavior.
+- Rejects tracked quest rewards from foreign source pools before weighted outfit scoring.
+
+### Added
+
+- Adds curated provenance profiles for every distinct retail racial, allied-race, hero-class, and Exile's Reach starting geography.
+- Adds a 30-case regression matrix covering every current race, shared starts, both death-knight openings, Mardum, and Exile's Reach.
+- Verifies every starting context's expansion ceiling, local-source acceptance, and cross-zone rejection.
+
+### Preserved
+
+- Promotional exclusion, outfit coherence, Blizzard-safe weapon handling, full manual wardrobe browsing, and deliberate previews.
+- Wardrobe cache format 5, SavedVariables schema 2, and Courier format 1; no collection rescan is required.
+
 ## 0.7.2 - 2026-07-31
 
 ### Fixed

@@ -47,23 +47,83 @@ ZoneStyle.expansions = {
 }
 
 local eraRules = {
-    { maxExpansionID = 11, match = { "midnight", "amani highlands", "harandar", "voidstorm" } },
-    { maxExpansionID = 10, match = { "khaz algar", "isle of dorn", "dornogal", "ringing deeps", "hallowfall", "azjkahet", "azj kahet", "undermine", "karesh", "k aresh" } },
-    { maxExpansionID = 9, match = { "dragon isles", "waking shores", "ohnahran", "ohn ahran", "azure span", "thaldraszus", "valdrakken", "zaralek", "emerald dream", "amirdrassil" } },
-    { maxExpansionID = 8, match = { "shadowlands", "oribos", "bastion", "maldraxxus", "ardenweald", "revendreth", "the maw", "korthia", "zereth mortis" } },
+    { maxExpansionID = 11, match = { "midnight", "amani highlands", "harandar", "har mara", "voidstorm" } },
+    { maxExpansionID = 10, match = { "khaz algar", "isle of dorn", "dornogal", "ringing deeps", "hall of awakening", "hallowfall", "azjkahet", "azj kahet", "undermine", "karesh", "k aresh" } },
+    { maxExpansionID = 9, match = { "dragon isles", "forbidden reach", "war creche", "waking shores", "ohnahran", "ohn ahran", "azure span", "thaldraszus", "valdrakken", "zaralek", "emerald dream", "amirdrassil" } },
+    { maxExpansionID = 8, match = { "shadowlands", "exiles reach", "darkmaul citadel", "oribos", "bastion", "maldraxxus", "ardenweald", "revendreth", "the maw", "korthia", "zereth mortis" } },
     { maxExpansionID = 7, match = { "kul tiras", "zandalar", "boralus", "tiragarde", "drustvar", "stormsong", "zuldazar", "nazmir", "voldun", "vol dun", "nazjatar", "mechagon" } },
-    { maxExpansionID = 6, match = { "broken isles", "azsuna", "valsharah", "val sharah", "highmountain", "stormheim", "suramar", "broken shore", "argus" } },
+    { maxExpansionID = 6, match = { "broken isles", "mardum", "telogrus rift", "vindicaar", "azsuna", "valsharah", "val sharah", "highmountain", "stormheim", "suramar", "broken shore", "argus" } },
     { maxExpansionID = 5, match = { "draenor", "frostfire ridge", "shadowmoon valley draenor", "gorgrond", "talador", "spires of arak", "nagrand draenor", "tanaan jungle", "ashran" } },
-    { maxExpansionID = 4, match = { "pandaria", "jade forest", "valley of the four winds", "krasarang", "kun lai", "townlong", "dread wastes", "vale of eternal blossoms", "timeless isle", "isle of thunder" } },
-    { maxExpansionID = 3, match = { "mount hyjal", "vashjir", "vashj ir", "deepholm", "uldum", "twilight highlands", "tol barad", "molten front" } },
-    { maxExpansionID = 2, match = { "northrend", "borean tundra", "howling fjord", "dragonblight", "grizzly hills", "zul drak", "sholazar", "storm peaks", "icecrown", "wintergrasp" } },
-    { maxExpansionID = 1, match = { "outland", "hellfire peninsula", "zangarmarsh", "terokkar", "nagrand", "blades edge", "blade s edge", "netherstorm", "shadowmoon valley", "shattrath", "silvermoon", "eversong", "ghostlands", "queldanas", "quel danas", "sunwell", "zulaman", "zul aman" } },
+    { maxExpansionID = 4, match = { "pandaria", "wandering isle", "shang xi training grounds", "temple of five dawns", "jade forest", "valley of the four winds", "krasarang", "kun lai", "townlong", "dread wastes", "vale of eternal blossoms", "timeless isle", "isle of thunder" } },
+    { maxExpansionID = 3, match = { "gilneas", "kezan", "lost isles", "mount hyjal", "vashjir", "vashj ir", "deepholm", "uldum", "twilight highlands", "tol barad", "molten front" } },
+    { maxExpansionID = 2, match = { "scarlet enclave", "acherus the ebon hold", "frozen throne", "northrend", "borean tundra", "howling fjord", "dragonblight", "grizzly hills", "zul drak", "sholazar", "storm peaks", "icecrown", "wintergrasp" } },
+    { maxExpansionID = 1, match = { "outland", "azuremyst isle", "ammen vale", "bloodmyst isle", "hellfire peninsula", "zangarmarsh", "terokkar", "nagrand", "blades edge", "blade s edge", "netherstorm", "shadowmoon valley", "shattrath", "silvermoon", "eversong", "sunstrider isle", "ghostlands", "queldanas", "quel danas", "sunwell", "zulaman", "zul aman" } },
+}
+
+-- Each retail racial or hero-class opening maps to one of these geographic
+-- source pools. Shared starts deliberately share a pool: dwarves and gnomes
+-- both remain in Dun Morogh, while orcs and trolls both remain in Durotar.
+-- This table also drives the deterministic starting-zone regression matrix.
+ZoneStyle.startingZoneCases = {
+    { race = "Human", zone = "Elwynn Forest", subzone = "Northshire Valley", provenanceKey = "northshire", maxExpansionID = 0 },
+    { race = "Dwarf", zone = "Dun Morogh", subzone = "Coldridge Valley", provenanceKey = "dunmorogh", maxExpansionID = 0 },
+    { race = "Gnome", zone = "Dun Morogh", subzone = "New Tinkertown", provenanceKey = "dunmorogh", maxExpansionID = 0 },
+    { race = "Night Elf", zone = "Teldrassil", subzone = "Shadowglen", provenanceKey = "teldrassil", maxExpansionID = 0 },
+    { race = "Draenei", zone = "Azuremyst Isle", subzone = "Ammen Vale", provenanceKey = "azuremyst", maxExpansionID = 1 },
+    { race = "Worgen", zone = "Gilneas", subzone = "Gilneas City", provenanceKey = "gilneas", maxExpansionID = 3 },
+    { race = "Pandaren", zone = "The Wandering Isle", subzone = "Shang Xi Training Grounds", provenanceKey = "wanderingisle", maxExpansionID = 4 },
+    { race = "Dracthyr", zone = "The Forbidden Reach", subzone = "The War Creche", provenanceKey = "forbiddenreach", maxExpansionID = 9 },
+    { race = "Orc", zone = "Durotar", subzone = "Valley of Trials", provenanceKey = "durotar", maxExpansionID = 0 },
+    { race = "Undead", zone = "Tirisfal Glades", subzone = "Deathknell", provenanceKey = "tirisfal", maxExpansionID = 0 },
+    { race = "Tauren", zone = "Mulgore", subzone = "Camp Narache", provenanceKey = "mulgore", maxExpansionID = 0 },
+    { race = "Troll", zone = "Durotar", subzone = "Echo Isles", provenanceKey = "durotar", maxExpansionID = 0 },
+    { race = "Blood Elf", zone = "Eversong Woods", subzone = "Sunstrider Isle", provenanceKey = "sunstrider", maxExpansionID = 1 },
+    { race = "Goblin", zone = "Kezan", subzone = "Bilgewater Port", provenanceKey = "kezan", maxExpansionID = 3 },
+    { race = "Core-race Death Knight", zone = "Plaguelands: The Scarlet Enclave", subzone = "Acherus: The Ebon Hold", provenanceKey = "scarletenclave", maxExpansionID = 2 },
+    { race = "Pandaren/Allied Death Knight", zone = "Icecrown", subzone = "The Frozen Throne", provenanceKey = "frozenthrone", maxExpansionID = 2 },
+    { race = "Demon Hunter", zone = "Mardum, the Shattered Abyss", subzone = "Illidari Foothold", provenanceKey = "mardum", maxExpansionID = 6 },
+    { race = "Core races", zone = "Exile's Reach", subzone = "Darkmaul Citadel", provenanceKey = "exilesreach", maxExpansionID = 8 },
+    { race = "Void Elf", zone = "Telogrus Rift", subzone = "Telogrus Rift", provenanceKey = "telogrus", maxExpansionID = 6 },
+    { race = "Lightforged Draenei", zone = "The Vindicaar", subzone = "The Vindicaar", provenanceKey = "vindicaar", maxExpansionID = 6 },
+    { race = "Dark Iron Dwarf", zone = "Blackrock Mountain", subzone = "Shadowforge City", provenanceKey = "shadowforge", maxExpansionID = 0 },
+    { race = "Kul Tiran", zone = "Tiragarde Sound", subzone = "Boralus", provenanceKey = "tiragarde", maxExpansionID = 7 },
+    { race = "Mechagnome", zone = "Mechagon Island", subzone = "Mechagon City", provenanceKey = "mechagon", maxExpansionID = 7 },
+    { race = "Nightborne", zone = "Suramar", subzone = "The Nighthold", provenanceKey = "suramar", maxExpansionID = 6 },
+    { race = "Highmountain Tauren", zone = "Highmountain", subzone = "Thunder Totem", provenanceKey = "highmountain", maxExpansionID = 6 },
+    { race = "Mag'har Orc", zone = "Orgrimmar", subzone = "Valley of Honor", provenanceKey = "orgrimmar", maxExpansionID = 0 },
+    { race = "Zandalari Troll", zone = "Zuldazar", subzone = "Dazar'alor", provenanceKey = "zuldazar", maxExpansionID = 7 },
+    { race = "Vulpera", zone = "Orgrimmar", subzone = "Valley of Honor", provenanceKey = "orgrimmar", maxExpansionID = 0 },
+    { race = "Earthen", zone = "The Ringing Deeps", subzone = "Hall of Awakening", provenanceKey = "hallofawakening", maxExpansionID = 10 },
+    { race = "Haranir", zone = "Harandar", subzone = "Har'mara", provenanceKey = "harandar", maxExpansionID = 11 },
 }
 
 -- Blizzard exposes exact instance provenance for boss-drop appearances. Other
 -- sources do not consistently carry a zone, so their explicit item/source names
 -- are checked against the same curated vocabulary and otherwise remain eligible.
 ZoneStyle.provenanceProfiles = {
+    { key = "exilesreach", label = "Exile's Reach", match = { "exiles reach", "darkmaul citadel" }, origins = { "exiles reach", "darkmaul citadel", "north sea" } },
+    { key = "northshire", label = "Northshire Valley", match = { "northshire valley", "northshire abbey" }, origins = { "northshire", "northshire abbey", "elwynn forest", "goldshire" } },
+    { key = "dunmorogh", label = "Dun Morogh", match = { "dun morogh", "coldridge valley", "new tinkertown", "chill breeze valley" }, origins = { "dun morogh", "coldridge", "anvilmar", "new tinkertown", "chill breeze", "kharanos", "gnomeregan" } },
+    { key = "teldrassil", label = "Teldrassil", match = { "teldrassil", "shadowglen", "aldrassil" }, origins = { "teldrassil", "shadowglen", "aldrassil", "dolanaar" } },
+    { key = "azuremyst", label = "Azuremyst Isle", match = { "azuremyst isle", "ammen vale", "crash site" }, origins = { "azuremyst", "ammen vale", "crash site", "azure watch", "bloodmyst" } },
+    { key = "gilneas", label = "Gilneas", match = { "gilneas", "gilneas city", "duskhaven" }, origins = { "gilneas", "gilneas city", "duskhaven" } },
+    { key = "durotar", label = "Durotar", match = { "durotar", "valley of trials", "echo isles", "darkspear training grounds" }, origins = { "durotar", "valley of trials", "the den", "razor hill", "echo isles", "darkspear", "senjin" } },
+    { key = "tirisfal", label = "Tirisfal Glades", match = { "tirisfal glades", "deathknell" }, origins = { "tirisfal", "deathknell", "brill", "undercity" } },
+    { key = "mulgore", label = "Mulgore", match = { "mulgore", "red cloud mesa", "camp narache" }, origins = { "mulgore", "red cloud mesa", "camp narache", "bloodhoof village" } },
+    { key = "sunstrider", label = "Sunstrider Isle", match = { "sunstrider isle", "the sunspire" }, origins = { "sunstrider isle", "sunspire", "eversong", "falconwing square" } },
+    { key = "kezan", label = "Kezan and the Lost Isles", match = { "kezan", "bilgewater port", "lost isles", "shipwreck shore", "town in a box" }, origins = { "kezan", "bilgewater", "lost isles", "shipwreck shore", "town in a box", "ktc headquarters" } },
+    { key = "wanderingisle", label = "The Wandering Isle", match = { "wandering isle", "shang xi training grounds", "temple of five dawns" }, origins = { "wandering isle", "shang xi", "temple of five dawns", "dai lo farmstead", "shen zin su" } },
+    { key = "forbiddenreach", label = "The Forbidden Reach", match = { "forbidden reach", "war creche" }, origins = { "forbidden reach", "war creche" } },
+    { key = "scarletenclave", label = "The Scarlet Enclave", match = { "scarlet enclave", "acherus the ebon hold" }, origins = { "scarlet enclave", "acherus", "ebon hold", "havenshire", "new avalon" } },
+    { key = "frozenthrone", label = "The Frozen Throne", match = { "frozen throne" }, origins = { "frozen throne", "icecrown" } },
+    { key = "mardum", label = "Mardum", match = { "mardum", "illidari foothold", "fel hammer" }, origins = { "mardum", "illidari foothold", "fel hammer" } },
+    { key = "telogrus", label = "Telogrus Rift", match = { "telogrus rift" }, origins = { "telogrus rift", "telogrus" } },
+    { key = "vindicaar", label = "The Vindicaar", match = { "vindicaar" }, origins = { "vindicaar" } },
+    { key = "shadowforge", label = "Shadowforge City", match = { "shadowforge city" }, origins = { "shadowforge city", "blackrock depths" } },
+    { key = "mechagon", label = "Mechagon", match = { "mechagon island", "mechagon city", "mechagon" }, origins = { "mechagon", "operation mechagon" } },
+    { key = "orgrimmar", label = "Orgrimmar", match = { "orgrimmar", "valley of honor" }, origins = { "orgrimmar", "valley of honor" } },
+    { key = "hallofawakening", label = "Hall of Awakening", match = { "hall of awakening" }, origins = { "hall of awakening", "ringing deeps" } },
+
     { key = "sunwell", label = "Isle of Quel'Danas", match = { "queldanas", "quel danas", "sunwell" }, origins = { "sunwell", "magisters terrace", "queldanas", "quel danas", "kiljaeden", "kil jaeden", "muru", "eredar twins", "felmyst", "brutallus" } },
     { key = "eversong", label = "Eversong and Ghostlands", match = { "silvermoon", "eversong", "ghostlands" }, origins = { "silvermoon", "eversong", "ghostlands", "deatholme" } },
     { key = "zulaman", label = "Amani Highlands", match = { "zulaman", "zul aman", "amani highlands", "atal aman" }, origins = { "zulaman", "zul aman", "amani", "nalorakk", "akilzon", "janalai", "halazzi", "malacrass" } },
@@ -139,12 +199,19 @@ ZoneStyle.provenanceProfiles = {
 
 local provenanceByKey = {}
 local provenanceOriginMarkers = {}
+local provenanceOriginMarkerByText = {}
 for _, profile in ipairs(ZoneStyle.provenanceProfiles) do
     provenanceByKey[profile.key] = profile
     for _, phrase in ipairs(profile.origins or {}) do
         local normalized = Normalize(phrase)
         if normalized ~= "" then
-            table.insert(provenanceOriginMarkers, { text = normalized, profile = profile })
+            local marker = provenanceOriginMarkerByText[normalized]
+            if not marker then
+                marker = { text = normalized, profile = profile, profileKeys = {} }
+                provenanceOriginMarkerByText[normalized] = marker
+                table.insert(provenanceOriginMarkers, marker)
+            end
+            marker.profileKeys[profile.key] = true
         end
     end
 end
@@ -661,6 +728,112 @@ local function SourceMetadata(source)
     return Normalize(table.concat(parts, " "))
 end
 
+-- C_Item.GetItemInfo's expansionID is useful but is not authoritative for
+-- every legacy quest reward. The Wandering Isle's low-quality starter gear is
+-- a known example: several sources are catalogued like older generic items.
+-- Keep the fallback exact and reviewable so similarly named gear elsewhere is
+-- not swept into Pandaria by a broad keyword rule.
+local wanderingIsleSourceIDs = {
+    [38062] = true, -- Unmarred Cord
+    [38063] = true, -- Unmarred Waistband
+    [38064] = true, -- Unmarred Belt
+    [38091] = true, -- Cord of Grieving
+    [38092] = true, -- Ropes of Grieving
+    [38093] = true, -- Cinch of Grieving
+}
+
+local wanderingIsleItemIDs = {
+    [74597] = true, -- Cord of Grieving
+}
+
+local wanderingIsleStarterNames = {}
+for _, name in ipairs({
+    "Initiate's Robes", "Initiate's Wristwraps", "Initiate's Gloves", "Initiate's Rope Belt", "Initiate's Leggings", "Initiate's Slippers",
+    "Initiate's Vest", "Initiate's Bracers", "Initiate's Handguards", "Initiate's Belt", "Initiate's Britches", "Initiate's Footgear",
+    "Initiate's Chestpiece", "Initiate's Cuffs", "Initiate's Grips", "Initiate's Braided Belt", "Initiate's Greaves", "Initiate's Boots",
+    "Initiate's Breastplate", "Initiate's Armguards", "Initiate's Gauntlets", "Initiate's Plate Belt", "Initiate's Legguards", "Initiate's Sabatons",
+    "Robes of the Water Spirit", "Playful Wristbands", "Sun Pearl Gloves", "Unmarred Cord", "Homespun Leggings", "Silk Shoes",
+    "Sun Pearl Vest", "Bindings of the Earth Spirit", "Gloves of Splashing Water", "Unmarred Waistband", "Soft Britches", "Summer Shoes",
+    "Sun Pearl Chainmail", "Bracers of the Earth Spirit", "Gauntlets of Splashing Water", "Unmarred Chain", "Padded Greaves", "Ringing Boots",
+    "Glistening Breastplate", "Sun Pearl Bracers", "Gauntlets of Earth and Water", "Unmarred Belt", "Comfortable Greaves", "Dancing Boots",
+    "Protector's Robes", "Healer's Wristwraps", "Gloves of Wisdom", "Cord of Grieving", "Survival Leggings",
+    "Vest of Compassion", "Gloves of Verity", "Ropes of Grieving", "Ceremonial Leggings", "Boots of Courage",
+    "Empathetic Mail", "Handgrips of Verity", "Links of Grieving", "Service Greaves", "Waders of Bravery",
+    "Ritual Breastplate", "Unvarnished Vambraces", "Gauntlets of Mercy", "Cinch of Grieving", "Legguards of the Brave",
+    "Flameheart Crossbow", "Jade Crossbow", "Dagger of the Master", "Dagger of Silent Flame", "Dagger of the Hozen", "Jade Hilted Dagger",
+    "Mace of the Master", "Humble Cudgel", "Sword of the Hozen", "Shield of Blazing Will", "Jade Shield", "Staff of the Master",
+    "Staff of the Hozen", "Sword of the Burning Spirit", "Jade Hilted Sword",
+}) do
+    wanderingIsleStarterNames[Normalize(name)] = true
+end
+
+local function GetCuratedSourceOrigin(source, nativeExpansionID)
+    if not source then return nil end
+    if wanderingIsleSourceIDs[tonumber(source.sourceID)] or wanderingIsleItemIDs[tonumber(source.itemID)] then
+        return { provenanceKey = "wanderingisle", label = "The Wandering Isle", expansionID = 4, method = "curated source" }
+    end
+
+    local name = Normalize(source.styleName or source.name)
+    if tonumber(source.sourceType) == 2 and tonumber(nativeExpansionID) and tonumber(nativeExpansionID) <= 1 and wanderingIsleStarterNames[name] then
+        return { provenanceKey = "wanderingisle", label = "The Wandering Isle", expansionID = 4, method = "curated starter family" }
+    end
+    return nil
+end
+
+local trackedOriginCache = {}
+
+local function GetAppearanceTrackingType()
+    return Enum and Enum.ContentTrackingType and Enum.ContentTrackingType.Appearance
+end
+
+local function GetTrackedSourceOrigin(source)
+    local sourceID = tonumber(source and source.sourceID)
+    if not sourceID or tonumber(source.sourceType) ~= 2 then return nil end
+    if trackedOriginCache[sourceID] ~= nil then return trackedOriginCache[sourceID] or nil end
+
+    local trackingType = GetAppearanceTrackingType()
+    local getter = C_ContentTracking and C_ContentTracking.GetBestMapForTrackable
+    if trackingType == nil or type(getter) ~= "function" then return nil end
+
+    local identifiers = { sourceID }
+    local visualID = tonumber(source.visualID)
+    if visualID and visualID ~= sourceID then table.insert(identifiers, visualID) end
+
+    local lastResult
+    for _, trackableID in ipairs(identifiers) do
+        local result, mapID = SafeCall(getter, trackingType, trackableID, true)
+        lastResult = result
+        if mapID then
+            local mapInfo = SafeCall(C_Map and C_Map.GetMapInfo, mapID)
+            local mapName = mapInfo and mapInfo.name or "Tracked appearance source"
+            local originContext = {
+                mapID = mapID,
+                mapName = mapName,
+                zone = mapName,
+                subzone = "",
+                mapTrail = BuildMapTrail(mapID),
+            }
+            local provenance, provenanceKey = ZoneStyle.ResolveProvenance(originContext)
+            local origin = {
+                provenanceKey = provenanceKey,
+                label = provenance and provenance.label or mapName,
+                mapID = mapID,
+                result = result,
+                method = "WoW appearance tracking",
+            }
+            trackedOriginCache[sourceID] = origin
+            return origin
+        end
+    end
+
+    -- A hard failure is stable for the session. DataPending is intentionally
+    -- retried because Blizzard may finish loading the trackable later.
+    local failure = Enum and Enum.ContentTrackingResult and Enum.ContentTrackingResult.Failure
+    if failure == nil then failure = 2 end
+    if lastResult == failure then trackedOriginCache[sourceID] = false end
+    return nil
+end
+
 local function GetSourceTypeLabel(source)
     local sourceType = tonumber(source and source.sourceType)
     local label = sourceType and _G and _G["TRANSMOG_SOURCE_" .. tostring(sourceType)]
@@ -871,7 +1044,9 @@ local function GetDropOrigin(source)
 end
 
 function ZoneStyle.GetSourceExpansionID(source)
-    return LoadItemMetadata(source)
+    local nativeExpansionID = LoadItemMetadata(source)
+    local curatedOrigin = GetCuratedSourceOrigin(source, nativeExpansionID)
+    return curatedOrigin and curatedOrigin.expansionID or nativeExpansionID
 end
 
 function ZoneStyle.GetSourceEligibility(source, modeKey, context)
@@ -885,7 +1060,9 @@ function ZoneStyle.GetSourceEligibility(source, modeKey, context)
     end
     local eraMax, eraLabel = context.eraMax, context.eraLabel
 
-    local expansionID = LoadItemMetadata(source)
+    local nativeExpansionID = LoadItemMetadata(source)
+    local curatedOrigin = GetCuratedSourceOrigin(source, nativeExpansionID)
+    local expansionID = curatedOrigin and curatedOrigin.expansionID or nativeExpansionID
     if expansionID == nil then
         return false, "pending", "Waiting for WoW to load this item's era."
     end
@@ -911,6 +1088,13 @@ function ZoneStyle.GetSourceEligibility(source, modeKey, context)
     context.provenanceKey = provenance.key
     context.provenanceLabel = provenance.label
 
+    if curatedOrigin then
+        if curatedOrigin.provenanceKey == provenance.key then
+            return true, "eligible", string.format("Curated %s origin; eligible for %s through %s.", curatedOrigin.label, provenance.label, eraLabel)
+        end
+        return false, "zone", string.format("%s starter reward; outside the %s source pool.", curatedOrigin.label, provenance.label)
+    end
+
     local dropText, dropLabel = GetDropOrigin(source)
     if dropText ~= "" then
         if TextMatchesAny(dropText, provenance.origins) then
@@ -919,13 +1103,21 @@ function ZoneStyle.GetSourceEligibility(source, modeKey, context)
         return false, "zone", string.format("%s is outside the %s source pool.", dropLabel or "This boss drop", provenance.label)
     end
 
+    local trackedOrigin = GetTrackedSourceOrigin(source)
+    if trackedOrigin and trackedOrigin.provenanceKey then
+        if trackedOrigin.provenanceKey == provenance.key then
+            return true, "eligible", string.format("WoW tracks this appearance to %s; eligible through %s.", trackedOrigin.label, eraLabel)
+        end
+        return false, "zone", string.format("WoW tracks this appearance to %s, outside the %s source pool.", trackedOrigin.label, provenance.label)
+    end
+
     local metadata = SourceMetadata(source)
     if TextMatchesAny(metadata, provenance.origins) then
         return true, "eligible", string.format("Eligible for %s through %s.", provenance.label, eraLabel)
     end
     local paddedMetadata = " " .. metadata .. " "
     for _, marker in ipairs(provenanceOriginMarkers) do
-        if marker.profile.key ~= provenance.key and paddedMetadata:find(" " .. marker.text .. " ", 1, true) then
+        if not marker.profileKeys[provenance.key] and paddedMetadata:find(" " .. marker.text .. " ", 1, true) then
             return false, "zone", string.format("Associated with %s, not %s.", marker.profile.label, provenance.label)
         end
     end
