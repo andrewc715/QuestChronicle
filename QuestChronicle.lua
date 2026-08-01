@@ -16,7 +16,7 @@ local questSyncToken = 0
 
 local SCHEMA_VERSION = 2
 local COURIER_FORMAT_VERSION = 1
-local ADDON_VERSION = "0.5.4"
+local ADDON_VERSION = "0.5.5"
 local PREFIX = "|cffd9b36cQuest Chronicle:|r "
 local OBJECTIVE_SYNC_DELAY = 0.35
 local REMOVAL_CLASSIFY_DELAY = 0.45

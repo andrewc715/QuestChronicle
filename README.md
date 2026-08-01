@@ -1,8 +1,8 @@
-# Quest Chronicle v0.5.4
+# Quest Chronicle v0.5.5
 
-> **Native visual indexing:** v0.5.4 caches one entry for each collapsed visual returned by Blizzard's Wardrobe and resolves a collected, compatible item source only for previewing that visual.
+> **Native visual eligibility:** v0.5.5 caches each collected, displayable appearance row returned by Blizzard's Wardrobe and uses source-specific restrictions only to rank the item used for preview.
 
-Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.5.4 preserves the lifecycle recorder and manual preview while correcting the Wardrobe scanner's appearance identity model.
+Quest Chronicle records a character's quest journey for later Chronicle and roleplay work. Version 0.5.5 preserves the lifecycle recorder and manual preview while matching Blizzard's collapsed appearance-level collection model.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

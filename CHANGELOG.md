@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.5 - 2026-07-31
+
+### Fixed
+
+- Uses the collapsed category appearance's collection and display flags to decide whether a visual belongs in the catalog.
+- Stops rejecting an unlocked visual merely because an individual item source is unknown, restricted, or reports a transmog-use error.
+- Retains source-specific flags to rank the best representative preview item.
+- Advances the rebuildable wardrobe cache to format 5.
+- Preserves SavedVariables schema 2 and Courier format 1.
+
 ## 0.5.4 - 2026-07-31
 
 ### Fixed

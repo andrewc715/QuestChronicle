@@ -3,7 +3,7 @@ local QC = QuestChronicle
 QC.Wardrobe = QC.Wardrobe or {}
 local Wardrobe = QC.Wardrobe
 
-Wardrobe.CACHE_VERSION = 4
+Wardrobe.CACHE_VERSION = 5
 Wardrobe.PAGE_SIZE = 7
 
 -- Resolve collection enum values when the scan runs instead of when this file loads.
@@ -453,23 +453,11 @@ function Wardrobe.ValidateSource(source, slotKey)
     if type(source) ~= "table" then
         return false, "Appearance data is unavailable."
     end
-    if not source.isCollected then
+    if not source.isCollected and not source.appearanceIsCollected then
         return false, "This appearance is not collected."
     end
-    if source.isUsable == false then
-        return false, "This appearance is not usable by this character."
-    end
-    if source.canDisplayOnPlayer == false then
+    if source.appearanceCanDisplayOnPlayer == false then
         return false, "This character cannot display the appearance."
-    end
-    if source.isValidSourceForPlayer == false then
-        return false, "The appearance is not valid for this character."
-    end
-    if source.meetsTransmogPlayerCondition == false then
-        return false, source.useError or "A player condition is not met."
-    end
-    if source.useError then
-        return false, source.useError
     end
     if source.isHideVisual then
         return false, "Hidden-slot visuals are not included in the foundation preview."
@@ -490,6 +478,8 @@ local function NormalizeSource(source, appearance, slotKey, categoryID)
     end
 
     local itemID = GetSourceItemID(sourceID, source)
+    local sourceIsCollected = IsSourceCollected(sourceID, source, appearance)
+    local appearanceIsCollected = appearance and appearance.isCollected == true
     local normalized = {
         sourceID = sourceID,
         -- GetCategoryAppearances is already Blizzard's collapsed visual catalog.
@@ -503,9 +493,15 @@ local function NormalizeSource(source, appearance, slotKey, categoryID)
         inventoryType = source and source.invType or nil,
         categoryID = source and source.categoryID or categoryID,
         slotKey = slotKey,
-        isCollected = IsSourceCollected(sourceID, source, appearance),
+        -- Collection and display eligibility belong to Blizzard's collapsed
+        -- appearance row. A source can be individually unknown or unusable
+        -- while another source has already unlocked the same visual.
+        isCollected = appearanceIsCollected,
+        appearanceIsCollected = appearanceIsCollected,
+        sourceIsCollected = sourceIsCollected,
         isHideVisual = source and source.isHideVisual == true or appearance and appearance.isHideVisual == true,
         isUsable = appearance and appearance.isUsable,
+        appearanceCanDisplayOnPlayer = appearance and appearance.canDisplayOnPlayer,
         playerCanCollect = source and source.playerCanCollect,
         isValidSourceForPlayer = source and source.isValidSourceForPlayer,
         canDisplayOnPlayer = source and source.canDisplayOnPlayer,
@@ -535,8 +531,8 @@ local function BetterSource(candidate, current)
     if not current then
         return true
     end
-    if candidate.isCollected ~= current.isCollected then
-        return candidate.isCollected
+    if candidate.sourceIsCollected ~= current.sourceIsCollected then
+        return candidate.sourceIsCollected == true
     end
     if (candidate.useError == nil) ~= (current.useError == nil) then
         return candidate.useError == nil

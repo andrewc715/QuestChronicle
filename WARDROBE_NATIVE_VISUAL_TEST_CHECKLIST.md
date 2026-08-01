@@ -1,13 +1,13 @@
-# Quest Chronicle v0.5.4 Native Visual Index Live Test
+# Quest Chronicle v0.5.5 Native Appearance Eligibility Live Test
 
 ## Install and migrate
 
 1. Exit World of Warcraft completely.
 2. Back up `WTF\\Account\\<ACCOUNT>\\SavedVariables\\QuestChronicle.lua`.
-3. Replace the installed `Interface\\AddOns\\QuestChronicle` folder with v0.5.4.
+3. Replace the installed `Interface\\AddOns\\QuestChronicle` folder with v0.5.5.
 4. Log into the same character used for the v0.5.3 Legs comparison.
 5. Open `/qc`, then open **Outfits**.
-6. Confirm the format 3 wardrobe cache is treated as stale and **Rescan Collection** is offered. Do not delete SavedVariables.
+6. Confirm the older wardrobe cache is treated as stale and **Rescan Collection** is offered. Do not delete SavedVariables.
 
 ## Native comparison
 

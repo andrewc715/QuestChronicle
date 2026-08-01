@@ -1,29 +1,31 @@
-# Quest Chronicle v0.5.4: Native Visual Indexing
+# Quest Chronicle v0.5.5: Native Appearance Eligibility
 
-Version 0.5.4 fixes the wardrobe catalog regression revealed by the live Legs comparison. Blizzard's native Wardrobe already returns one row per collapsed visual appearance. Quest Chronicle v0.5.3 resolved a source for each row, but then used a source-level appearance identifier as the cache key. That mixed two identifier namespaces and could overwrite hundreds of distinct Blizzard visual rows with one entry.
+The live SavedVariables diagnostics explain the one-item result: v0.5.3 received hundreds of collected collapsed appearances from WoW, then rejected almost every one while validating individual item sources. Legs returned 302 collected appearance rows and 1,039 source rows, but only one appearance survived the source gate. Other armor slots showed the same pattern.
+
+Blizzard's native Wardrobe determines whether a visual belongs in the catalog from the collapsed category appearance row. Individual source records describe the items sharing that visual and help choose a representative item; they are not separate catalog entries and their restrictions must not erase an already-unlocked appearance.
 
 ## Scanner correction
 
-- Treats `GetCategoryAppearances(...).visualID` as the authoritative catalog identity.
-- Keeps one cache record per collected, non-hidden Blizzard visual row.
-- Resolves all sources belonging to that visual and retains the best collected source the current character can display.
-- Never uses a source's `appearanceID` or `itemAppearanceID` to deduplicate the catalog.
-- Handles API paths that return either full source records or numeric source IDs.
-- Uses Blizzard's collection source-to-item lookup before the older transmog fallback.
-- Preserves staged-cache protection: an impossible empty result cannot replace a healthy cache.
+- Uses the category appearance's `visualID` as the catalog identity.
+- Uses the category appearance's `isCollected` flag as the visual's collection state.
+- Uses the category appearance's display flag for preview eligibility.
+- Keeps source-level collection, validity, condition, and use-error fields only for ranking the best preview source.
+- Allows an appearance unlocked through one source to use another item sharing the same visual as its preview representative.
+- Continues to exclude hidden visuals and entries for which WoW provides no previewable item.
+- Handles source-info records and numeric source-ID API results.
 
 ## Cache migration
 
-The rebuildable wardrobe cache advances from format 3 to format 4. On first load, v0.5.4 marks the old cache stale and requires **Scan Collection**. This is intentional because format 3 may already have lost distinct visuals. The migration does not change or delete Chronicle history, quest state, RP notes, drafts, settings, or Courier data. Manual preview selections remain stored and will reconnect when their source is present in the rebuilt cache.
+The rebuildable wardrobe cache advances to format 5. Older wardrobe caches are marked stale and rebuilt with **Scan Collection**. Chronicle history, quest state, RP notes, drafts, settings, Courier data, and manual selection storage are preserved.
 
 ## Compatibility
 
-- Addon version 0.5.4.
+- Addon version 0.5.5.
 - SavedVariables schema 2.
 - Courier format 1.
 - Warcraft Quest Chronicle Courier v1.0.0 remains compatible.
-- Preview only: Quest Chronicle does not apply transmog or alter Blizzard outfit slots.
+- Preview only; Quest Chronicle does not apply transmog or alter Blizzard outfit slots.
 
 ## Expected live result
 
-After a clean scan, **Legs** should contain roughly the same collapsed collected visual catalog shown by Blizzard's native Wardrobe. For the reported collection, that means approximately 15 seven-row pages rather than one cached visual. Small count differences are acceptable only when Blizzard marks a visual hidden, unusable, or undisplayable on the current character.
+The native screenshot shows 17 Head pages. After rescanning with v0.5.5, Quest Chronicle should expose approximately the same collected Head catalog across its seven-row pages instead of a single Clefthoof Helm. Legs should similarly expand from one result to roughly the full native collection. Small differences remain possible for hidden visuals or rows for which WoW supplies no item that the embedded model can preview.
