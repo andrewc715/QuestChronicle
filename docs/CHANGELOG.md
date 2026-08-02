@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.8.3 - 2026-08-01
+
+### Fixed
+
+- Revalidated cached item expansion metadata against the exact representative item ID.
+- Prevented stale SavedVariables `expansionID` values from admitting later-expansion appearances into earlier-era generation pools.
+- Made unavailable or unverified item-era metadata fail closed as Loading era.
+- Preserved manual browsing and preview for era-excluded appearances.
+
 ## 1.8.2 - 2026-08-01
 
 ### Added

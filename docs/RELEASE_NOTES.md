@@ -1,36 +1,32 @@
-# Quest Chronicle v1.8.2: Heritage Armor Progression Rule
+# Quest Chronicle v1.8.3: Era Metadata Revalidation
 
-Version 1.8.2 adds race Heritage Armor to Quest Chronicle's progression restrictions while preserving the normalized v1.8 architecture and the validated v1.7.2 weapon-route behavior.
+Version 1.8.3 fixes a progression leak where a later-expansion appearance could enter an earlier-zone generation pool because a stale `expansionID` persisted on the cached wardrobe source.
 
-## New rule
+## Live symptom
 
-Race Heritage Armor remains visible in the appearance browser and may be selected manually for preview, but automatic outfit generation excludes it while the character is below the maximum level currently reachable by the account.
-
-At maximum level, Heritage Armor returns to the normal generation pipeline and must still pass the existing zone-era, provenance, promotion, coherence, weapon, and per-zone preference rules.
-
-## Detection
-
-Quest Chronicle identifies Heritage Armor through Blizzard's native transmog-set membership and `TransmogSetInfo` metadata. It checks a source's containing sets and recognizes Blizzard set labels, descriptions, or names that identify Heritage Armor. This avoids maintaining a fragile per-item list and allows future Heritage sets to participate when Blizzard classifies them consistently.
-
-The current level cap is resolved through Blizzard's expansion-aware level APIs, preferring the maximum level reachable for the player's owned expansion and retaining current-max fallbacks for client compatibility.
-
-## Browser feedback
-
-Below max level, affected rows remain browseable and display:
+While questing in Outland, automatic generation selected **Green Belt of Quiet Understanding** (item 89561), a Mists of Pandaria reward. Its tooltip incorrectly reported:
 
 ```text
-Heritage locked
+Generated pool: Era eligible; no conflicting source zone is reported by WoW.
 ```
 
-Their tooltip explains the current and maximum levels and confirms that manual preview remains available.
+## Root cause
 
-## Preserved
+Wardrobe sources persist in SavedVariables. Earlier versions cached `source.expansionID` but did not record which representative item ID had supplied that value. `LoadItemMetadata()` returned any existing value immediately, so an unverified or stale era could survive indefinitely.
 
-- Every runtime Lua file remains at or below 500 lines.
-- SavedVariables schema remains 2.
-- Courier format remains 1.
-- Wardrobe cache format remains 6.
-- Weapon Appearance Routes are unchanged.
-- Linked and unlinked Main Hand and Off Hand generation are unchanged.
-- Existing concepts and linked Custom Sets require no migration or rebuild.
-- No wardrobe rescan is required solely for this update.
+## Correction
+
+- Item metadata is now keyed to `itemMetadataItemID`.
+- Cached era data is trusted only when `itemMetadataVerified` is true for that exact item ID.
+- Older unverified values are re-read through `C_Item.GetItemInfo` the next time the source is evaluated.
+- If WoW has not loaded the item yet, the source fails closed as **Loading era**.
+- Unverified SavedVariables era data is never used to admit an appearance into generation.
+- No curated item-name blacklist was added. The repair applies to every appearance.
+
+## Compatibility
+
+- SavedVariables schema: 2
+- Courier format: 1
+- Wardrobe cache format: 6
+- No collection rescan is required solely for this update.
+- Existing concepts, selections, weapon routes, Custom Set links, and Chronicle data are preserved.

@@ -1,8 +1,8 @@
-# Quest Chronicle v1.8.2
+# Quest Chronicle v1.8.3
 
-> **Heritage progression rule:** v1.8.2 excludes race Heritage Armor from automatic outfit generation while the character is below the maximum level reachable by the account. Manual browsing and preview remain available.
+> **Era metadata repair:** v1.8.3 revalidates every cached appearance era against its current representative item. Unverified metadata now fails closed instead of allowing later-expansion gear into earlier-zone generation pools.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.8.2 preserves the normalized architecture and adds one progression rule: race Heritage Armor remains browseable and previewable but cannot be selected by automatic outfit generation until the character reaches the account's current maximum reachable level.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.8.3 preserves the normalized architecture, Heritage Armor progression rule, and Weapon Appearance Routes while repairing persistent item-era metadata validation.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

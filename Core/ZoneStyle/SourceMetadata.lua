@@ -3,8 +3,18 @@ local ZoneStyle = QC.ZoneStyle
 local P = ZoneStyle._Private
 function P.LoadItemMetadata(source)
     if not source or not source.itemID then return nil end
+    local itemID = tonumber(source.itemID)
     local genericName = not source.name or tostring(source.name):match("^Appearance %d+$")
-    if source.expansionID ~= nil and not genericName then
+
+    -- Metadata stored on wardrobe sources persists in SavedVariables. Only
+    -- trust it when this exact item ID was verified by the current loader.
+    -- Older builds stored expansionID without recording which representative
+    -- item produced it, allowing stale era data to survive indefinitely.
+    if source.itemMetadataVerified == true
+        and tonumber(source.itemMetadataItemID) == itemID
+        and source.expansionID ~= nil
+        and not genericName
+    then
         return source.expansionID
     end
 
@@ -19,15 +29,23 @@ function P.LoadItemMetadata(source)
             source.styleItemType = itemType
             source.styleItemSubType = itemSubType
             source.styleEquipLocation = equipLocation
-            if expansionID ~= nil then source.expansionID = tonumber(expansionID) end
+            source.itemMetadataItemID = itemID
+            source.itemMetadataVerified = true
+            source.expansionID = expansionID ~= nil and tonumber(expansionID) or nil
             return source.expansionID
         end
     end
 
+    -- Fail closed while WoW loads the item. Do not fall back to an unverified
+    -- SavedVariables expansion value, because a later-expansion appearance
+    -- must never leak into an earlier-era generation pool.
+    source.itemMetadataVerified = nil
+    source.itemMetadataItemID = itemID
+    source.expansionID = nil
     if C_Item and C_Item.RequestLoadItemDataByID then
         P.SafeCall(C_Item.RequestLoadItemDataByID, source.itemID)
     end
-    return source.expansionID
+    return nil
 end
 
 function P.SourceMetadata(source)
