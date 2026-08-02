@@ -366,6 +366,7 @@ function P.PrintHelp()
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc removals on|off|r - toggle abandonment and removal events")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc minimap show|hide|toggle|reset|r - manage the minimap button")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc weapon debug|r - print weapon slot, option, and selection diagnostics")
+    DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc traveler debug|r - explain Traveler cohesion, mismatch budget, and outliers")
 end
 
 function P.HandleSlashCommand(message)
@@ -420,6 +421,13 @@ function P.HandleSlashCommand(message)
         P.SetTrackingSetting("objectiveTracking", string.lower(rest), "Objectives")
     elseif command == "removals" then
         P.SetTrackingSetting("removalTracking", string.lower(rest), "Removals")
+    elseif command == "traveler" then
+        local subcommand = string.lower(rest:match("^(%S*)") or "")
+        if subcommand == "debug" and QC.ZoneStyle and QC.ZoneStyle.PrintTravelerDiagnostics then
+            QC.ZoneStyle.PrintTravelerDiagnostics()
+        else
+            P.Print("Usage: /qc traveler debug")
+        end
     elseif command == "weapon" then
         local subcommand = string.lower(rest:match("^(%S*)") or "")
         if subcommand == "debug" and QC.Wardrobe and QC.Wardrobe.PrintWeaponRuleDiagnostics then

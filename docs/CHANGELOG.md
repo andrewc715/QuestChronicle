@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.9.0a - 2026-08-02
+
+### Added
+
+- Began Phase A of the Traveler Cohesion Rewrite with read-only instrumentation.
+- Added confidence-bearing palette, material, finish, motif, visual-weight, and loudness descriptors.
+- Added the planned pairwise cohesion formula and anchor-derived outfit profile.
+- Added mismatch classifications for cohesive pieces, useful weathered mismatch, supported accents, strong mismatch, and postal-code outliers.
+- Added `/qc traveler debug` with per-piece base score, cohesion, loudness, echo support, and diagnostic mismatch-budget output.
+
+### Preserved
+
+- Traveler selection, weighting, slot order, and generation behavior remain unchanged from v1.8.5.
+- Zone, Class, Chronicle Echo, Weapon Appearance Routes, concepts, Custom Sets, SavedVariables schema 2, Courier format 1, and wardrobe cache format 7 remain unchanged.
+
 ## 1.8.5 - 2026-08-02
 
 ### Fixed

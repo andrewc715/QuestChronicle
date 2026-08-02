@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.8.4 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0a enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -94,6 +94,18 @@ These tables are runtime implementation details. Other subsystems should use pub
 `Core/ZoneStyle/Scoring.lua`
 : Outfit naming, coherence, eligibility, source weighting, and weapon ordering.
 
+`Core/ZoneStyle/Traveler/StyleLexicon.lua`
+: Traveler-only style vocabulary, compatibility relations, formula weights, visibility weights, and mismatch thresholds.
+
+`Core/ZoneStyle/Traveler/Descriptors.lua`
+: Confidence-bearing palette, material, finish, motif, visual-weight, and loudness descriptors.
+
+`Core/ZoneStyle/Traveler/Cohesion.lua`
+: Pair cohesion, anchor profiles, accent echo, mismatch classification, and diagnostic budget accounting.
+
+`Core/ZoneStyle/Traveler/Debug.lua`
+: Read-only current-outfit analysis and `/qc traveler debug` output.
+
 ## Outfits UI
 
 The Outfits tab uses a shared construction context so its formerly 1,700-line constructor can be assembled by focused modules without changing the resulting frame hierarchy or callbacks.
@@ -125,3 +137,14 @@ python tools/verify_lua_line_limit.py
 ```
 
 The command exits nonzero if any Lua file exceeds 500 physical lines.
+
+## Traveler cohesion instrumentation (v1.9.0a)
+
+`Core/ZoneStyle/Traveler/` contains the observation layer for the Traveler Cohesion Rewrite:
+
+- `StyleLexicon.lua` owns coarse style families, compatibility relations, thresholds, and weights.
+- `Descriptors.lua` converts an appearance's available metadata into confidence-bearing visual descriptors.
+- `Cohesion.lua` computes pair compatibility, anchor profiles, accent echo, mismatch classes, and the diagnostic budget.
+- `Debug.lua` analyzes the current outfit and implements `/qc traveler debug`.
+
+In v1.9.0a this subsystem is read-only. It does not participate in candidate selection or mutate the wardrobe preview.

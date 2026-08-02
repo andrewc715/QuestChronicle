@@ -1,8 +1,8 @@
-# Quest Chronicle v1.8.5
+# Quest Chronicle v1.9.0a
 
 > **Live appearance metadata:** item names, era evidence, quality colors, icons, and eligibility now update as soon as WoW finishes loading the relevant item data. Visible rows update in place without waiting for a click or rebuilding the entire Outfits page.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.8.5 preserves the normalized architecture, Heritage Armor progression rule, Weapon Appearance Routes, and wardrobe cache format 7 while making source metadata event-driven.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a begins the Traveler Cohesion Rewrite with instrumentation-only style descriptors, cohesion scoring, mismatch classification, and `/qc traveler debug`. Generation behavior remains identical to the validated v1.8.5 baseline.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -121,6 +121,7 @@ Settings include:
 /qc removals on|off
 /qc minimap show|hide|toggle|reset
 /qc weapon debug
+/qc traveler debug
 ```
 
 Bare `/qc` toggles the main window. `/qc help` displays command help.
