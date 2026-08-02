@@ -42,8 +42,11 @@ P.eventFrame:SetScript("OnEvent", function(_, event, ...)
         local eventArg1 = select(1, ...)
         Wardrobe.InvalidateWeaponAppearanceRoutes()
         local now = GetTime and GetTime()
+        -- Blizzard may emit TRANSMOG_COLLECTION_UPDATED while its own UI
+        -- settles after equipment or specialization changes. Suppress that
+        -- transient event, but never force the expensive global usability
+        -- recalculation ourselves. Live route APIs are queried below.
         P.internalUsabilityUpdateUntil = now and (now + 1.0) or nil
-        P.SafeCall(C_TransmogCollection and C_TransmogCollection.UpdateUsableAppearances)
         local function NotifyCapabilities()
             local state = P.EnsurePreviewState()
             local capabilities = P.NormalizeWeaponFamilyChoices(state, Wardrobe.GetWeaponAppearanceCapabilities())
@@ -69,11 +72,9 @@ P.eventFrame:SetScript("OnEvent", function(_, event, ...)
         and GetTime
         and GetTime() <= P.internalUsabilityUpdateUntil
     then
-        -- Weapon generation asks Blizzard to refresh current-character
-        -- usability before validating the equipped hands. Blizzard reports
-        -- that calculation through the generic collection-updated event even
-        -- though no appearance was learned or removed. Do not turn our own
-        -- validation refresh into a full wardrobe rescan.
+        -- Equipment and specialization changes can produce a transient
+        -- collection-updated event even when no appearance was learned or
+        -- removed. Do not turn that state refresh into a full wardrobe rescan.
         local cache = P.EnsureCache()
         cache.lastInternalUsabilityUpdateAt = time and time() or 0
     else

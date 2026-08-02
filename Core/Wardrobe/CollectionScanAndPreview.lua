@@ -101,7 +101,11 @@ function Wardrobe.Scan(force, trigger)
     Wardrobe.scanning = true
     Wardrobe.scanCollectionState = P.CaptureCollectionState()
     P.ApplyScanCollectionState()
-    P.SafeCall(C_TransmogCollection.UpdateUsableAppearances)
+    -- Do not call C_TransmogCollection.UpdateUsableAppearances here. On large
+    -- collections Blizzard performs that recalculation synchronously and can
+    -- freeze the entire client before our cooperative scan worker begins. The
+    -- category queries below already use the active character and temporary
+    -- collection filters.
 
     cache.scanState = "PREPARING"
     cache.scanStartedAt = time()

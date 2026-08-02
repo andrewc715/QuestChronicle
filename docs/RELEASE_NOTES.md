@@ -1,59 +1,55 @@
-# Quest Chronicle v1.9.0a2 — Cooperative Wardrobe Refresh
+# Quest Chronicle v1.9.0a3 — Non-Blocking Foreground Wardrobe Actions
 
-v1.9.0a2 preserves the calibrated Traveler Cohesion instrumentation from v1.9.0a1 and repairs a severe login and `/reload` performance regression in the wardrobe refresh pipeline. Traveler generation and all cohesion results remain unchanged.
+v1.9.0a3 preserves the calibrated Traveler Cohesion instrumentation and cooperative background collection scan from v1.9.0a2. It removes the remaining synchronous Blizzard collection recalculation that could freeze the client when generating an outfit or starting a manual scan.
 
 ## Root cause
 
-The automatic login refresh was performing the same metadata work up to three times:
+Three foreground paths still called:
 
-1. hydrating and indexing the previous 5,000+ appearance cache immediately on `PLAYER_ENTERING_WORLD`;
-2. hydrating each source again while rebuilding the collection cache;
-3. clearing the completed index and hydrating every new source again after the scan.
-
-The era-evidence rebuild also requested metadata for every sibling item source during the scan, producing a large burst of item API work. A large equipment slot was still processed as one uninterrupted Lua loop.
-
-## Corrected pipeline
-
-The login path now performs one metadata lifecycle:
-
-```text
-Begin scan
-→ clear metadata watches once
-→ discover and hydrate each representative source once
-→ preserve broad sibling-source manifests without requesting every sibling immediately
-→ finalize sorting without a second hydration pass
+```lua
+C_TransmogCollection.UpdateUsableAppearances()
 ```
 
-If the login scan is deferred or fails, Quest Chronicle restores the lightweight item-to-source watch index without calling item-information APIs.
+The call was made before Quest Chronicle's cooperative work began:
 
-## Cooperative slot scanning
+- `Generate Outfit`, while creating the weapon-generation context;
+- `Scan Collection`, immediately after applying temporary collection filters;
+- equipment and specialization refresh events.
 
-Large slots now yield throughout the scan:
+On a collection containing more than 5,000 visuals, Blizzard can execute that global usability recalculation synchronously. The Lua scan worker cannot yield until Blizzard returns, so the game appears frozen even though the later scan stages are cooperative.
+
+## Corrected capability flow
+
+Quest Chronicle no longer forces the global usability index to rebuild.
 
 ```text
-maximum appearances per step: 18
-maximum addon work per step: approximately 3 ms
+Equipment/spec change
+→ invalidate weapon appearance routes
+→ query Blizzard's live slot-and-option APIs
+→ repeat once after a short settling delay
 ```
 
-The next batch resumes on a later timer frame. This changes scheduling only; source validation, diagnostics, visual deduplication, era manifests, and final cache contents use the same rules.
+Weapon Appearance Routes already use current per-hand transmog outfit slots, enabled weapon options, and category permissions. Those live APIs are sufficient for generation and do not require rebuilding the entire collection index.
 
-## Traveler instrumentation
+Collection scans now proceed directly from temporary collection-filter setup into the existing readiness wait and cooperative slot workers.
 
-The v1.9.0a1 calibration is retained unchanged:
+## Guardrail
 
-- linked matching weapons count as one analysis block;
-- slot prominence scales visual impact;
-- strongly echoed variations cost zero mismatch budget;
-- mismatch costs are fractional;
-- `/qc traveler debug` reports evidence-based bridges and clashes.
+The package adds:
 
-Traveler generation remains instrumentation-only and is still byte-for-byte unchanged from the validated v1.8.5 generation path.
+```text
+tools/verify_no_blocking_usability_refresh.py
+```
 
-## Compatibility
+Packaging fails if runtime Lua reintroduces a call to `UpdateUsableAppearances`.
 
-- Addon version: `1.9.0a2`
-- SavedVariables schema: `2`
-- Courier format: `1`
-- Wardrobe cache format: `7`
-- No wardrobe rescan or migration is required beyond the normal automatic login refresh
-- Every runtime Lua file remains below 500 lines
+## Preserved behavior
+
+- Traveler cohesion formulas and calibrated diagnostics are unchanged.
+- Traveler outfit selection remains instrumentation-only and unchanged.
+- Cooperative scan limits remain 18 appearances or approximately 3 ms per worker step.
+- Weapon Appearance Routes, linked hands, era evidence, live metadata updates, concepts, and Custom Sets are unchanged.
+- SavedVariables schema remains `2`.
+- Courier format remains `1`.
+- Wardrobe cache format remains `7`.
+- No cache migration or additional rescan is required.

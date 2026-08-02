@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.0a3 - 2026-08-02
+
+### Performance
+
+- Removed synchronous `C_TransmogCollection.UpdateUsableAppearances()` calls from Generate Outfit, Scan Collection, and equipment/spec refresh paths.
+- Preserved live weapon capability updates through route invalidation and Blizzard's per-slot weapon-option APIs.
+- Added a packaging guard that prevents the blocking global usability recalculation from returning to runtime Lua.
+- Preserved v1.9.0a2 cooperative scanning and v1.9.0a1 Traveler calibration unchanged.
+
 ## 1.9.0a2 - 2026-08-02
 
 - Removed the duplicate full-cache metadata hydration pass from `PLAYER_ENTERING_WORLD`.

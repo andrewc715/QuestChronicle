@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0a2 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0a3 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -155,3 +155,12 @@ In v1.9.0a2 this subsystem remains read-only. It does not participate in candida
 The login collection refresh is divided into bounded appearance batches. A slot scan yields after 18 appearances or approximately 3 milliseconds of addon work, whichever comes first. Metadata watch tables are rebuilt during the scan rather than through a full pre-scan hydration pass, and sibling item metadata is requested lazily when era evidence is actually needed.
 
 This preserves the single automatic login refresh while preventing the scan from monopolizing one frame.
+
+
+## Non-blocking transmog capability refresh (v1.9.0a3)
+
+Quest Chronicle never calls `C_TransmogCollection.UpdateUsableAppearances()` from runtime Lua. On large collections Blizzard may perform that global recalculation synchronously, blocking the client before Quest Chronicle's cooperative workers can yield.
+
+Current weapon permissions are read through the live outfit-slot and weapon-option APIs. Equipment, specialization, talent, and trait events invalidate the cached route matrix and query those live APIs immediately and once more after a short settling delay. Collection scans use the temporary collection filters and category queries directly.
+
+`tools/verify_no_blocking_usability_refresh.py` enforces this boundary during packaging.

@@ -400,9 +400,11 @@ function Wardrobe.GetFilteredSlotSources(slotKey)
 end
 
 function P.CreateWeaponGenerationContext()
-    local now = GetTime and GetTime()
-    P.internalUsabilityUpdateUntil = now and (now + 1.0) or nil
-    P.SafeCall(C_TransmogCollection and C_TransmogCollection.UpdateUsableAppearances)
+    -- GetWeaponAppearanceCapabilities queries Blizzard's live slot-and-option
+    -- APIs directly. Forcing UpdateUsableAppearances here performs a global,
+    -- synchronous collection recalculation and can lock the client every time
+    -- Generate Outfit is clicked. Route invalidation on equipment and spec
+    -- events is sufficient to keep this context current.
     local capabilities = Wardrobe.GetWeaponAppearanceCapabilities()
     return {
         mainItem = capabilities.topology.mainItem,
