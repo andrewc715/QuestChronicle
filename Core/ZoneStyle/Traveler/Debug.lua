@@ -6,6 +6,10 @@ local function FormatPercent(value)
     return string.format("%.0f%%", (tonumber(value) or 0) * 100)
 end
 
+local function FormatCost(value)
+    return string.format("%.2f", tonumber(value) or 0)
+end
+
 local function FormatMap(values, limit)
     local entries = {}
     for key, value in pairs(values or {}) do table.insert(entries, { key = key, value = value }) end
@@ -29,6 +33,12 @@ local function SourceName(source)
     return tostring(source and (source.styleName or source.name) or "Unknown appearance")
 end
 
+local function EntryName(entry)
+    local name = SourceName(entry.source)
+    if entry.isWeaponBlock and (entry.memberCount or 1) > 1 then return name .. " x" .. tostring(entry.memberCount) end
+    return name
+end
+
 local function CurrentEntries()
     local Wardrobe = QC.Wardrobe
     if not Wardrobe or not Wardrobe.GetPreviewState then return {} end
@@ -48,6 +58,7 @@ local function CurrentEntries()
                 descriptor = descriptor,
                 travelerScore = travelerScore,
                 locked = state.locks and state.locks[definition.key] == true,
+                linkedHands = state.linkWeaponHands ~= false,
             })
         end
     end
@@ -77,7 +88,7 @@ function T.GetEntrySummary(sourceID)
                 "Traveler cohesion %s • %s • mismatch %s",
                 FormatPercent(entry.profileCohesion),
                 entry.mismatchClass,
-                entry.mismatchPoints
+                FormatCost(entry.mismatchPoints)
             ), entry
         end
     end
@@ -86,12 +97,13 @@ end
 
 function T.PrintDiagnostics()
     local analysis = T.AnalyzeCurrentOutfit("/qc traveler debug")
-    Print("Traveler cohesion diagnostics (instrumentation only; generation is unchanged):")
+    Print("Traveler cohesion diagnostics (calibrated instrumentation only; generation is unchanged):")
     Print(string.format(
-        "Outfit: %s | current mode %s | %d selected appearances",
+        "Outfit: %s | current mode %s | %d selected appearances | %d analysis blocks",
         tostring(analysis.outfitName or "Unnamed current look"),
         tostring(analysis.currentMode or "unknown"),
-        #(analysis.entries or {})
+        tonumber(analysis.selectedAppearanceCount) or #(analysis.entries or {}),
+        tonumber(analysis.analysisBlockCount) or #(analysis.entries or {})
     ))
     Print(string.format(
         "Profile: palette %s | material %s | finish %s | motif %s | visual weight %.2f",
@@ -108,31 +120,33 @@ function T.PrintDiagnostics()
         tonumber(analysis.skeletonScore) or 0
     ))
     Print(string.format(
-        "Mismatch budget %d/%d | postal-code outliers %d | hard anchor clashes %d",
-        tonumber(analysis.mismatchUsed) or 0,
-        tonumber(analysis.mismatchBudget) or 0,
+        "Mismatch budget %s/%s | supported variations %d | postal-code outliers %d | hard anchor clashes %d",
+        FormatCost(analysis.mismatchUsed),
+        FormatCost(analysis.mismatchBudget),
+        tonumber(analysis.supportedVariationCount) or 0,
         tonumber(analysis.postalCount) or 0,
         tonumber(analysis.hardClashes) or 0
     ))
 
     table.sort(analysis.entries, function(left, right)
-        local leftVisibility = T.SLOT_VISIBILITY_WEIGHTS[left.slotKey] or 0
-        local rightVisibility = T.SLOT_VISIBILITY_WEIGHTS[right.slotKey] or 0
+        local leftVisibility = left.slotProminence or T.SLOT_VISIBILITY_WEIGHTS[left.slotKey] or 0
+        local rightVisibility = right.slotProminence or T.SLOT_VISIBILITY_WEIGHTS[right.slotKey] or 0
         if leftVisibility == rightVisibility then return tostring(left.slotKey) < tostring(right.slotKey) end
         return leftVisibility > rightVisibility
     end)
     for _, entry in ipairs(analysis.entries) do
         Print(string.format(
-            "%s%s: %s | base %.1f | cohesion %s | loud %s | echo %s | %s (%d) — %s",
+            "%s%s: %s | base %.1f | cohesion %s | loud %s raw / %s impact | echo %s | %s (%s) — %s",
             tostring(entry.slotLabel or entry.slotKey),
             entry.locked and " [locked]" or "",
-            SourceName(entry.source),
+            EntryName(entry),
             tonumber(entry.travelerScore) or 0,
             FormatPercent(entry.profileCohesion),
-            FormatPercent(entry.descriptor.loudness),
+            FormatPercent(entry.intrinsicLoudness or entry.descriptor.loudness),
+            FormatPercent(entry.visualImpact),
             FormatPercent(entry.echoSupport),
             tostring(entry.mismatchClass),
-            tonumber(entry.mismatchPoints) or 0,
+            FormatCost(entry.mismatchPoints),
             tostring(entry.mismatchReason or "")
         ))
     end

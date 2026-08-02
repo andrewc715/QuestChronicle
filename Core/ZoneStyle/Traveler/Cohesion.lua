@@ -13,6 +13,15 @@ local function Average(left, right)
     return ((tonumber(left) or 0) + (tonumber(right) or 0)) * 0.5
 end
 
+local function Round(value, places)
+    local scale = 10 ^ (places or 0)
+    return math.floor((tonumber(value) or 0) * scale + 0.5) / scale
+end
+
+local function FormatPercent(value)
+    return string.format("%.0f%%", Clamp(value, 0, 1) * 100)
+end
+
 local function MapTotal(values)
     local total = 0
     for _, value in pairs(values or {}) do total = total + math.max(0, tonumber(value) or 0) end
@@ -96,6 +105,52 @@ function T.GetPairCohesion(left, right)
     return Clamp(score, 0, 1), components
 end
 
+local function SourceID(entry)
+    return tonumber(entry and entry.source and entry.source.sourceID)
+end
+
+local function IsPrimaryWeaponSlot(slotKey)
+    return slotKey == "ONE_HAND" or slotKey == "TWO_HAND" or slotKey == "RANGED"
+end
+
+local function BuildAnalysisUnits(entries)
+    local units, consumed = {}, {}
+    local offHandIndex
+    for index, entry in ipairs(entries or {}) do
+        if entry.slotKey == "OFF_HAND" then offHandIndex = index end
+    end
+
+    for index, entry in ipairs(entries or {}) do
+        if not consumed[index] then
+            local unit = entry
+            if IsPrimaryWeaponSlot(entry.slotKey) and entry.linkedHands and offHandIndex and not consumed[offHandIndex] then
+                local offHand = entries[offHandIndex]
+                if SourceID(entry) and SourceID(entry) == SourceID(offHand) then
+                    consumed[offHandIndex] = true
+                    unit = {
+                        slotKey = entry.slotKey,
+                        slotLabel = "Weapon Pair",
+                        definition = entry.definition,
+                        source = entry.source,
+                        descriptor = entry.descriptor,
+                        travelerScore = Average(entry.travelerScore, offHand.travelerScore),
+                        locked = entry.locked or offHand.locked,
+                        linkedHands = true,
+                        isWeaponBlock = true,
+                        memberCount = 2,
+                        members = { entry, offHand },
+                    }
+                end
+            end
+            unit.members = unit.members or { entry }
+            unit.memberCount = unit.memberCount or 1
+            unit.slotProminence = T.SLOT_VISIBILITY_WEIGHTS[unit.slotKey] or 0.40
+            table.insert(units, unit)
+        end
+    end
+    return units
+end
+
 local function AggregateMap(entries, field)
     local values, totalWeight = {}, 0
     for _, entry in ipairs(entries or {}) do
@@ -146,7 +201,6 @@ local function BuildProfileDescriptor(anchors)
     end
     descriptor.visualWeight = totalWeight > 0 and descriptor.visualWeight / totalWeight or 2.5
     descriptor.dominantPalette, descriptor.dominantPaletteStrength = Dominant(descriptor.palette)
-    descriptor.secondaryPalette = nil
     local secondValue = -1
     for key, value in pairs(descriptor.palette) do
         if key ~= descriptor.dominantPalette and value > secondValue then descriptor.secondaryPalette, secondValue = key, value end
@@ -176,47 +230,114 @@ local function EchoSupport(entry, entries)
     local support = 0
     for _, other in ipairs(entries or {}) do
         if other ~= entry then
-            local visibility = T.SLOT_VISIBILITY_WEIGHTS[other.slotKey] or 0.40
+            local visibility = other.slotProminence or T.SLOT_VISIBILITY_WEIGHTS[other.slotKey] or 0.40
             support = support + (other.descriptor.palette[accent] or 0) * visibility
         end
     end
     return Clamp(support, 0, 1)
 end
 
+local COMPONENT_LABELS = {
+    palette = "palette",
+    material = "material",
+    finish = "finish",
+    visualWeight = "visual weight",
+    motif = "motif",
+}
+
+local function ComponentExtremes(components)
+    local strongestKey, strongestValue, weakestKey, weakestValue
+    for key, value in pairs(components or {}) do
+        if COMPONENT_LABELS[key] then
+            if not strongestValue or value > strongestValue then strongestKey, strongestValue = key, value end
+            if not weakestValue or value < weakestValue then weakestKey, weakestValue = key, value end
+        end
+    end
+    return strongestKey, strongestValue or 0.50, weakestKey, weakestValue or 0.50
+end
+
 local function BridgeSupport(components)
-    return math.max(components.material or 0, components.finish or 0, components.motif or 0)
+    local bestKey, bestValue
+    for _, key in ipairs({ "material", "finish", "motif" }) do
+        local value = components[key] or 0
+        if not bestValue or value > bestValue then bestKey, bestValue = key, value end
+    end
+    return bestValue or 0, bestKey
+end
+
+local function ClassificationReason(classification, entry, profileScore, components, echoSupport, bridgeSupport, bridgeKey)
+    local strongestKey, strongestValue, weakestKey, weakestValue = ComponentExtremes(components)
+    local accent = entry.descriptor.dominantPalette or "unclassified"
+    if classification == "POSTAL" then
+        return string.format(
+            "high-impact %s accent (%s) has %s echo; best bridge is %s %s",
+            accent, FormatPercent(entry.visualImpact), FormatPercent(echoSupport),
+            COMPONENT_LABELS[bridgeKey] or "style", FormatPercent(bridgeSupport)
+        )
+    end
+    if classification == "COHESIVE" then
+        return string.format(
+            "profile fit is led by %s %s; weakest fit is %s %s",
+            COMPONENT_LABELS[strongestKey] or "style", FormatPercent(strongestValue),
+            COMPONENT_LABELS[weakestKey] or "style", FormatPercent(weakestValue)
+        )
+    end
+    if classification == "SUPPORTED VARIATION" then
+        if echoSupport >= T.CONFIG.thresholds.echo then
+            return string.format("%s accent is echoed at %s; visual impact is only %s", accent, FormatPercent(echoSupport), FormatPercent(entry.visualImpact))
+        end
+        return string.format("overall profile cohesion %s absorbs the variation; strongest bridge is %s %s", FormatPercent(profileScore), COMPONENT_LABELS[strongestKey] or "style", FormatPercent(strongestValue))
+    end
+    if classification == "SUPPORTED" then
+        return string.format("high-impact %s accent (%s) is supported by %s echo and %s %s", accent, FormatPercent(entry.visualImpact), FormatPercent(echoSupport), COMPONENT_LABELS[bridgeKey] or "style", FormatPercent(bridgeSupport))
+    end
+    if classification == "MILD" then
+        return string.format("mild %s deviation (%s); %s %s provides the bridge", COMPONENT_LABELS[weakestKey] or "style", FormatPercent(weakestValue), COMPONENT_LABELS[strongestKey] or "style", FormatPercent(strongestValue))
+    end
+    return string.format("weak %s fit (%s); best bridge is %s %s", COMPONENT_LABELS[weakestKey] or "style", FormatPercent(weakestValue), COMPONENT_LABELS[bridgeKey] or "style", FormatPercent(bridgeSupport))
 end
 
 local function ClassifyMismatch(entry, profileScore, components, echoSupport)
     local thresholds = T.CONFIG.thresholds
+    local prominence = entry.slotProminence or T.SLOT_VISIBILITY_WEIGHTS[entry.slotKey] or 0.40
     local loudness = entry.descriptor.loudness or 0
-    local bridgeSupport = BridgeSupport(components)
-    if loudness >= thresholds.loud and profileScore < thresholds.postalCohesion and echoSupport < thresholds.echo and bridgeSupport < 0.55 then
-        return "POSTAL", 3, "isolated loud accent with no palette echo or material/finish bridge", bridgeSupport
+    local visualImpact = loudness * prominence
+    local bridgeSupport, bridgeKey = BridgeSupport(components)
+    local highImpact = visualImpact >= thresholds.loudImpact
+    entry.intrinsicLoudness = loudness
+    entry.visualImpact = visualImpact
+
+    local classification, cost
+    if highImpact and profileScore < thresholds.postalCohesion and echoSupport < thresholds.echo and bridgeSupport < thresholds.postalBridge then
+        classification, cost = "POSTAL", 0
+    elseif profileScore >= thresholds.cohesive then
+        classification, cost = "COHESIVE", 0
+    elseif highImpact and profileScore < thresholds.supportedCohesion and (echoSupport >= thresholds.echo or bridgeSupport >= thresholds.strongBridge) then
+        classification, cost = "SUPPORTED", prominence
+    elseif profileScore >= thresholds.supportedCohesion or echoSupport >= thresholds.echo then
+        classification, cost = "SUPPORTED VARIATION", 0
+    elseif profileScore >= thresholds.mild or bridgeSupport >= thresholds.mildBridge then
+        classification, cost = "MILD", 0.5 * prominence
+    elseif prominence <= 0.30 and profileScore >= thresholds.postalCohesion and not highImpact then
+        classification, cost = "MILD", 0.5 * prominence
+    else
+        classification, cost = "STRONG", prominence
     end
-    if profileScore >= thresholds.cohesive and not (loudness >= thresholds.loud and echoSupport < thresholds.echo) then
-        return "COHESIVE", 0, "supports the established outfit profile", bridgeSupport
-    end
-    if profileScore >= thresholds.mild and loudness < thresholds.loud then
-        return "MILD", 1, "weathered mismatch retains a shared visual bridge", bridgeSupport
-    end
-    if loudness >= thresholds.loud and (echoSupport >= thresholds.echo or bridgeSupport >= 0.65) then
-        return "SUPPORTED", 2, "strong accent is echoed or narratively bridged", bridgeSupport
-    end
-    if profileScore >= thresholds.postalCohesion or bridgeSupport >= 0.58 then
-        return "MILD", 1, "imperfect but connected to the profile", bridgeSupport
-    end
-    return "STRONG", 2, "weak profile fit without enough isolation to be a hard outlier", bridgeSupport
+
+    return classification, Round(cost, 2), ClassificationReason(classification, entry, profileScore, components, echoSupport, bridgeSupport, bridgeKey), bridgeSupport, bridgeKey
 end
 
 local function MeanAnchorCohesion(anchors)
     local total, count, hardClashes = 0, 0, 0
     for leftIndex = 1, #anchors do
         for rightIndex = leftIndex + 1, #anchors do
-            local score = T.GetPairCohesion(anchors[leftIndex].descriptor, anchors[rightIndex].descriptor)
+            local left, right = anchors[leftIndex], anchors[rightIndex]
+            local score = T.GetPairCohesion(left.descriptor, right.descriptor)
             total = total + score
             count = count + 1
-            if score < 0.35 and anchors[leftIndex].descriptor.loudness >= 0.70 and anchors[rightIndex].descriptor.loudness >= 0.70 then
+            local leftImpact = (left.descriptor.loudness or 0) * (left.slotProminence or 0.40)
+            local rightImpact = (right.descriptor.loudness or 0) * (right.slotProminence or 0.40)
+            if score < 0.35 and leftImpact >= T.CONFIG.thresholds.loudImpact and rightImpact >= T.CONFIG.thresholds.loudImpact then
                 hardClashes = hardClashes + 1
             end
         end
@@ -229,8 +350,10 @@ local function NormalizeTravelerScore(score)
 end
 
 function T.AnalyzeEntries(entries, context)
+    local selectedAppearanceCount = #(entries or {})
+    local units = BuildAnalysisUnits(entries or {})
     local anchors = {}
-    for _, entry in ipairs(entries or {}) do
+    for _, entry in ipairs(units) do
         local weight = T.ANCHOR_SLOT_WEIGHTS[entry.slotKey]
         if weight then
             entry.profileWeight = weight
@@ -238,8 +361,8 @@ function T.AnalyzeEntries(entries, context)
         end
     end
     if #anchors == 0 then
-        for _, entry in ipairs(entries or {}) do
-            entry.profileWeight = T.SLOT_VISIBILITY_WEIGHTS[entry.slotKey] or 0.50
+        for _, entry in ipairs(units) do
+            entry.profileWeight = entry.slotProminence or 0.50
             table.insert(anchors, entry)
         end
     end
@@ -247,20 +370,23 @@ function T.AnalyzeEntries(entries, context)
     local profile = BuildProfileDescriptor(anchors)
     local meanAnchorCohesion, hardClashes = MeanAnchorCohesion(anchors)
     local travelerTotal, travelerCount = 0, 0
-    local mismatchUsed, postalCount = 0, 0
+    local mismatchUsed, postalCount, supportedVariationCount = 0, 0, 0
 
-    for _, entry in ipairs(entries or {}) do
+    for _, entry in ipairs(units) do
         local score, components = ProfileCohesion(entry.descriptor, profile)
-        local echo = EchoSupport(entry, entries)
-        local classification, points, reason, bridge = ClassifyMismatch(entry, score, components, echo)
+        local echo = EchoSupport(entry, units)
+        local classification, points, reason, bridge, bridgeKey = ClassifyMismatch(entry, score, components, echo)
         entry.profileCohesion = score
         entry.cohesionComponents = components
         entry.echoSupport = echo
         entry.bridgeSupport = bridge
+        entry.bridgeType = bridgeKey
         entry.mismatchClass = classification
         entry.mismatchPoints = points
         entry.mismatchReason = reason
-        if points < 3 then mismatchUsed = mismatchUsed + points else postalCount = postalCount + 1 end
+        if classification == "POSTAL" then postalCount = postalCount + 1
+        else mismatchUsed = mismatchUsed + points end
+        if classification == "SUPPORTED VARIATION" then supportedVariationCount = supportedVariationCount + 1 end
         travelerTotal = travelerTotal + (entry.travelerScore or 0)
         travelerCount = travelerCount + 1
     end
@@ -272,7 +398,9 @@ function T.AnalyzeEntries(entries, context)
     return {
         mode = ZoneStyle.MODE_TRAVELER,
         context = context,
-        entries = entries,
+        entries = units,
+        selectedAppearanceCount = selectedAppearanceCount,
+        analysisBlockCount = #units,
         anchors = anchors,
         profile = profile,
         meanTravelerScore = meanTravelerRaw,
@@ -280,8 +408,9 @@ function T.AnalyzeEntries(entries, context)
         meanAnchorCohesion = meanAnchorCohesion,
         hardClashes = hardClashes,
         mismatchBudget = T.DEFAULT_MISMATCH_BUDGET,
-        mismatchUsed = mismatchUsed,
+        mismatchUsed = Round(mismatchUsed, 2),
         postalCount = postalCount,
+        supportedVariationCount = supportedVariationCount,
         skeletonScore = skeletonScore,
         instrumentationVersion = T.INSTRUMENTATION_VERSION,
         analyzedAt = time and time() or 0,

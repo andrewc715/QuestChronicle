@@ -3,7 +3,7 @@ local ZoneStyle = QC.ZoneStyle
 ZoneStyle.Traveler = ZoneStyle.Traveler or {}
 local T = ZoneStyle.Traveler
 
-T.INSTRUMENTATION_VERSION = 1
+T.INSTRUMENTATION_VERSION = 2
 T.DEFAULT_MISMATCH_BUDGET = 2
 T.CONFIG = {
     pairWeights = {
@@ -23,10 +23,14 @@ T.CONFIG = {
     },
     thresholds = {
         cohesive = 0.70,
-        mild = 0.48,
+        supportedCohesion = 0.65,
+        mild = 0.45,
         postalCohesion = 0.40,
-        loud = 0.70,
+        loudImpact = 0.55,
         echo = 0.65,
+        mildBridge = 0.58,
+        strongBridge = 0.65,
+        postalBridge = 0.55,
         severe = 0.72,
     },
 }

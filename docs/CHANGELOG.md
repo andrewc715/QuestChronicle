@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.9.0a1 - 2026-08-02
+
+- Calibrated Traveler cohesion diagnostics without changing generation behavior.
+- Collapsed matching linked Main Hand and Off Hand appearances into one Weapon Pair analysis block.
+- Split intrinsic loudness from slot-weighted visual impact.
+- Added zero-cost Supported Variation for sufficiently cohesive or strongly echoed pieces.
+- Replaced integer mismatch charges with fractional slot-prominence costs.
+- Replaced generic mismatch prose with the strongest bridge, weakest fit, accent echo, and visual-impact evidence.
+- Expanded the instrumentation regression harness for linked weapons, echo support, and slot prominence.
+
 ## 1.9.0a - 2026-08-02
 
 ### Added

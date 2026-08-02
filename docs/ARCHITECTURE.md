@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0a enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0a1 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -138,7 +138,7 @@ python tools/verify_lua_line_limit.py
 
 The command exits nonzero if any Lua file exceeds 500 physical lines.
 
-## Traveler cohesion instrumentation (v1.9.0a)
+## Traveler cohesion instrumentation (v1.9.0a1 calibration)
 
 `Core/ZoneStyle/Traveler/` contains the observation layer for the Traveler Cohesion Rewrite:
 
@@ -147,4 +147,4 @@ The command exits nonzero if any Lua file exceeds 500 physical lines.
 - `Cohesion.lua` computes pair compatibility, anchor profiles, accent echo, mismatch classes, and the diagnostic budget.
 - `Debug.lua` analyzes the current outfit and implements `/qc traveler debug`.
 
-In v1.9.0a this subsystem is read-only. It does not participate in candidate selection or mutate the wardrobe preview.
+In v1.9.0a1 this subsystem remains read-only. It does not participate in candidate selection or mutate the wardrobe preview.
