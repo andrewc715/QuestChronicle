@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.0a2 - 2026-08-02
+
+- Removed the duplicate full-cache metadata hydration pass from `PLAYER_ENTERING_WORLD`.
+- Reused metadata watches built during the automatic collection scan instead of rebuilding and rehydrating them afterward.
+- Deferred sibling-item requests until era evidence needs them.
+- Added cooperative collection scanning with bounded appearance and time budgets per timer frame.
+- Preserved v1.9.0a1 Traveler cohesion diagnostics and unchanged Traveler generation.
+
 ## 1.9.0a1 - 2026-08-02
 
 - Calibrated Traveler cohesion diagnostics without changing generation behavior.

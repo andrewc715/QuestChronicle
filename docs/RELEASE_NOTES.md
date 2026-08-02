@@ -1,60 +1,59 @@
-# Quest Chronicle v1.9.0a1 — Traveler Cohesion Calibration
+# Quest Chronicle v1.9.0a2 — Cooperative Wardrobe Refresh
 
-v1.9.0a1 calibrates Phase A of the Traveler Cohesion Rewrite. It changes only the read-only diagnostics. Traveler candidate selection, random generation, rerolls, and outfit commitment remain unchanged from the validated v1.8.5 generation path.
+v1.9.0a2 preserves the calibrated Traveler Cohesion instrumentation from v1.9.0a1 and repairs a severe login and `/reload` performance regression in the wardrobe refresh pipeline. Traveler generation and all cohesion results remain unchanged.
 
-## Calibrated mismatch accounting
+## Root cause
 
-The analyzer now distinguishes intrinsic loudness from outfit impact:
+The automatic login refresh was performing the same metadata work up to three times:
 
-```text
-visual impact = intrinsic loudness × slot prominence
-```
+1. hydrating and indexing the previous 5,000+ appearance cache immediately on `PLAYER_ENTERING_WORLD`;
+2. hydrating each source again while rebuilding the collection cache;
+3. clearing the completed index and hydrating every new source again after the scan.
 
-A vivid belt or wrist piece can therefore be visually noticeable without carrying the same outfit-level weight as a chest, shoulder, head, or weapon appearance.
+The era-evidence rebuild also requested metadata for every sibling item source during the scan, producing a large burst of item API work. A large equipment slot was still processed as one uninterrupted Lua loop.
 
-Mismatch costs are now fractional:
+## Corrected pipeline
 
-- Cohesive: `0.00`
-- Supported Variation: `0.00`
-- Mild: `0.50 × slot prominence`
-- Supported strong mismatch: `1.00 × slot prominence`
-- Strong mismatch: `1.00 × slot prominence`
-- Postal-code outlier: reported separately rather than charged to the budget
-
-A piece with at least 65% profile cohesion, or at least 65% accent echo, is normally treated as Supported Variation at zero cost unless it remains a high-impact clash.
-
-## Linked weapon analysis
-
-Matching linked Main Hand and Off Hand selections are now analyzed as one Weapon Pair block. The two physical selections remain visible in Current Preview, but the diagnostics no longer charge the same visual twice or double-weight it in the anchor profile.
-
-## Evidence-based explanations
-
-The debug output now names the actual evidence behind each classification:
-
-- strongest visual bridge
-- weakest compatibility component
-- dominant accent
-- accent echo support
-- raw loudness
-- slot-weighted visual impact
-
-Generic explanations such as “weathered mismatch” are no longer emitted when the descriptor evidence does not support that claim.
-
-## Command
-
-Run after generating a Traveler outfit:
+The login path now performs one metadata lifecycle:
 
 ```text
-/qc traveler debug
+Begin scan
+→ clear metadata watches once
+→ discover and hydrate each representative source once
+→ preserve broad sibling-source manifests without requesting every sibling immediately
+→ finalize sorting without a second hydration pass
 ```
 
-The report now includes both selected appearance count and analysis-block count, fractional mismatch budget use, Supported Variation count, and per-block raw loudness versus effective visual impact.
+If the login scan is deferred or fails, Quest Chronicle restores the lightweight item-to-source watch index without calling item-information APIs.
+
+## Cooperative slot scanning
+
+Large slots now yield throughout the scan:
+
+```text
+maximum appearances per step: 18
+maximum addon work per step: approximately 3 ms
+```
+
+The next batch resumes on a later timer frame. This changes scheduling only; source validation, diagnostics, visual deduplication, era manifests, and final cache contents use the same rules.
+
+## Traveler instrumentation
+
+The v1.9.0a1 calibration is retained unchanged:
+
+- linked matching weapons count as one analysis block;
+- slot prominence scales visual impact;
+- strongly echoed variations cost zero mismatch budget;
+- mismatch costs are fractional;
+- `/qc traveler debug` reports evidence-based bridges and clashes.
+
+Traveler generation remains instrumentation-only and is still byte-for-byte unchanged from the validated v1.8.5 generation path.
 
 ## Compatibility
 
-- Addon version: `1.9.0a1`
+- Addon version: `1.9.0a2`
 - SavedVariables schema: `2`
 - Courier format: `1`
 - Wardrobe cache format: `7`
-- No wardrobe rescan or migration required
-- Every runtime Lua file remains under 500 lines
+- No wardrobe rescan or migration is required beyond the normal automatic login refresh
+- Every runtime Lua file remains below 500 lines

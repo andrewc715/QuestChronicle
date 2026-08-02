@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0a1 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0a2 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -138,7 +138,7 @@ python tools/verify_lua_line_limit.py
 
 The command exits nonzero if any Lua file exceeds 500 physical lines.
 
-## Traveler cohesion instrumentation (v1.9.0a1 calibration)
+## Traveler cohesion instrumentation (v1.9.0a2 calibration)
 
 `Core/ZoneStyle/Traveler/` contains the observation layer for the Traveler Cohesion Rewrite:
 
@@ -147,4 +147,11 @@ The command exits nonzero if any Lua file exceeds 500 physical lines.
 - `Cohesion.lua` computes pair compatibility, anchor profiles, accent echo, mismatch classes, and the diagnostic budget.
 - `Debug.lua` analyzes the current outfit and implements `/qc traveler debug`.
 
-In v1.9.0a1 this subsystem remains read-only. It does not participate in candidate selection or mutate the wardrobe preview.
+In v1.9.0a2 this subsystem remains read-only. It does not participate in candidate selection or mutate the wardrobe preview.
+
+
+## Cooperative wardrobe refresh (v1.9.0a2)
+
+The login collection refresh is divided into bounded appearance batches. A slot scan yields after 18 appearances or approximately 3 milliseconds of addon work, whichever comes first. Metadata watch tables are rebuilt during the scan rather than through a full pre-scan hydration pass, and sibling item metadata is requested lazily when era evidence is actually needed.
+
+This preserves the single automatic login refresh while preventing the scan from monopolizing one frame.

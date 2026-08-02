@@ -26,11 +26,10 @@ P.eventFrame:SetScript("OnEvent", function(_, event, ...)
             P.ResetCache(cache, "STALE")
             cache.dirtyReason = "CHARACTER_CHANGED"
         end
-        if C_Timer and C_Timer.After then
-            C_Timer.After(0, function() P.RebuildAppearanceMetadataIndex(cache, false, true) end)
-        else
-            P.RebuildAppearanceMetadataIndex(cache, false, true)
-        end
+        -- The automatic login scan rebuilds the metadata watch index while it
+        -- discovers the new cache. Performing a full hydration pass over the
+        -- old cache here caused thousands of item API calls immediately before
+        -- the scan repeated the same work.
         P.ScheduleLoginRefresh()
     elseif event == "GET_ITEM_INFO_RECEIVED" or event == "ITEM_DATA_LOAD_RESULT" then
         local itemID, success = ...

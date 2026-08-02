@@ -7,6 +7,7 @@ P.eraItemRequests = P.eraItemRequests or {}
 P.itemMetadataWatch = P.itemMetadataWatch or {}
 P.pendingItemMetadata = P.pendingItemMetadata or {}
 P.itemMetadataBatchScheduled = false
+P.metadataRefreshActive = false
 
 local function AddUnique(list, seen, value)
     value = tonumber(value)
@@ -87,11 +88,13 @@ function P.EnsureEraSourceManifest(source, invalidate)
     if invalidate ~= false then P.InvalidateSourceEraEvidence(source) end
 end
 
-function P.AttachEraSourceManifest(source)
+function P.AttachEraSourceManifest(source, requestItems)
     if not source then return end
     source.eraManifestVersion = nil
     P.EnsureEraSourceManifest(source, true)
-    P.RequestEraManifestItems(source.eraItemIDs)
+    if requestItems ~= false then
+        P.RequestEraManifestItems(source.eraItemIDs)
+    end
 end
 
 local function SetIfChanged(source, key, value)
@@ -154,7 +157,7 @@ local function WatchItem(itemID, source)
     watchers[source] = true
 end
 
-function P.TrackAppearanceMetadata(source)
+function P.TrackAppearanceMetadata(source, requestManifestItems)
     if not source then return false end
     P.EnsureEraSourceManifest(source, true)
     if source.itemID then WatchItem(source.itemID, source) end
@@ -163,12 +166,38 @@ function P.TrackAppearanceMetadata(source)
     end
 
     local loaded, changed = P.HydrateSourceItemMetadata(source)
-    for _, itemID in ipairs(source.eraItemIDs or {}) do
-        if not loaded or tonumber(itemID) ~= tonumber(source.itemID) then
-            P.RequestAppearanceItemData(itemID)
+    if requestManifestItems ~= false then
+        for _, itemID in ipairs(source.eraItemIDs or {}) do
+            if not loaded or tonumber(itemID) ~= tonumber(source.itemID) then
+                P.RequestAppearanceItemData(itemID)
+            end
         end
     end
     return changed == true
+end
+
+function P.BeginAppearanceMetadataRefresh()
+    -- A collection scan reconstructs the watch index as it discovers sources.
+    -- Clear it once here instead of rebuilding and hydrating the entire old
+    -- cache before the scan, then doing the same work again afterward.
+    P.itemMetadataWatch = {}
+    P.eraItemRequests = {}
+    P.pendingItemMetadata = {}
+    P.itemMetadataBatchScheduled = false
+    P.metadataRefreshActive = true
+end
+
+function P.RestoreAppearanceMetadataWatchIndex(cache)
+    P.itemMetadataWatch = {}
+    for _, sources in pairs(cache and cache.bySlot or {}) do
+        for _, source in ipairs(sources or {}) do
+            if source.itemID then WatchItem(source.itemID, source) end
+            for _, itemID in ipairs(source.eraItemIDs or {}) do
+                WatchItem(itemID, source)
+            end
+        end
+    end
+    P.metadataRefreshActive = false
 end
 
 local function SortSlotSources(sources)
@@ -180,14 +209,14 @@ local function SortSlotSources(sources)
     end)
 end
 
-function P.RebuildAppearanceMetadataIndex(cache, sortSources, notify)
+function P.RebuildAppearanceMetadataIndex(cache, sortSources, notify, requestManifestItems)
     P.itemMetadataWatch = {}
     P.eraItemRequests = {}
     local changedSourceIDs = {}
     local changedCount = 0
     for _, sources in pairs(cache and cache.bySlot or {}) do
         for _, source in ipairs(sources or {}) do
-            if P.TrackAppearanceMetadata(source) then
+            if P.TrackAppearanceMetadata(source, requestManifestItems == true) then
                 changedSourceIDs[source.sourceID] = true
                 changedCount = changedCount + 1
             end
@@ -201,11 +230,22 @@ function P.RebuildAppearanceMetadataIndex(cache, sortSources, notify)
             changedCount = changedCount,
         })
     end
+    P.metadataRefreshActive = false
     return changedCount
+end
+
+function P.FinalizeAppearanceMetadataRefresh(cache, sortSources)
+    if sortSources then
+        for _, sources in pairs(cache and cache.bySlot or {}) do
+            SortSlotSources(sources)
+        end
+    end
+    P.metadataRefreshActive = false
 end
 
 local function ProcessItemMetadataBatch()
     P.itemMetadataBatchScheduled = false
+P.metadataRefreshActive = false
     local pending = P.pendingItemMetadata
     P.pendingItemMetadata = {}
     local changedSourceIDs, changedItemIDs = {}, {}
@@ -258,5 +298,5 @@ function Wardrobe.QueueItemMetadataUpdate(itemID, success, eventName)
 end
 
 function Wardrobe.RebuildAppearanceMetadataIndex(sortSources, notify)
-    return P.RebuildAppearanceMetadataIndex(P.EnsureCache(), sortSources == true, notify == true)
+    return P.RebuildAppearanceMetadataIndex(P.EnsureCache(), sortSources == true, notify == true, false)
 end

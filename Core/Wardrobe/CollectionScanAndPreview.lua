@@ -1,101 +1,6 @@
 local QC = QuestChronicle
 local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
-function P.ScanSlot(definition)
-    local visuals = {}
-    local diagnostics = {
-        expectedCollected = 0,
-        returnedAppearances = 0,
-        collectedAppearances = 0,
-        returnedSources = 0,
-        compatibleVisuals = 0,
-        excludedVisuals = 0,
-        categories = {},
-    }
-
-    local transmogLocation = P.GetTransmogLocation(definition)
-    if not transmogLocation then
-        error("WoW did not provide a transmog location for " .. tostring(definition.slotName))
-    end
-
-    for _, categoryID in ipairs(P.ResolveCategoryIDs(definition)) do
-        -- Use the unfiltered collection count as the diagnostic baseline. The
-        -- filtered count can temporarily be zero while WoW rebuilds a search.
-        local expected = tonumber(P.SafeCall(C_TransmogCollection.GetCategoryCollectedCount, categoryID)) or 0
-        local appearances, retrievalMode = P.GetCategoryAppearancesRobust(categoryID, transmogLocation)
-        local categoryDiagnostic = {
-            categoryID = categoryID,
-            expectedCollected = expected,
-            returnedAppearances = #appearances,
-            collectedAppearances = 0,
-            returnedSources = 0,
-            compatibleVisuals = 0,
-            retrievalMode = retrievalMode,
-        }
-        diagnostics.expectedCollected = diagnostics.expectedCollected + expected
-        diagnostics.returnedAppearances = diagnostics.returnedAppearances + #appearances
-
-        for _, appearance in ipairs(appearances) do
-            if appearance.isCollected == true and appearance.isHideVisual ~= true then
-                categoryDiagnostic.collectedAppearances = categoryDiagnostic.collectedAppearances + 1
-                diagnostics.collectedAppearances = diagnostics.collectedAppearances + 1
-
-                local acceptedForAppearance = false
-                local bestSource
-                local sources = P.GetKnownSources(appearance, categoryID, transmogLocation)
-                categoryDiagnostic.returnedSources = categoryDiagnostic.returnedSources + #sources
-                diagnostics.returnedSources = diagnostics.returnedSources + #sources
-
-                for _, source in ipairs(sources) do
-                    local normalized = P.NormalizeSource(source, appearance, definition.key, categoryID)
-                    if normalized then
-                        local valid = Wardrobe.ValidateSource(normalized, definition.key)
-                        if valid then
-                            acceptedForAppearance = true
-                            if P.BetterSource(normalized, bestSource) then
-                                bestSource = normalized
-                            end
-                        end
-                    end
-                end
-
-                if acceptedForAppearance and bestSource then
-                    P.AttachEraSourceManifest(bestSource)
-                    P.TrackAppearanceMetadata(bestSource)
-                    -- One entry per Blizzard appearance row. Resolving a source
-                    -- chooses how to preview that row; it does not define or
-                    -- deduplicate the catalog itself.
-                    local visualKey = appearance.visualID
-                    if visualKey and P.BetterSource(bestSource, visuals[visualKey]) then
-                        visuals[visualKey] = bestSource
-                    end
-                    categoryDiagnostic.compatibleVisuals = categoryDiagnostic.compatibleVisuals + 1
-                else
-                    diagnostics.excludedVisuals = diagnostics.excludedVisuals + 1
-                end
-            end
-        end
-
-        table.insert(diagnostics.categories, categoryDiagnostic)
-    end
-
-    local results = {}
-    for _, source in pairs(visuals) do
-        table.insert(results, source)
-    end
-    table.sort(results, function(left, right)
-        local leftName = string.lower(left.name or "")
-        local rightName = string.lower(right.name or "")
-        if leftName == rightName then
-            return (left.sourceID or 0) < (right.sourceID or 0)
-        end
-        return leftName < rightName
-    end)
-
-    diagnostics.compatibleVisuals = #results
-    return results, diagnostics
-end
-
 function Wardrobe.IsScanning()
     return Wardrobe.scanning == true
 end
@@ -110,6 +15,7 @@ function P.ScheduleLoginRefresh()
     if not C_Timer or type(C_Timer.After) ~= "function" then
         cache.loginRefreshPending = false
         cache.loginRefreshDeferredReason = "TIMER_UNAVAILABLE"
+        P.RestoreAppearanceMetadataWatchIndex(cache)
         return
     end
 
@@ -137,6 +43,7 @@ function P.ScheduleLoginRefresh()
 
             cache.loginRefreshPending = false
             cache.loginRefreshDeferredReason = blockedByCombat and "COMBAT" or (blockedByWardrobe and "BLIZZARD_WARDROBE_OPEN" or "SCAN_BUSY")
+            P.RestoreAppearanceMetadataWatchIndex(cache)
             local settings = QC.GetSettings and QC.GetSettings() or {}
             if settings.announceWardrobeUpdates ~= false and QC.Print then
                 QC.Print("Login wardrobe refresh deferred. Use Scan Collection when ready.")
@@ -149,6 +56,7 @@ function P.ScheduleLoginRefresh()
         local started, message = Wardrobe.Scan(true, "AUTO_LOGIN")
         if not started then
             cache.loginRefreshDeferredReason = message or "SCAN_UNAVAILABLE"
+            P.RestoreAppearanceMetadataWatchIndex(cache)
             if QC.Notify then QC.Notify("WARDROBE_LOGIN_REFRESH_DEFERRED", cache.loginRefreshDeferredReason) end
         end
     end
@@ -188,6 +96,7 @@ function Wardrobe.Scan(force, trigger)
 
     P.loginRefreshToken = P.loginRefreshToken + 1
     cache.loginRefreshPending = false
+    P.BeginAppearanceMetadataRefresh()
     P.CaptureRecoveryIdentities()
     Wardrobe.scanning = true
     Wardrobe.scanCollectionState = P.CaptureCollectionState()
@@ -229,7 +138,7 @@ function Wardrobe.Scan(force, trigger)
         cache.dirty = true
         cache.dirtyReason = "SCAN_FAILED"
         if scanStartedPrecise and GetTime then cache.scanDurationMS = math.floor(((GetTime() - scanStartedPrecise) * 1000) + 0.5) end
-        P.RebuildAppearanceMetadataIndex(cache, false, false)
+        P.RestoreAppearanceMetadataWatchIndex(cache)
         if QC.Notify then
             QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
         end
@@ -247,7 +156,7 @@ function Wardrobe.Scan(force, trigger)
             cache.dirty = true
             cache.dirtyReason = "EMPTY_COLLECTION_RESPONSE"
             if scanStartedPrecise and GetTime then cache.scanDurationMS = math.floor(((GetTime() - scanStartedPrecise) * 1000) + 0.5) end
-            P.RebuildAppearanceMetadataIndex(cache, false, false)
+            P.RestoreAppearanceMetadataWatchIndex(cache)
             if QC.Notify then
                 QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
             end
@@ -282,13 +191,22 @@ function Wardrobe.Scan(force, trigger)
         -- sources are intentionally excluded. Do not flag a healthy non-empty
         -- cache merely because those totals differ.
         cache.scanWarning = nil
-        P.RebuildAppearanceMetadataIndex(cache, true, false)
+        P.FinalizeAppearanceMetadataRefresh(cache, true)
 
         if QC.Notify then
             QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
         end
     end
 
+    local function ScheduleScanStep(delay, callback)
+        if C_Timer and type(C_Timer.After) == "function" then
+            C_Timer.After(delay or 0, callback)
+        else
+            callback()
+        end
+    end
+
+    local slotWorker
     local function ScanCurrentSlot(retryCount)
         local definition = Wardrobe.slotDefinitions[index]
         if not definition then
@@ -296,25 +214,48 @@ function Wardrobe.Scan(force, trigger)
             return
         end
 
-        local ok, sources, diagnostics = pcall(P.ScanSlot, definition)
-        if ok and diagnostics and diagnostics.expectedCollected > 0 and diagnostics.returnedAppearances == 0 and (retryCount or 0) < 2 then
-            if C_Timer and C_Timer.After then
-                C_Timer.After(0.25, function() ScanCurrentSlot((retryCount or 0) + 1) end)
+        if not slotWorker then
+            local ok, workerOrError = pcall(P.CreateSlotScanWorker, definition)
+            if not ok then
+                pending.bySlot[definition.key] = {}
+                pending.slotDiagnostics[definition.key] = { error = tostring(workerOrError) }
+                pending.scanError = tostring(workerOrError)
+                index = index + 1
+                ScheduleScanStep(0, function() ScanCurrentSlot(0) end)
                 return
             end
+            slotWorker = workerOrError
         end
 
-        if ok then
-            pending.bySlot[definition.key] = sources or {}
-            pending.slotDiagnostics[definition.key] = diagnostics or {}
-            pending.totalSources = pending.totalSources + ((diagnostics and diagnostics.returnedSources) or 0)
-            pending.totalVisuals = pending.totalVisuals + #(sources or {})
-            pending.expectedCollectedVisuals = pending.expectedCollectedVisuals + ((diagnostics and diagnostics.expectedCollected) or 0)
-        else
+        local ok, done, sources, diagnostics = pcall(
+            P.StepSlotScanWorker, slotWorker, P.SCAN_APPEARANCE_BATCH, P.SCAN_TIME_BUDGET_SECONDS
+        )
+        if not ok then
             pending.bySlot[definition.key] = {}
-            pending.slotDiagnostics[definition.key] = { error = tostring(sources) }
-            pending.scanError = tostring(sources)
+            pending.slotDiagnostics[definition.key] = { error = tostring(done) }
+            pending.scanError = tostring(done)
+            slotWorker = nil
+            index = index + 1
+            ScheduleScanStep(0, function() ScanCurrentSlot(0) end)
+            return
         end
+
+        if not done then
+            ScheduleScanStep(0, function() ScanCurrentSlot(retryCount or 0) end)
+            return
+        end
+
+        if diagnostics and diagnostics.expectedCollected > 0 and diagnostics.returnedAppearances == 0 and (retryCount or 0) < 2 then
+            slotWorker = nil
+            ScheduleScanStep(0.25, function() ScanCurrentSlot((retryCount or 0) + 1) end)
+            return
+        end
+
+        pending.bySlot[definition.key] = sources or {}
+        pending.slotDiagnostics[definition.key] = diagnostics or {}
+        pending.totalSources = pending.totalSources + ((diagnostics and diagnostics.returnedSources) or 0)
+        pending.totalVisuals = pending.totalVisuals + #(sources or {})
+        pending.expectedCollectedVisuals = pending.expectedCollectedVisuals + ((diagnostics and diagnostics.expectedCollected) or 0)
 
         if QC.Notify then
             QC.Notify(
@@ -327,12 +268,9 @@ function Wardrobe.Scan(force, trigger)
             )
         end
 
+        slotWorker = nil
         index = index + 1
-        if C_Timer and C_Timer.After then
-            C_Timer.After(0, function() ScanCurrentSlot(0) end)
-        else
-            ScanCurrentSlot(0)
-        end
+        ScheduleScanStep(0, function() ScanCurrentSlot(0) end)
     end
 
     local readyStarted = GetTime and GetTime() or 0
