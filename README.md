@@ -1,8 +1,8 @@
-# Quest Chronicle v1.7.2
+# Quest Chronicle v1.8.0
 
-> **Current Preview hand labels:** v1.7.2 preserves the v1.7.1 weapon-route engine while presenting generated weapon pairs as explicit Main Hand and Off Hand rows.
+> **Code normalization:** v1.8.0 preserves the live-validated v1.7.2 behavior while splitting every oversized Lua monolith into focused modules capped at 500 physical lines.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.7.2 keeps the physical weapon-route model and makes Current Preview describe weapon selections by hand rather than by appearance family.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.8.0 is a structure-only maintenance release: no feature, UI, generation-rule, SavedVariables, Courier, or cache behavior is intentionally changed.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -152,32 +152,65 @@ Bare `/qc` toggles the main window. `/qc help` displays command help.
 ```text
 QuestChronicle\
 ├── QuestChronicle.toc
-├── QuestChronicle.lua
 ├── VERSION.txt
 ├── README.md
 ├── Core\
-│   ├── Wardrobe.lua
-│   └── ZoneStyle.lua
+│   ├── Chronicle\
+│   │   ├── Foundation.lua
+│   │   ├── QuestLifecycle.lua
+│   │   ├── Commands.lua
+│   │   └── PublicAPI.lua
+│   ├── Wardrobe\
+│   │   ├── Foundation.lua
+│   │   ├── StateAndPreferences.lua
+│   │   ├── EquipmentTopology.lua
+│   │   ├── AppearanceRoutes.lua
+│   │   ├── WeaponFilters.lua
+│   │   ├── WeaponSelection.lua
+│   │   ├── GenerationAndConcepts.lua
+│   │   ├── CustomSetBuild.lua
+│   │   ├── CustomSetSyncAndManifest.lua
+│   │   ├── CollectionScanAndPreview.lua
+│   │   └── Events.lua
+│   └── ZoneStyle\
+│       ├── Profiles.lua
+│       ├── Context.lua
+│       ├── SourceMetadata.lua
+│       └── Scoring.lua
 ├── UI\
 │   ├── Shared.lua
 │   ├── ChronicleTab.lua
 │   ├── ActiveQuestsTab.lua
 │   ├── NoteTab.lua
 │   ├── StatusTab.lua
-│   ├── OutfitsTab.lua
+│   ├── Outfits\
+│   │   ├── OutfitsHelpers.lua
+│   │   ├── Layout.lua
+│   │   ├── ConceptManager.lua
+│   │   ├── AppearanceBrowser.lua
+│   │   ├── RefreshAndEvents.lua
+│   │   └── OutfitsTab.lua
 │   ├── Settings.lua
-│   └── MainWindow.lua
+│   ├── MainWindow.lua
+│   └── MinimapButton.lua
 ├── docs\
+│   ├── ARCHITECTURE.md
 │   ├── CHANGELOG.md
 │   ├── RELEASE_NOTES.md
 │   └── testing\
-│       ├── QUEST_CHRONICLE_V100_TEST_CHECKLIST.md
-│       └── ... 21 historical and subsystem checklists
+├── tools\
+│   └── verify_lua_line_limit.py
 └── config\
     └── COURIER_CONFIG_PATCH.json
 ```
 
-The lifecycle recorder remains in `QuestChronicle.lua`. UI modules use the public addon API and callback bus rather than reaching into the recorder's local tracking state.
+The TOC is the dependency manifest. Public subsystem APIs remain on `QuestChronicle`, `QuestChronicle.Wardrobe`, `QuestChronicle.ZoneStyle`, and `QuestChronicle.UI`; module-private helpers are documented in `docs/ARCHITECTURE.md`.
+
+The project enforces a maximum of 500 physical lines per runtime Lua file:
+
+```text
+python tools/verify_lua_line_limit.py
+```
 
 ## Zone Style Engine
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.8.0 - 2026-08-01
+
+### Normalized
+
+- Split every oversized runtime Lua file into focused modules.
+- Enforced a hard maximum of 500 physical lines per Lua file.
+- Replaced the 4,626-line Wardrobe monolith with eleven ordered modules.
+- Split the Chronicle recorder, Zone Style engine, and Outfits constructor into cohesive subsystems.
+- Preserved all public addon, Wardrobe, ZoneStyle, and UI APIs.
+- Added architecture documentation and an automated line-limit verifier.
+- Made no intentional runtime behavior, UI, generation-rule, SavedVariables, Courier, or cache changes.
+
+### Compatibility
+
+- Preserves SavedVariables schema 2, Courier format 1, and wardrobe cache format 6.
+- No wardrobe rescan, concept migration, or Custom Set rebuild is required.
+
 ## 1.7.2 - 2026-08-01
 
 ### Polished
