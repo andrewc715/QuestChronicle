@@ -2,6 +2,9 @@
 
 ## 1.9.0a7 - 2026-08-02
 
+- Corrected the runtime Status version to read authoritative TOC metadata instead of retaining the stale `1.9.0a5` internal constant.
+- Added a version-consistency verifier so TOC, `VERSION.txt`, and the runtime fallback cannot silently diverge.
+
 ### Performance
 
 - Cached resolved, unknown, and temporarily pending visual-era results with metadata and manifest invalidation.

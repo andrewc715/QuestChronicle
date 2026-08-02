@@ -1,5 +1,11 @@
 # Quest Chronicle v1.9.0a7 - Cache and Pipeline Repair
 
+## Corrected package metadata
+
+- The runtime version displayed by Status now reads the authoritative TOC metadata.
+- Corrected a stale internal fallback that displayed `1.9.0a5` even while the `1.9.0a7` modules were loaded.
+- Added an automated version-consistency guard covering the TOC, `VERSION.txt`, and runtime fallback.
+
 v1.9.0a7 addresses the bottlenecks identified by v1.9.0a6's live phase telemetry. The scheduler itself was yielding correctly, but generation repeatedly recomputed fail-closed era evidence, routed weapons in one synchronous operation, and rebuilt the complete Outfits workbench after committing the result.
 
 ## Era and eligibility caching
