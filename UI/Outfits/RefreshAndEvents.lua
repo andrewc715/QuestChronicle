@@ -5,8 +5,23 @@ local ZoneStyle = QC.ZoneStyle
 UI._Outfits = UI._Outfits or {}
 local P = UI._Outfits
 
+local function NowMilliseconds()
+    if type(debugprofilestop) == "function" then return debugprofilestop() end
+    if type(GetTimePreciseSec) == "function" then return GetTimePreciseSec() * 1000 end
+    if type(GetTime) == "function" then return GetTime() * 1000 end
+    return 0
+end
+
 P.builders = P.builders or {}
 P.builders[#P.builders + 1] = function(C)
+    local function UpdateGenerationPerformance(performance)
+        C.pane.generationPerformance = performance
+        C.pane.generationPerformanceText = performance and Wardrobe.FormatGenerationPerformance
+            and Wardrobe.FormatGenerationPerformance(performance)
+            or ""
+        if C.performanceText then C.performanceText:SetText(C.pane.generationPerformanceText or "") end
+    end
+
     function C.pane:RefreshSourceRow(row, source, slotKey, selected, styleMode, styleContext)
         row.source = source
         row:SetShown(source ~= nil)
@@ -201,6 +216,7 @@ P.builders[#P.builders + 1] = function(C)
 
         local diagnostics = Wardrobe.GetSlotDiagnostics(slotKey)
         C.statusText:SetText(message or P.CacheSummary(cache, diagnostics, #sources))
+        C.performanceText:SetText(self.generationPerformanceText or "")
 
         local canGenerate = not Wardrobe.IsScanning() and not generating and cache.totalVisuals > 0
         C.generateButton:SetEnabled(canGenerate)
@@ -229,6 +245,9 @@ P.builders[#P.builders + 1] = function(C)
     end
 
     QC.RegisterCallback("WARDROBE_GENERATION_STARTED", C.pane, function(reroll)
+        C.pane.generationPerformance = nil
+        C.pane.generationPerformanceText = nil
+        if C.performanceText then C.performanceText:SetText("") end
         if not C.pane:IsShown() then return end
         C.generateButton:SetEnabled(false)
         C.rerollUnlocked:SetEnabled(false)
@@ -243,24 +262,27 @@ P.builders[#P.builders + 1] = function(C)
         C.statusText:SetText(string.format("Preparing outfit %d of %d: %s", index or 0, total or 0, definition and definition.label or tostring(slotKey or "appearance")))
     end)
     QC.RegisterCallback("WARDROBE_GENERATION_COMPLETE", C.pane, function(success, message, performance)
-        if performance then
-            message = string.format(
-                "%s Prepared across %d frame%s; longest Quest Chronicle step %.1f ms.",
-                tostring(message or (success and "Outfit generated." or "Outfit generation failed.")),
-                tonumber(performance.steps) or 0,
-                tonumber(performance.steps) == 1 and "" or "s",
-                tonumber(performance.maxStepMs) or 0
-            )
-        end
+        UpdateGenerationPerformance(performance)
         if not C.pane:IsShown() then return end
         C.generateButton:SetText("Generate Outfit")
         C.rerollUnlocked:SetText("Reroll Unlocked")
         if success then
             local function RefreshAfterPreview()
-                if C.pane:IsShown() then C.pane:Refresh(message) end
+                if not C.pane:IsShown() then return end
+                local refreshStarted = NowMilliseconds()
+                C.pane:Refresh(message)
+                if Wardrobe.RecordGenerationPostPhase then
+                    Wardrobe.RecordGenerationPostPhase(performance, "uiRefresh", NowMilliseconds() - refreshStarted)
+                end
+                UpdateGenerationPerformance(performance)
             end
             local function ApplyThenRefresh()
+                local previewStarted = NowMilliseconds()
                 Wardrobe.ApplyPreview(C.model)
+                if Wardrobe.RecordGenerationPostPhase then
+                    Wardrobe.RecordGenerationPostPhase(performance, "previewApply", NowMilliseconds() - previewStarted)
+                end
+                UpdateGenerationPerformance(performance)
                 if C_Timer and type(C_Timer.After) == "function" then
                     C_Timer.After(0, RefreshAfterPreview)
                 else
@@ -273,7 +295,12 @@ P.builders[#P.builders + 1] = function(C)
                 ApplyThenRefresh()
             end
         else
+            local refreshStarted = NowMilliseconds()
             C.pane:Refresh(message)
+            if Wardrobe.RecordGenerationPostPhase then
+                Wardrobe.RecordGenerationPostPhase(performance, "uiRefresh", NowMilliseconds() - refreshStarted)
+            end
+            UpdateGenerationPerformance(performance)
         end
     end)
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.9.0a6 - 2026-08-02
+
+### Performance
+
+- Replaced the fixed 30-candidate generation throttle with a time-first 2.5 ms scheduler and a high emergency operation ceiling.
+- Split uncached appearance-era resolution into resumable visual-sibling steps.
+- Skips era work for candidates rejected by zone preferences, promotional rules, or progression restrictions.
+- Cached unchanged normalized source metadata and reused precomputed coherence during weighting.
+- Added phase-level measurements for armor preparation, era evidence, weapon routing, state commit, preview application, and final UI refresh.
+- Added a hoverable generation-performance breakdown while preserving the independent result and timing lines.
+- Preserved weighted selection order, atomic commits, Traveler instrumentation-only behavior, schema 2, Courier format 1, and wardrobe cache format 7.
+
+## 1.9.0a5 - 2026-08-02
+
+### Fixed
+
+- Separated the generated-outfit summary from cooperative-generation performance measurements in the Outfits UI.
+- Added a persistent performance line that survives preview application and the final full workbench refresh.
+- Clears the previous measurement only when a new Generate Outfit or Reroll Unlocked operation begins.
+- Preserved v1.9.0a4 cooperative generation, Traveler instrumentation, wardrobe scanning, and all generation rules unchanged.
+
 ## 1.9.0a4 - 2026-08-02
 
 ### Performance

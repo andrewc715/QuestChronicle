@@ -2,23 +2,24 @@ local QC = QuestChronicle
 local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
 
-P.GENERATION_CANDIDATE_BATCH = 30
+-- Time is the primary governor. The operation ceiling is only a runaway guard,
+-- replacing the old 30-candidate throttle that forced warm outfits across 204
+-- frames even when cached candidate work was inexpensive.
 P.GENERATION_TIME_BUDGET_MS = 2.5
+P.GENERATION_OPERATION_SAFETY_CAP = 2000
+P.GENERATION_ERA_CANDIDATES_PER_OPERATION = 1
 P.generationToken = P.generationToken or 0
 P.generationJob = nil
 P.lastGenerationPerformance = nil
 
 local function NowMilliseconds()
-    if type(debugprofilestop) == "function" then
-        return debugprofilestop()
+    return P.GenerationNowMilliseconds and P.GenerationNowMilliseconds() or 0
+end
+
+local function RecordPhase(job, phaseKey, startedAt)
+    if P.RecordGenerationPhase then
+        P.RecordGenerationPhase(job, phaseKey, NowMilliseconds() - startedAt)
     end
-    if type(GetTimePreciseSec) == "function" then
-        return GetTimePreciseSec() * 1000
-    end
-    if type(GetTime) == "function" then
-        return GetTime() * 1000
-    end
-    return 0
 end
 
 local function CopyDraftState(state)
@@ -78,18 +79,23 @@ end
 local function FinishJob(job, success, message)
     if not job or P.generationJob ~= job then return end
     local finishedAt = NowMilliseconds()
-    local performance = {
-        elapsedMs = math.max(0, finishedAt - job.startedAtMs),
-        steps = job.steps or 0,
-        maxStepMs = math.max(job.maxStepMs or 0, job.weaponMs or 0, job.commitMs or 0),
-        weaponMs = job.weaponMs or 0,
-        commitMs = job.commitMs or 0,
-        candidates = job.candidatesProcessed or 0,
-        selectedArmor = job.selectedArmor or 0,
-    }
+    local performance = P.BuildGenerationPerformance
+        and P.BuildGenerationPerformance(job, finishedAt)
+        or {
+            elapsedMs = math.max(0, finishedAt - job.startedAtMs),
+            steps = job.steps or 0,
+            maxStepMs = job.maxStepMs or 0,
+            candidates = job.candidatesProcessed or 0,
+            selectedArmor = job.selectedArmor or 0,
+        }
     P.lastGenerationPerformance = performance
     P.generationJob = nil
+    local notifyStarted = NowMilliseconds()
     Notify("WARDROBE_GENERATION_COMPLETE", success == true, message, performance)
+    if Wardrobe.RecordGenerationPostPhase then
+        Wardrobe.RecordGenerationPostPhase(performance, "completionNotify", NowMilliseconds() - notifyStarted)
+    end
+    return performance
 end
 
 local function BuildGenerationMessage(job, generatedName, weaponCount, weaponNotice)
@@ -123,8 +129,7 @@ end
 
 local function CommitDraft(job, weaponCount, weaponNotice)
     if GenerationStateSignature(job.liveState) ~= job.startSignature then
-        FinishJob(job, false, "Outfit generation was cancelled because the workbench changed while Quest Chronicle was preparing the outfit.")
-        return
+        return FinishJob(job, false, "Outfit generation was cancelled because the workbench changed while Quest Chronicle was preparing the outfit.")
     end
 
     local commitStarted = NowMilliseconds()
@@ -135,9 +140,8 @@ local function CommitDraft(job, weaponCount, weaponNotice)
     job.liveState.generatedName = generatedName
     job.liveState.styleMode = job.styleMode
     job.liveState.selectedConceptID = nil
-    job.commitMs = NowMilliseconds() - commitStarted
-    job.maxStepMs = math.max(job.maxStepMs or 0, job.commitMs)
-    FinishJob(job, true, BuildGenerationMessage(job, generatedName, weaponCount, weaponNotice))
+    RecordPhase(job, "stateCommit", commitStarted)
+    return FinishJob(job, true, BuildGenerationMessage(job, generatedName, weaponCount, weaponNotice))
 end
 
 local function FinalizeArmorSlot(job, work)
@@ -153,12 +157,10 @@ local function FinalizeArmorSlot(job, work)
             end
             chosen = chosen or work.pool[#work.pool].source
         end
+    elseif #work.pool == 0 then
+        chosen = work.fallback
     else
-        if #work.pool == 0 then
-            chosen = work.fallback
-        else
-            chosen = work.pool[math.random(1, #work.pool)]
-        end
+        chosen = work.pool[math.random(1, #work.pool)]
     end
 
     if chosen then
@@ -184,18 +186,23 @@ local function BeginArmorSlot(job, slotKey)
         pool = {},
         totalWeight = 0,
         fallback = nil,
+        candidateWork = nil,
     }
 end
 
-local function EvaluateArmorCandidate(job, work, source)
-    local valid = Wardrobe.ValidateSource(source, work.slotKey)
-    if not valid then return end
-
+local function AddCandidateToPool(job, work, source, coherenceScore, coherent, coherenceReason)
     if job.styleEngine and job.styleEngine.ChooseWeightedSource then
-        local eligible = job.styleEngine.GetSourceEligibility(source, job.styleMode, job.styleContext)
-        local _, coherent = job.styleEngine.GetSourceCoherence(source, job.styleContext)
-        if not eligible or not coherent then return end
-        local weight, score = job.styleEngine.WeightForSource(source, work.definition, job.styleMode, job.styleContext)
+        local scoringStarted = NowMilliseconds()
+        local weight, score = job.styleEngine.WeightForSource(
+            source,
+            work.definition,
+            job.styleMode,
+            job.styleContext,
+            coherenceScore,
+            coherent,
+            coherenceReason
+        )
+        RecordPhase(job, "scoring", scoringStarted)
         local entry = { source = source, weight = weight, score = score }
         if source.sourceID == work.excludeSourceID then
             work.fallback = entry
@@ -210,33 +217,109 @@ local function EvaluateArmorCandidate(job, work, source)
     end
 end
 
+local function ContinueArmorCandidate(job, work)
+    local candidate = work.candidateWork
+    if not candidate then
+        local source = work.sources[work.sourceIndex]
+        candidate = { source = source }
+        work.candidateWork = candidate
+
+        local validationStarted = NowMilliseconds()
+        candidate.valid = Wardrobe.ValidateSource(source, work.slotKey) == true
+        RecordPhase(job, "validation", validationStarted)
+        if not candidate.valid then return true end
+
+        if not job.styleEngine or not job.styleEngine.ChooseWeightedSource then
+            AddCandidateToPool(job, work, source)
+            return true
+        end
+
+        if job.styleEngine.GetSourcePreEraEligibility then
+            local eligibilityStarted = NowMilliseconds()
+            local eligible = job.styleEngine.GetSourcePreEraEligibility(source, job.styleContext)
+            RecordPhase(job, "eligibility", eligibilityStarted)
+            if not eligible then return true end
+            candidate.prechecked = true
+        end
+
+        local eraStarted = NowMilliseconds()
+        if job.styleEngine.CreateSourceEraEvidenceWork then
+            candidate.eraWork = job.styleEngine.CreateSourceEraEvidenceWork(source)
+            if candidate.eraWork.done then candidate.eraEvidence = candidate.eraWork.result end
+        else
+            candidate.eraEvidence = job.styleEngine.GetSourceEraEvidence(source)
+        end
+        RecordPhase(job, "eraEvidence", eraStarted)
+    end
+
+    if candidate.eraWork and not candidate.eraWork.done then
+        local eraStarted = NowMilliseconds()
+        local done, evidence, processed = job.styleEngine.StepSourceEraEvidenceWork(
+            candidate.eraWork,
+            P.GENERATION_ERA_CANDIDATES_PER_OPERATION
+        )
+        job.eraCandidatesProcessed = job.eraCandidatesProcessed + (tonumber(processed) or 0)
+        RecordPhase(job, "eraEvidence", eraStarted)
+        if not done then return false end
+        candidate.eraEvidence = evidence
+    end
+
+    local eligibilityStarted = NowMilliseconds()
+    local eligible = job.styleEngine.GetSourceEligibility(
+        candidate.source,
+        job.styleMode,
+        job.styleContext,
+        candidate.eraEvidence,
+        candidate.prechecked
+    )
+    RecordPhase(job, "eligibility", eligibilityStarted)
+    if not eligible then return true end
+
+    local coherenceStarted = NowMilliseconds()
+    local coherenceScore, coherent, coherenceReason = job.styleEngine.GetSourceCoherence(candidate.source, job.styleContext)
+    RecordPhase(job, "coherence", coherenceStarted)
+    if not coherent then return true end
+
+    AddCandidateToPool(job, work, candidate.source, coherenceScore, coherent, coherenceReason)
+    return true
+end
+
 local function ProcessArmor(job, stepStarted)
+    local operations = 0
     while job.armorIndex <= #P.ARMOR_GENERATION_ORDER do
         if not job.armorWork then
+            local setupStarted = NowMilliseconds()
             local slotKey = P.ARMOR_GENERATION_ORDER[job.armorIndex]
             job.armorWork = BeginArmorSlot(job, slotKey)
+            RecordPhase(job, "slotSetup", setupStarted)
             if not job.armorWork then job.armorIndex = job.armorIndex + 1 end
         end
 
         local work = job.armorWork
         if work then
-            local processed = 0
             while work.sourceIndex <= #work.sources do
-                EvaluateArmorCandidate(job, work, work.sources[work.sourceIndex])
-                work.sourceIndex = work.sourceIndex + 1
-                processed = processed + 1
-                job.candidatesProcessed = job.candidatesProcessed + 1
-                if processed >= P.GENERATION_CANDIDATE_BATCH then break end
-                if NowMilliseconds() - stepStarted >= P.GENERATION_TIME_BUDGET_MS then break end
+                local complete = ContinueArmorCandidate(job, work)
+                operations = operations + 1
+                if complete then
+                    work.candidateWork = nil
+                    work.sourceIndex = work.sourceIndex + 1
+                    job.candidatesProcessed = job.candidatesProcessed + 1
+                end
+                if operations >= P.GENERATION_OPERATION_SAFETY_CAP then return false end
+                if NowMilliseconds() - stepStarted >= P.GENERATION_TIME_BUDGET_MS then return false end
             end
-            if work.sourceIndex > #work.sources then
-                FinalizeArmorSlot(job, work)
-                Notify("WARDROBE_GENERATION_PROGRESS", job.armorIndex, #P.ARMOR_GENERATION_ORDER, work.slotKey)
-                job.armorWork = nil
-                job.armorIndex = job.armorIndex + 1
-            end
+
+            local finalizationStarted = NowMilliseconds()
+            FinalizeArmorSlot(job, work)
+            RecordPhase(job, "slotFinalization", finalizationStarted)
+            local progressStarted = NowMilliseconds()
+            Notify("WARDROBE_GENERATION_PROGRESS", job.armorIndex, #P.ARMOR_GENERATION_ORDER, work.slotKey)
+            RecordPhase(job, "progressUpdate", progressStarted)
+            job.armorWork = nil
+            job.armorIndex = job.armorIndex + 1
         end
 
+        if operations >= P.GENERATION_OPERATION_SAFETY_CAP then return false end
         if NowMilliseconds() - stepStarted >= P.GENERATION_TIME_BUDGET_MS then return false end
     end
     return true
@@ -255,8 +338,7 @@ function P.StepGenerationJob(token)
 
     if job.phase == "ARMOR" then
         if ProcessArmor(job, stepStarted) then job.phase = "WEAPONS" end
-        local stepMs = NowMilliseconds() - stepStarted
-        job.maxStepMs = math.max(job.maxStepMs, stepMs)
+        job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
         if not ScheduleNextStep(token) then
             FinishJob(job, false, "Quest Chronicle could not schedule the cooperative outfit generator. Try /reload.")
         end
@@ -266,8 +348,8 @@ function P.StepGenerationJob(token)
     if job.phase == "WEAPONS" then
         local weaponStarted = NowMilliseconds()
         local ok, countOrMessage, notice = P.GenerateWeapons(job.draft, job.reroll, job.styleMode, job.styleContext)
-        job.weaponMs = NowMilliseconds() - weaponStarted
-        job.maxStepMs = math.max(job.maxStepMs, job.weaponMs)
+        RecordPhase(job, "weaponRouting", weaponStarted)
+        job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
         if not ok then
             FinishJob(job, false, countOrMessage)
             return
@@ -282,8 +364,10 @@ function P.StepGenerationJob(token)
     end
 
     if job.phase == "COMMIT" then
-        CommitDraft(job, job.weaponCount, job.weaponNotice)
-        return
+        local performance = CommitDraft(job, job.weaponCount, job.weaponNotice)
+        if performance then
+            performance.maxStepMs = math.max(tonumber(performance.maxStepMs) or 0, NowMilliseconds() - stepStarted)
+        end
     end
 end
 
@@ -316,12 +400,14 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
         local startedAt = NowMilliseconds()
         local ok, message = Wardrobe.GenerateOutfit(reroll, requestedStyleMode)
         local elapsed = math.max(0, NowMilliseconds() - startedAt)
-        local performance = { elapsedMs = elapsed, steps = 1, maxStepMs = elapsed, weaponMs = 0, commitMs = 0, candidates = 0 }
+        local performance = { elapsedMs = elapsed, steps = 1, maxStepMs = elapsed, candidates = 0, phaseStats = {} }
         P.lastGenerationPerformance = performance
         Notify("WARDROBE_GENERATION_COMPLETE", ok == true, message, performance)
         return ok, message
     end
 
+    local startedAtMs = NowMilliseconds()
+    local setupStarted = startedAtMs
     local liveState = P.EnsurePreviewState()
     local draft = CopyDraftState(liveState)
     local styleEngine = QC.ZoneStyle
@@ -348,10 +434,13 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
         armorWork = nil,
         selectedArmor = 0,
         candidatesProcessed = 0,
+        eraCandidatesProcessed = 0,
         steps = 0,
         maxStepMs = 0,
-        startedAtMs = NowMilliseconds(),
+        phaseStats = {},
+        startedAtMs = startedAtMs,
     }
+    RecordPhase(job, "setup", setupStarted)
     P.generationJob = job
     Notify("WARDROBE_GENERATION_STARTED", job.reroll, styleMode)
     if not ScheduleNextStep(job.token) then

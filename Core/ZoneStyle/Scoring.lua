@@ -147,26 +147,31 @@ function ZoneStyle.GetSourceExpansionID(source)
     return evidence and evidence.expansionID or nil
 end
 
-function ZoneStyle.GetSourceEligibility(source, modeKey, context)
+function ZoneStyle.GetSourcePreEraEligibility(source, context)
     context = context or ZoneStyle.GetCurrentContext()
     local preference = ZoneStyle.GetSourcePreference(source, context)
     if preference == "excluded" then
         return false, "excluded", "Excluded from generated outfits in this zone. Manual preview remains available."
     end
     local promotionReason = P.GetPromotionReason(source) or P.GetPromotionalSetReason(source)
-    if promotionReason then
-        return false, "promotional", promotionReason
-    end
+    if promotionReason then return false, "promotional", promotionReason end
     local progressionReason = P.GetProgressionRestrictionReason(source)
-    if progressionReason then
-        return false, "heritage", progressionReason
+    if progressionReason then return false, "heritage", progressionReason end
+    return true
+end
+
+function ZoneStyle.GetSourceEligibility(source, modeKey, context, resolvedEraEvidence, prechecked)
+    context = context or ZoneStyle.GetCurrentContext()
+    if not prechecked then
+        local eligible, kind, reason = ZoneStyle.GetSourcePreEraEligibility(source, context)
+        if not eligible then return false, kind, reason end
     end
     if context.eraMax == nil then
         context.eraMax, context.eraLabel, context.eraShortLabel = ZoneStyle.ResolveEra(context)
     end
     local eraMax, eraLabel = context.eraMax, context.eraLabel
 
-    local eraEvidence = ZoneStyle.GetSourceEraEvidence(source)
+    local eraEvidence = resolvedEraEvidence or ZoneStyle.GetSourceEraEvidence(source)
     if not eraEvidence or eraEvidence.expansionID == nil then
         local reason = eraEvidence and eraEvidence.reason or "WoW did not expose source-era evidence."
         return false, "pending", reason
@@ -282,7 +287,7 @@ function P.StableAffinity(source, profile, modeKey, classID)
     return (value / 2147483647) * 3.0
 end
 
-function ZoneStyle.ScoreSource(source, definition, modeKey, context)
+function ZoneStyle.ScoreSource(source, definition, modeKey, context, coherenceScore, coherent, coherenceReason)
     modeKey = ZoneStyle.NormalizeMode(modeKey)
     context = context or ZoneStyle.GetCurrentContext()
     local profile = ZoneStyle.profiles[context.profileKey] or ZoneStyle.profiles.azeroth
@@ -326,10 +331,12 @@ function ZoneStyle.ScoreSource(source, definition, modeKey, context)
     end
 
     if context.outfitProfile then
-        local coherenceScore, coherent, coherenceReason = ZoneStyle.GetSourceCoherence(source, context)
-        score = score + coherenceScore
-        if #reasons < 4 and coherenceReason and (coherenceScore > 0 or not coherent) then
-            table.insert(reasons, (coherent and "Match: " or "Clash: ") .. coherenceReason)
+        if coherenceScore == nil then
+            coherenceScore, coherent, coherenceReason = ZoneStyle.GetSourceCoherence(source, context)
+        end
+        score = score + (coherenceScore or 0)
+        if #reasons < 4 and coherenceReason and ((coherenceScore or 0) > 0 or coherent == false) then
+            table.insert(reasons, ((coherent == false) and "Clash: " or "Match: ") .. coherenceReason)
         end
     end
 
@@ -342,8 +349,8 @@ function ZoneStyle.ScoreSource(source, definition, modeKey, context)
     return score, reasons
 end
 
-function ZoneStyle.WeightForSource(source, definition, modeKey, context)
-    local score = ZoneStyle.ScoreSource(source, definition, modeKey, context)
+function ZoneStyle.WeightForSource(source, definition, modeKey, context, coherenceScore, coherent, coherenceReason)
+    local score = ZoneStyle.ScoreSource(source, definition, modeKey, context, coherenceScore, coherent, coherenceReason)
     return math.max(1, score + 4) ^ 2, score
 end
 
@@ -353,9 +360,9 @@ function ZoneStyle.ChooseWeightedSource(candidates, definition, modeKey, context
     local fallback
     for _, source in ipairs(candidates or {}) do
         local eligible = ZoneStyle.GetSourceEligibility(source, modeKey, context)
-        local _, coherent = ZoneStyle.GetSourceCoherence(source, context)
+        local coherenceScore, coherent, coherenceReason = ZoneStyle.GetSourceCoherence(source, context)
         if eligible and coherent then
-            local weight, score = ZoneStyle.WeightForSource(source, definition, modeKey, context)
+            local weight, score = ZoneStyle.WeightForSource(source, definition, modeKey, context, coherenceScore, coherent, coherenceReason)
             local entry = { source = source, weight = weight, score = score }
             if source.sourceID == excludeSourceID then
                 fallback = entry
@@ -381,12 +388,26 @@ function ZoneStyle.OrderWeaponCandidates(candidates, modeKey, context)
     for index = #(candidates or {}), 1, -1 do
         local candidate = candidates[index]
         local eligible = ZoneStyle.GetSourceEligibility(candidate.source, modeKey, context)
-        local _, coherent = ZoneStyle.GetSourceCoherence(candidate.source, context)
+        local coherenceScore, coherent, coherenceReason = ZoneStyle.GetSourceCoherence(candidate.source, context)
+        candidate.coherenceScore = coherenceScore
+        candidate.coherent = coherent
+        candidate.coherenceReason = coherenceReason
         if not eligible or not coherent then table.remove(candidates, index) end
     end
     for _, candidate in ipairs(candidates or {}) do
         local definition = QC.Wardrobe and QC.Wardrobe.GetSlotDefinition and QC.Wardrobe.GetSlotDefinition(candidate.slotKey)
-        local weight = ZoneStyle.WeightForSource(candidate.source, definition, modeKey, context)
+        local weight = ZoneStyle.WeightForSource(
+            candidate.source,
+            definition,
+            modeKey,
+            context,
+            candidate.coherenceScore,
+            candidate.coherent,
+            candidate.coherenceReason
+        )
+        candidate.coherenceScore = nil
+        candidate.coherent = nil
+        candidate.coherenceReason = nil
         local roll = math.max(0.000001, math.random())
         candidate.stylePriority = math.log(roll) / weight
     end

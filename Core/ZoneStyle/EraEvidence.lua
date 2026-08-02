@@ -218,9 +218,9 @@ local function CacheEvidence(source, evidence, candidateCount)
     source.eraEvidenceCandidateCount = candidateCount
 end
 
-function ZoneStyle.GetSourceEraEvidence(source)
-    if not source then return { pending = true, reason = "No appearance source was provided." } end
-    if source.eraEvidenceVersion == P.ERA_EVIDENCE_VERSION
+local function ReadCachedEvidence(source)
+    if source
+        and source.eraEvidenceVersion == P.ERA_EVIDENCE_VERSION
         and source.eraEvidenceVisualID == source.visualID
         and source.eraEvidenceManifestVersion == source.eraManifestVersion
         and source.eraEvidenceExpansionID ~= nil
@@ -234,43 +234,106 @@ function ZoneStyle.GetSourceEraEvidence(source)
             candidateCount = source.eraEvidenceCandidateCount,
         }
     end
+end
 
-    local sourceIDs = P.GetAppearanceEraSourceIDs(source)
-    local earliest, pending = nil, false
-    for _, sourceID in ipairs(sourceIDs) do
-        local evidence, candidatePending = P.ResolveEraCandidate(P.BuildEraCandidate(source, sourceID))
-        pending = pending or candidatePending
-        if evidence and (not earliest
-            or evidence.expansionID < earliest.expansionID
-            or (evidence.expansionID == earliest.expansionID and evidence.rank > earliest.rank))
-        then
-            earliest = evidence
-        end
-    end
-
+local function FinalizeEraWork(work)
+    local earliest = work.earliest
+    local pending = work.pending == true
+    local candidateCount = #work.sourceIDs
+    local result
     if earliest then
         -- A pending sibling may still reveal stronger set/tracking/encounter
         -- evidence. Do not freeze a weak item-only answer while Blizzard is
         -- still loading the rest of the visual family.
         if pending and (earliest.rank or 0) < evidenceRanks.encounter then
-            return {
+            result = {
                 pending = true,
-                candidateCount = #sourceIDs,
+                candidateCount = candidateCount,
                 provisionalExpansionID = earliest.expansionID,
                 reason = "WoW is still loading stronger source-era evidence.",
             }
+        else
+            CacheEvidence(work.source, earliest, candidateCount)
+            earliest.candidateCount = candidateCount
+            earliest.partial = pending
+            result = earliest
         end
-        CacheEvidence(source, earliest, #sourceIDs)
-        earliest.candidateCount = #sourceIDs
-        earliest.partial = pending == true
-        return earliest
+    else
+        result = {
+            pending = pending,
+            unknown = not pending,
+            candidateCount = candidateCount,
+            reason = pending and "WoW is still loading source-era evidence." or "WoW did not expose enough evidence to establish this appearance's era.",
+        }
+    end
+    work.done = true
+    work.result = result
+    return result
+end
+
+function ZoneStyle.CreateSourceEraEvidenceWork(source)
+    if not source then
+        return {
+            source = source,
+            sourceIDs = {},
+            sourceIndex = 1,
+            done = true,
+            result = { pending = true, reason = "No appearance source was provided." },
+        }
+    end
+    local cached = ReadCachedEvidence(source)
+    if cached then
+        return {
+            source = source,
+            sourceIDs = {},
+            sourceIndex = 1,
+            done = true,
+            result = cached,
+            cached = true,
+        }
     end
     return {
-        pending = pending,
-        unknown = not pending,
-        candidateCount = #sourceIDs,
-        reason = pending and "WoW is still loading source-era evidence." or "WoW did not expose enough evidence to establish this appearance's era.",
+        source = source,
+        sourceIDs = P.GetAppearanceEraSourceIDs(source),
+        sourceIndex = 1,
+        earliest = nil,
+        pending = false,
+        done = false,
     }
+end
+
+function ZoneStyle.StepSourceEraEvidenceWork(work, maxCandidates)
+    if not work then return true, { pending = true, reason = "No era-evidence work was provided." }, 0 end
+    if work.done then return true, work.result, 0 end
+
+    maxCandidates = math.max(1, tonumber(maxCandidates) or 1)
+    local processed = 0
+    while work.sourceIndex <= #work.sourceIDs and processed < maxCandidates do
+        local sourceID = work.sourceIDs[work.sourceIndex]
+        local evidence, candidatePending = P.ResolveEraCandidate(P.BuildEraCandidate(work.source, sourceID))
+        work.pending = work.pending or candidatePending
+        if evidence and (not work.earliest
+            or evidence.expansionID < work.earliest.expansionID
+            or (evidence.expansionID == work.earliest.expansionID and evidence.rank > work.earliest.rank))
+        then
+            work.earliest = evidence
+        end
+        work.sourceIndex = work.sourceIndex + 1
+        processed = processed + 1
+    end
+
+    if work.sourceIndex > #work.sourceIDs then
+        return true, FinalizeEraWork(work), processed
+    end
+    return false, nil, processed
+end
+
+function ZoneStyle.GetSourceEraEvidence(source)
+    local work = ZoneStyle.CreateSourceEraEvidenceWork(source)
+    while not work.done do
+        ZoneStyle.StepSourceEraEvidenceWork(work, 1000000)
+    end
+    return work.result
 end
 
 function ZoneStyle.GetSourceExpansionID(source)

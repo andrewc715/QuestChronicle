@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0a4
+# Quest Chronicle v1.9.0a6
 
-> **Live appearance metadata:** item names, era evidence, quality colors, icons, and eligibility now update as soon as WoW finishes loading the relevant item data. Visible rows update in place without waiting for a click or rebuilding the entire Outfits page.
+> **Adaptive generation:** cached candidates now run until the frame-time budget is consumed, while uncached visual-sibling era evidence yields incrementally. The performance line identifies the slowest measured phase and exposes a detailed breakdown on hover.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a4 preserves the calibrated Traveler Cohesion instrumentation and cooperative wardrobe scanner while preparing Generate Outfit and Reroll Unlocked across bounded timer-frame work units. Completed outfits remain atomic, and Traveler selection rules remain unchanged.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a6 repairs the fixed 30-candidate throttle exposed by v1.9.0a5 live testing, keeps completed outfits atomic, and adds phase-aware generation diagnostics without changing outfit-selection rules.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -169,6 +169,8 @@ QuestChronicle\
 │   │   ├── WeaponFilters.lua
 │   │   ├── WeaponSelection.lua
 │   │   ├── GenerationAndConcepts.lua
+│   │   ├── GenerationPerformance.lua
+│   │   ├── GenerationWorker.lua
 │   │   ├── CustomSetBuild.lua
 │   │   ├── CustomSetSyncAndManifest.lua
 │   │   ├── CollectionScanAndPreview.lua

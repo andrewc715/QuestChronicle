@@ -48,8 +48,26 @@ function P.LoadItemMetadata(source)
     return nil
 end
 
+P.sourceMetadataTextCache = setmetatable({}, { __mode = "k" })
+local function MetadataCacheMatches(cached, source)
+    return cached
+        and (source.itemID == nil or cached.itemMetadataVerified == true)
+        and cached.itemID == source.itemID
+        and cached.name == source.name
+        and cached.styleName == source.styleName
+        and cached.styleItemLink == source.styleItemLink
+        and cached.styleItemType == source.styleItemType
+        and cached.styleItemSubType == source.styleItemSubType
+        and cached.styleEquipLocation == source.styleEquipLocation
+        and cached.itemMetadataVerified == source.itemMetadataVerified
+        and cached.metadataRevision == source.metadataRevision
+end
+
 function P.SourceMetadata(source)
     if not source then return "" end
+    local cached = P.sourceMetadataTextCache[source]
+    if MetadataCacheMatches(cached, source) then return cached.text end
+
     P.LoadItemMetadata(source)
     local parts = {}
     local function AddPart(value)
@@ -57,14 +75,26 @@ function P.SourceMetadata(source)
             table.insert(parts, tostring(value))
         end
     end
-
     AddPart(source.name)
     AddPart(source.styleName)
     AddPart(source.styleItemLink)
     AddPart(source.styleItemType)
     AddPart(source.styleItemSubType)
     AddPart(source.styleEquipLocation)
-    return P.Normalize(table.concat(parts, " "))
+    cached = {
+        itemID = source.itemID,
+        name = source.name,
+        styleName = source.styleName,
+        styleItemLink = source.styleItemLink,
+        styleItemType = source.styleItemType,
+        styleItemSubType = source.styleItemSubType,
+        styleEquipLocation = source.styleEquipLocation,
+        itemMetadataVerified = source.itemMetadataVerified,
+        metadataRevision = source.metadataRevision,
+        text = P.Normalize(table.concat(parts, " ")),
+    }
+    P.sourceMetadataTextCache[source] = cached
+    return cached.text
 end
 
 -- C_Item.GetItemInfo's expansionID is useful but is not authoritative for

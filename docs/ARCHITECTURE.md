@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0a4 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0a6 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -59,8 +59,11 @@ These tables are runtime implementation details. Other subsystems should use pub
 `Core/Wardrobe/GenerationAndConcepts.lua`
 : Synchronous generation primitives, atomic weapon bundles, rerolls, and concept persistence.
 
+`Core/Wardrobe/GenerationPerformance.lua`
+: Generation phase measurements, persistent performance summaries, post-worker preview/UI timing, and tooltip-ready diagnostics.
+
 `Core/Wardrobe/GenerationWorker.lua`
-: Cooperative foreground generation, private draft state, frame budgets, progress callbacks, and performance measurements.
+: Time-first cooperative foreground generation, resumable era-evidence work, private draft state, progress callbacks, and atomic commits.
 
 `Core/Wardrobe/CustomSetBuild.lua`
 : Collected-source rebinding and native Custom Set payload construction.
@@ -89,7 +92,7 @@ These tables are runtime implementation details. Other subsystems should use pub
 : Item/source metadata, promotion detection, Chronicle Intelligence, tracking origins, and source signals.
 
 `Core/ZoneStyle/EraEvidence.lua`
-: Provenance-bearing era resolution across curated corrections, native sets, tracked maps, encounter data, item metadata, and visual siblings.
+: Provenance-bearing era resolution across curated corrections, native sets, tracked maps, encounter data, item metadata, and visual siblings, including a resumable sibling-source worker for generation.
 
 `Core/ZoneStyle/ProgressionRestrictions.lua`
 : Character-progression restrictions such as below-cap Heritage Armor exclusion.
@@ -141,7 +144,7 @@ python tools/verify_lua_line_limit.py
 
 The command exits nonzero if any Lua file exceeds 500 physical lines.
 
-## Traveler cohesion instrumentation (v1.9.0a2 calibration)
+## Traveler cohesion instrumentation (v1.9.0a1 calibration)
 
 `Core/ZoneStyle/Traveler/` contains the observation layer for the Traveler Cohesion Rewrite:
 
@@ -150,7 +153,7 @@ The command exits nonzero if any Lua file exceeds 500 physical lines.
 - `Cohesion.lua` computes pair compatibility, anchor profiles, accent echo, mismatch classes, and the diagnostic budget.
 - `Debug.lua` analyzes the current outfit and implements `/qc traveler debug`.
 
-In v1.9.0a2 this subsystem remains read-only. It does not participate in candidate selection or mutate the wardrobe preview.
+In v1.9.0a6 this subsystem remains read-only. It does not participate in candidate selection or mutate the wardrobe preview.
 
 
 ## Cooperative wardrobe refresh (v1.9.0a2)
@@ -167,3 +170,12 @@ Quest Chronicle never calls `C_TransmogCollection.UpdateUsableAppearances()` fro
 Current weapon permissions are read through the live outfit-slot and weapon-option APIs. Equipment, specialization, talent, and trait events invalidate the cached route matrix and query those live APIs immediately and once more after a short settling delay. Collection scans use the temporary collection filters and category queries directly.
 
 `tools/verify_no_blocking_usability_refresh.py` enforces this boundary during packaging.
+
+## Adaptive cooperative generation (v1.9.0a6)
+
+Armor generation is governed primarily by a 2.5 ms addon-time budget. The worker continues processing inexpensive cached candidates until that budget is consumed; the 2,000-operation ceiling exists only as protection against a stalled or non-advancing timer. This replaces the former 30-candidate limit that produced a stable 204-frame warm-reroll floor on a large wardrobe.
+
+Uncached era evidence uses `ZoneStyle.CreateSourceEraEvidenceWork()` and `ZoneStyle.StepSourceEraEvidenceWork()` to process one visual sibling per operation. Candidates rejected by zone preferences, promotional rules, or progression restrictions are discarded before that era work begins. The ordinary synchronous era API remains available for browser and compatibility callers.
+
+Generation diagnostics are divided among `GenerationPerformance.lua`, the worker, and the Outfits completion callback. Core phases are measured during preparation; preview-model application and the final full workbench refresh are measured on their later frames. The selected armor and weapon bundle remains private until the atomic state commit.
+

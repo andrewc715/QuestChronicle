@@ -429,4 +429,42 @@ P.builders[#P.builders + 1] = function(C)
     C.statusText:SetWordWrap(true)
     if C.statusText.SetMaxLines then C.statusText:SetMaxLines(2) end
     C.pane.statusText = C.statusText
+
+    C.performanceText = C.sourcePanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    C.performanceText:SetPoint("TOPLEFT", C.sourcePanel, "TOPLEFT", 10, -145)
+    C.performanceText:SetPoint("RIGHT", C.sourcePanel, "RIGHT", -10, 0)
+    C.performanceText:SetHeight(16)
+    C.performanceText:SetJustifyH("LEFT")
+    C.performanceText:SetJustifyV("TOP")
+    C.performanceText:SetWordWrap(false)
+    C.performanceText:SetText("")
+    C.pane.performanceText = C.performanceText
+
+    C.performanceHitbox = CreateFrame("Frame", nil, C.sourcePanel)
+    C.performanceHitbox:SetPoint("TOPLEFT", C.performanceText, "TOPLEFT", 0, 2)
+    C.performanceHitbox:SetPoint("BOTTOMRIGHT", C.performanceText, "BOTTOMRIGHT", 0, -2)
+    C.performanceHitbox:EnableMouse(true)
+    C.performanceHitbox:SetScript("OnEnter", function(self)
+        local performance = C.pane.generationPerformance
+        if not performance then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Generation Performance", 1, 0.82, 0)
+        GameTooltip:AddLine(Wardrobe.FormatGenerationPerformance(performance), 1, 1, 1, true)
+        GameTooltip:AddLine(string.format(
+            "%d appearance candidates • %d era-source checks • %d selected armor slots",
+            tonumber(performance.candidates) or 0,
+            tonumber(performance.eraCandidates) or 0,
+            tonumber(performance.selectedArmor) or 0
+        ), 0.7, 0.7, 0.7, true)
+        for _, detail in ipairs(Wardrobe.GetGenerationPerformanceDetails(performance)) do
+            GameTooltip:AddDoubleLine(
+                detail.label,
+                string.format("%.1f ms max • %.1f ms total • %d calls", detail.maxMs, detail.totalMs, detail.calls),
+                1, 1, 1,
+                0.72, 0.82, 1
+            )
+        end
+        GameTooltip:Show()
+    end)
+    C.performanceHitbox:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end

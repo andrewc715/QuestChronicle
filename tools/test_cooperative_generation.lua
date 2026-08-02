@@ -1,10 +1,8 @@
 local queue = {}
 local clock = 0
 
-function debugprofilestop()
-    clock = clock + 0.20
-    return clock
-end
+local function Advance(milliseconds) clock = clock + milliseconds end
+function debugprofilestop() return clock end
 
 C_Timer = {
     After = function(_, callback) table.insert(queue, callback) end,
@@ -74,10 +72,12 @@ function P.SetSelectedSource(state, slotKey, source)
     state.selectionVisuals[slotKey] = source and source.visualID or nil
 end
 function P.RefreshGeneratedOutfitName(state)
+    Advance(0.10)
     state.generatedName = "Cooperative Test"
     return state.generatedName
 end
 function P.GenerateWeapons(state)
+    Advance(0.20)
     state.selections.ONE_HAND = 5001
     state.selections.OFF_HAND = 5001
     state.selectionVisuals.ONE_HAND = 51
@@ -87,7 +87,7 @@ function P.GenerateWeapons(state)
 end
 
 function Wardrobe.GetSlotSources(slotKey) return sources[slotKey] or {} end
-function Wardrobe.ValidateSource(source, slotKey) return source.slotKey == slotKey end
+function Wardrobe.ValidateSource(source, slotKey) Advance(0.002) return source.slotKey == slotKey end
 function Wardrobe.IsScanning() return false end
 
 QC.ZoneStyle.MODE_ZONE_NATIVE = "ZONE_NATIVE"
@@ -103,15 +103,19 @@ function QC.ZoneStyle.AddSourceToGenerationContext(context)
     context.outfitProfile.count = context.outfitProfile.count + 1
 end
 function QC.ZoneStyle.ChooseWeightedSource() end
-function QC.ZoneStyle.GetSourceEligibility() return true end
-function QC.ZoneStyle.GetSourceCoherence() return 0, true end
-function QC.ZoneStyle.WeightForSource(source) return source.sourceID % 17 + 1, source.sourceID % 17 end
+function QC.ZoneStyle.GetSourceEraEvidence() return { expansionID = 1 } end
+function QC.ZoneStyle.GetSourceEligibility() Advance(0.002) return true end
+function QC.ZoneStyle.GetSourceCoherence() Advance(0.001) return 0, true end
+function QC.ZoneStyle.WeightForSource(source) Advance(0.003) return source.sourceID % 17 + 1, source.sourceID % 17 end
 function QC.ZoneStyle.GetModeInfo() return { label = "Traveler" } end
 function QC.ZoneStyle.GetContextRestrictionLabel() return "TBC" end
 function QC.ZoneStyle.ConsumeSuggestion() end
 
 local root = (... and (...):match("^(.*)[/\\]") or "")
-dofile((root ~= "" and root .. "/../" or "") .. "Core/Wardrobe/GenerationWorker.lua")
+local base = root ~= "" and root .. "/../" or ""
+dofile(base .. "Core/Wardrobe/GenerationPerformance.lua")
+dofile(base .. "Core/Wardrobe/GenerationWorker.lua")
+P.GENERATION_TIME_BUDGET_MS = 1000
 
 local ok, message = Wardrobe.StartGenerateOutfit(false, "TRAVELER")
 assert(ok == true, message)
@@ -139,9 +143,11 @@ assert(liveState.selections.ONE_HAND == 5001 and liveState.selections.OFF_HAND =
 assert(liveState.generatedName == "Cooperative Test", "generated name missing")
 
 local perf = Wardrobe.GetLastGenerationPerformance()
-assert(perf and perf.steps > 3, "generation was not spread across frames")
+assert(perf and perf.steps == 3, "time-first generation should finish in armor, weapon, and commit frames")
 assert(perf.candidates == 360, "candidate count mismatch")
 assert(perf.selectedArmor == 3, "selected armor count mismatch")
+assert(perf.phaseStats and perf.phaseStats.scoring and perf.phaseStats.scoring.calls == 360, "scoring phase diagnostics missing")
+assert(perf.slowestPhase ~= nil, "slowest phase was not resolved")
 
 local sawStart, sawProgress, sawComplete = false, false, false
 for _, notification in ipairs(notifications) do

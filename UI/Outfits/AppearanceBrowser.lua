@@ -83,7 +83,7 @@ P.builders[#P.builders + 1] = function(C)
         row:SetPoint("LEFT", C.sourcePanel, "LEFT", 10, 0)
         row:SetPoint("RIGHT", C.sourcePanel, "RIGHT", -10, 0)
         if index == 1 then
-            row:SetPoint("TOP", C.sourcePanel, "TOP", 0, -148)
+            row:SetPoint("TOP", C.sourcePanel, "TOP", 0, -166)
         else
             row:SetPoint("TOP", C.pane.sourceRows[index - 1], "BOTTOM", 0, -P.SOURCE_ROW_SPACING)
         end
