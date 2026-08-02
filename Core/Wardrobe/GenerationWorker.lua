@@ -434,7 +434,11 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
         local startedAt = NowMilliseconds()
         local ok, message = Wardrobe.GenerateOutfit(reroll, requestedStyleMode)
         local elapsed = math.max(0, NowMilliseconds() - startedAt)
-        local performance = { elapsedMs = elapsed, steps = 1, maxStepMs = elapsed, candidates = 0, phaseStats = {} }
+        local performance = {
+            elapsedMs = elapsed, steps = 1, maxStepMs = elapsed, candidates = 0, phaseStats = {},
+            cacheDiagnostics = P.BuildGenerationCachePerformance
+                and P.BuildGenerationCachePerformance(nil) or nil,
+        }
         P.lastGenerationPerformance = performance
         Notify("WARDROBE_GENERATION_COMPLETE", ok == true, message, performance)
         return ok, message
@@ -475,6 +479,8 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
         steps = 0,
         maxStepMs = 0,
         phaseStats = {},
+        cacheCountersStarted = P.GetGenerationCacheCounterSnapshot
+            and P.GetGenerationCacheCounterSnapshot() or nil,
         startedAtMs = startedAtMs,
     }
     RecordPhase(job, "setup", setupStarted)

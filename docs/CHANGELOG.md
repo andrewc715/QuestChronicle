@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.0a8 - 2026-08-02
+
+### Performance
+
+- Added a versioned persistent generation cache inside the existing wardrobe SavedVariables store.
+- Migrated v1.9.0a7 resolved, unknown, and pending era evidence before the first automatic scan.
+- Replaced session-local metadata revision and mutable display-name identity with stable visual, manifest, source, player, zone, and evidence keys.
+- Preserved era evidence and reusable eligibility results across `/reload` and successful collection-cache rebuilds.
+- Added bounded context maps, pending retries, unknown-result expiry, selective item-data reopening, and exact invalidation diagnostics.
+- Expanded the Generation Performance tooltip with loaded, migrated, retained, added, and invalidated cache counts.
+- Preserved cooperative armor and weapon generation, targeted UI refreshes, atomic commits, Traveler instrumentation-only behavior, schema 2, Courier format 1, and wardrobe cache format 7.
+
 ## 1.9.0a7 - 2026-08-02
 
 - Corrected the runtime Status version to read authoritative TOC metadata instead of retaining the stale `1.9.0a5` internal constant.

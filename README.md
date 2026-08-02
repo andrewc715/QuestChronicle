@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0a7
+# Quest Chronicle v1.9.0a8
 
-> **Cache-and-pipeline repair:** resolved, unknown, and temporarily pending era results are reused safely; valid evidence survives wardrobe cache rebuilds; weapon routing now yields cooperatively; and generation completion refreshes only the affected workbench controls.
+> **Persistent generation cache:** era evidence and eligibility records now survive `/reload` and the automatic wardrobe scan through a dedicated versioned SavedVariables store, while the cooperative weapon pipeline and targeted completion refresh remain intact.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a7 repairs the repeated era-evidence workload and synchronous weapon/UI phases exposed by v1.9.0a6 live telemetry, while preserving outfit-selection rules and atomic completion.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a8 makes the generation cache persistent across reloads and collection-cache rebuilds, using stable visual and context identities while preserving the responsive v1.9.0a7 pipeline.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

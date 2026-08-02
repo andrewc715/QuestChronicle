@@ -60,11 +60,15 @@ local function PreferenceKey(source, context)
 end
 
 local function SourceIdentity(source)
+    local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
+    if wardrobePrivate and wardrobePrivate.GetStableGenerationSourceIdentity then
+        return wardrobePrivate.GetStableGenerationSourceIdentity(source)
+    end
     return table.concat({
         tostring(source and source.visualID or 0),
         tostring(source and source.sourceID or 0),
         tostring(source and source.itemID or 0),
-        tostring(source and source.metadataRevision or 0),
+        tostring(source and source.eraManifestSignature or ""),
     }, ":")
 end
 
@@ -93,11 +97,25 @@ function ZoneStyle.GetSourcePreEraEligibilityCached(source, context)
             source.generationPrecheckReason,
             true
     end
+    local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
+    local persistent = wardrobePrivate and wardrobePrivate.GetPersistentGenerationPrecheck
+        and wardrobePrivate.GetPersistentGenerationPrecheck(source, key)
+    if persistent then
+        source.generationPrecheckKey = key
+        source.generationPrecheckEligible = persistent.eligible == true
+        source.generationPrecheckKind = persistent.kind
+        source.generationPrecheckReason = persistent.reason
+        CountCacheHit()
+        return persistent.eligible == true, persistent.kind, persistent.reason, true
+    end
     local eligible, kind, reason = ZoneStyle.GetSourcePreEraEligibility(source, context)
     source.generationPrecheckKey = key
     source.generationPrecheckEligible = eligible == true
     source.generationPrecheckKind = kind
     source.generationPrecheckReason = reason
+    if wardrobePrivate and wardrobePrivate.StorePersistentGenerationPrecheck then
+        wardrobePrivate.StorePersistentGenerationPrecheck(source, key, eligible, kind, reason)
+    end
     return eligible == true, kind, reason, false
 end
 
@@ -143,10 +161,24 @@ function ZoneStyle.GetSourceEligibilityCached(source, modeKey, context, evidence
             source.generationEligibilityReason,
             true
     end
+    local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
+    local persistent = wardrobePrivate and wardrobePrivate.GetPersistentGenerationEligibility
+        and wardrobePrivate.GetPersistentGenerationEligibility(source, key)
+    if persistent then
+        source.generationEligibilityKey = key
+        source.generationEligibilityEligible = persistent.eligible == true
+        source.generationEligibilityKind = persistent.kind
+        source.generationEligibilityReason = persistent.reason
+        CountCacheHit()
+        return persistent.eligible == true, persistent.kind, persistent.reason, true
+    end
     local eligible, kind, reason = ZoneStyle.GetSourceEligibility(source, modeKey, context, evidence, true)
     source.generationEligibilityKey = key
     source.generationEligibilityEligible = eligible == true
     source.generationEligibilityKind = kind
     source.generationEligibilityReason = reason
+    if wardrobePrivate and wardrobePrivate.StorePersistentGenerationEligibility then
+        wardrobePrivate.StorePersistentGenerationEligibility(source, key, eligible, kind, reason)
+    end
     return eligible == true, kind, reason, false
 end

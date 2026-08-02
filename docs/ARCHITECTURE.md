@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0a7 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0a8 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -41,6 +41,12 @@ These tables are runtime implementation details. Other subsystems should use pub
 `Core/Wardrobe/Foundation.lua`
 : Static definitions, cache/concept stores, Blizzard collection state, and source retrieval helpers.
 
+`Core/Wardrobe/GenerationCacheStore.lua`
+: Versioned persistent era/eligibility records, stable identities, migration, invalidation, and bounded pruning.
+
+`Core/Wardrobe/GenerationCacheDiagnostics.lua`
+: Scan-retention counters, per-generation cache deltas, and tooltip-ready lifecycle diagnostics.
+
 `Core/Wardrobe/StateAndPreferences.lua`
 : Selection recovery, locks, hidden slots, zone preferences, and generated-name state.
 
@@ -78,7 +84,10 @@ These tables are runtime implementation details. Other subsystems should use pub
 : Native save verification, concept synchronization, Current Preview manifest, and source normalization.
 
 `Core/Wardrobe/AppearanceMetadata.lua`
-: Full visual-source manifests, item-data prefetching, and era-evidence cache invalidation.
+: Full visual-source manifests, item-data prefetching, persistent-cache migration, and era-evidence invalidation.
+
+`Core/Wardrobe/CollectionScanWorker.lua`
+: Cooperative per-slot category and appearance enumeration into a staging cache.
 
 `Core/Wardrobe/CollectionScanAndPreview.lua`
 : Collection scanning, deliberate refresh policy, manual selections, and model preview application.
@@ -190,6 +199,18 @@ Armor generation is governed primarily by a 2.5 ms addon-time budget. The worker
 Uncached era evidence uses `ZoneStyle.CreateSourceEraEvidenceWork()` and `ZoneStyle.StepSourceEraEvidenceWork()` to process one visual sibling per operation. Candidates rejected by zone preferences, promotional rules, or progression restrictions are discarded before that era work begins. The ordinary synchronous era API remains available for browser and compatibility callers.
 
 Generation diagnostics are divided among `GenerationPerformance.lua`, the worker, and the Outfits completion callback. Core phases are measured during preparation; preview-model application and the final full workbench refresh are measured on their later frames. The selected armor and weapon bundle remains private until the atomic state commit.
+
+## Persistent generation cache (v1.9.0a8)
+
+`GenerationCacheStore.lua` owns a versioned SavedVariables substore at `QuestChronicleDB.wardrobe.generationCache`. The store is independent of `wardrobe.bySlot`, whose source tables are intentionally replaced by every successful collection scan. Era evidence is stored once per visual. Pre-era and final eligibility records are stored in small bounded maps per visual.
+
+Persistent evidence identity uses the era resolver version, visual ID, visual-source manifest, and sibling-item manifest. Eligibility identity adds the representative source and item, player progression, zone preference, era/provenance context, restriction setting, mode, and evidence result. The session-local `metadataRevision` counter is deliberately excluded because it restarts when a scan constructs new source tables.
+
+At the start of an automatic or manual scan, the store migrates any v1.9.0a7 evidence still embedded on old source records. Each matching source discovered by the staging scan can then restore evidence from the persistent store. The old transient visual snapshot remains as a compatibility bridge, but it is no longer the persistence boundary.
+
+Item-data events invalidate the affected visual record and dependent eligibility records. Manifest changes also invalidate evidence. Pending records retry after 30 seconds, while unknown fail-closed records expire after six hours. Context maps are bounded and age-pruned to prevent unbounded SavedVariables growth.
+
+The generation performance record snapshots cache lifecycle counters. Its tooltip reports loaded, migrated, retained, added, and invalidated entries plus exact invalidation reasons, allowing a post-`/reload` test to distinguish a genuine persistent hit from a fresh session-only warmup.
 
 ## Cache-and-pipeline generation repair (v1.9.0a7)
 

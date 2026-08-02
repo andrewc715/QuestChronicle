@@ -83,6 +83,8 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         eligibilityCacheHits = job and job.eligibilityCacheHits or 0,
         weaponYields = job and job.weaponYields or 0,
         selectedArmor = job and job.selectedArmor or 0,
+        cacheDiagnostics = P.BuildGenerationCachePerformance
+            and P.BuildGenerationCachePerformance(job and job.cacheCountersStarted) or nil,
         phaseStats = job and job.phaseStats or {},
         slowestPhase = slowestKey,
         slowestPhaseMs = slowestMax,
@@ -139,4 +141,42 @@ function Wardrobe.GetGenerationPerformanceDetails(performance)
         return left.maxMs > right.maxMs
     end)
     return details
+end
+
+function Wardrobe.GetGenerationCachePerformanceLines(performance)
+    local diagnostics = performance and performance.cacheDiagnostics
+    if not diagnostics then return {} end
+    local lines = {
+        string.format(
+            "Persistent cache: %d evidence • %d prechecks • %d eligibility",
+            tonumber(diagnostics.persistentEvidence) or 0,
+            tonumber(diagnostics.persistentPrechecks) or 0,
+            tonumber(diagnostics.persistentEligibility) or 0
+        ),
+        string.format(
+            "Loaded: %d evidence • %d prechecks • %d eligibility • %d migrated",
+            tonumber(diagnostics.loadedEvidence) or 0,
+            tonumber(diagnostics.loadedPrechecks) or 0,
+            tonumber(diagnostics.loadedEligibility) or 0,
+            tonumber(diagnostics.migratedEvidence) or 0
+        ),
+        string.format(
+            "After scan: %d evidence retained • this generation: %d added • %d invalidated",
+            tonumber(diagnostics.retainedEvidenceAfterScan) or 0,
+            tonumber(diagnostics.addedDuringGeneration) or 0,
+            tonumber(diagnostics.invalidatedDuringGeneration) or 0
+        ),
+    }
+    local reasons = {}
+    for reason, count in pairs(diagnostics.invalidationReasons or {}) do
+        reasons[#reasons + 1] = { reason = reason, count = tonumber(count) or 0 }
+    end
+    table.sort(reasons, function(left, right)
+        if left.count == right.count then return left.reason < right.reason end
+        return left.count > right.count
+    end)
+    for _, entry in ipairs(reasons) do
+        lines[#lines + 1] = string.format("Invalidated %s: %d", entry.reason, entry.count)
+    end
+    return lines
 end

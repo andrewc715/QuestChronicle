@@ -22,7 +22,7 @@ local function IsGenericName(value)
     return value == nil or tostring(value):match("^Appearance %d+$") ~= nil
 end
 
-function P.InvalidateSourceEraEvidence(source)
+local function ClearSourceGenerationFields(source)
     if not source then return end
     source.eraEvidenceVersion = nil
     source.eraEvidenceVisualID = nil
@@ -40,6 +40,8 @@ function P.InvalidateSourceEraEvidence(source)
     source.eraEvidencePending = nil
     source.eraEvidenceUnknown = nil
     source.eraEvidenceRetryAt = nil
+    source.persistentEraFingerprint = nil
+    source.persistentGenerationFingerprint = nil
     source.generationEligibilityKey = nil
     source.generationEligibilityEligible = nil
     source.generationEligibilityKind = nil
@@ -48,6 +50,20 @@ function P.InvalidateSourceEraEvidence(source)
     source.generationPrecheckEligible = nil
     source.generationPrecheckKind = nil
     source.generationPrecheckReason = nil
+end
+
+function P.InvalidateSourceEraEvidence(source, reason, preservePersistent)
+    if not source then return end
+    ClearSourceGenerationFields(source)
+    if not preservePersistent then
+        if (reason == "ITEM_DATA_LOADED" or reason == "ITEM_METADATA_CHANGED")
+            and P.InvalidatePersistentGenerationCacheForItemData
+        then
+            P.InvalidatePersistentGenerationCacheForItemData(source, reason)
+        elseif P.InvalidatePersistentGenerationCache then
+            P.InvalidatePersistentGenerationCache(source, reason or "SOURCE_METADATA_CHANGED")
+        end
+    end
 end
 
 
@@ -95,14 +111,23 @@ function P.DiscardAppearanceGenerationCaches()
 end
 
 function P.RestoreAppearanceGenerationCache(source)
+    local restored = false
     local snapshot = source and P.previousGenerationCachesByVisual
         and P.previousGenerationCachesByVisual[tonumber(source.visualID)]
-    if not snapshot then return false end
-    local signature = source.eraManifestSignature or P.GetEraManifestSignature(source.eraSourceIDs)
-    if snapshot.manifestSignature ~= signature then return false end
-    for _, field in ipairs(generationCacheFields) do source[field] = snapshot[field] end
-    source.eraEvidenceMetadataRevision = tonumber(source.metadataRevision) or 0
-    return true
+    if snapshot then
+        local signature = source.eraManifestSignature or P.GetEraManifestSignature(source.eraSourceIDs)
+        if snapshot.manifestSignature == signature then
+            for _, field in ipairs(generationCacheFields) do source[field] = snapshot[field] end
+            source.eraEvidenceMetadataRevision = tonumber(source.metadataRevision) or 0
+            restored = true
+        end
+    end
+    if P.RestorePersistentGenerationFields then
+        local zonePrivate = QC.ZoneStyle and QC.ZoneStyle._Private
+        local evidenceVersion = zonePrivate and zonePrivate.ERA_EVIDENCE_VERSION or 2
+        restored = P.RestorePersistentGenerationFields(source, evidenceVersion) or restored
+    end
+    return restored
 end
 
 function P.BuildEraSourceManifest(source)
@@ -157,7 +182,9 @@ function P.EnsureEraSourceManifest(source, invalidate)
     source.eraSourceIDs = P.BuildEraSourceManifest(source)
     source.eraManifestSignature = P.GetEraManifestSignature(source.eraSourceIDs)
     source.eraItemIDs = P.BuildEraItemManifest(source.eraSourceIDs)
-    if invalidate ~= false then P.InvalidateSourceEraEvidence(source) end
+    if invalidate ~= false then
+        P.InvalidateSourceEraEvidence(source, "ERA_MANIFEST_REBUILT", P.metadataRefreshActive == true)
+    end
 end
 
 function P.AttachEraSourceManifest(source, requestItems)
@@ -213,7 +240,7 @@ function P.HydrateSourceItemMetadata(source)
     source.metadataPending = nil
     if changed then
         source.metadataRevision = (tonumber(source.metadataRevision) or 0) + 1
-        P.InvalidateSourceEraEvidence(source)
+        P.InvalidateSourceEraEvidence(source, "ITEM_METADATA_CHANGED", P.metadataRefreshActive == true)
     end
     return true, changed
 end
@@ -249,6 +276,8 @@ function P.TrackAppearanceMetadata(source, requestManifestItems)
 end
 
 function P.BeginAppearanceMetadataRefresh()
+    if P.EnsurePersistentGenerationCache then P.EnsurePersistentGenerationCache() end
+    if P.BeginPersistentGenerationCacheScan then P.BeginPersistentGenerationCacheScan() end
     P.CaptureAppearanceGenerationCaches(P.EnsureCache and P.EnsureCache() or nil)
     -- A collection scan reconstructs the watch index as it discovers sources.
     -- Clear it once here instead of rebuilding and hydrating the entire old
@@ -308,6 +337,7 @@ function P.RebuildAppearanceMetadataIndex(cache, sortSources, notify, requestMan
 end
 
 function P.FinalizeAppearanceMetadataRefresh(cache, sortSources)
+    if P.FinishPersistentGenerationCacheScan then P.FinishPersistentGenerationCacheScan() end
     P.DiscardAppearanceGenerationCaches()
     if sortSources then
         for _, sources in pairs(cache and cache.bySlot or {}) do
@@ -319,7 +349,6 @@ end
 
 local function ProcessItemMetadataBatch()
     P.itemMetadataBatchScheduled = false
-P.metadataRefreshActive = false
     local pending = P.pendingItemMetadata
     P.pendingItemMetadata = {}
     local changedSourceIDs, changedItemIDs = {}, {}
@@ -335,7 +364,9 @@ P.metadataRefreshActive = false
                 local _, changed = P.HydrateSourceItemMetadata(source)
                 sourceChanged = changed == true
             end
-            P.InvalidateSourceEraEvidence(source)
+            P.InvalidateSourceEraEvidence(
+                source, "ITEM_DATA_LOADED", P.metadataRefreshActive == true or Wardrobe.scanning == true
+            )
             if source.sourceID and not changedSourceIDs[source.sourceID] then
                 changedSourceIDs[source.sourceID] = true
                 changedCount = changedCount + 1

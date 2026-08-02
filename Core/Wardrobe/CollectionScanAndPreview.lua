@@ -147,6 +147,7 @@ function Wardrobe.Scan(force, trigger)
         cache.dirtyReason = "SCAN_FAILED"
         if scanStartedPrecise and GetTime then cache.scanDurationMS = math.floor(((GetTime() - scanStartedPrecise) * 1000) + 0.5) end
         P.RestoreAppearanceMetadataWatchIndex(cache)
+        if P.FinishPersistentGenerationCacheScan then P.FinishPersistentGenerationCacheScan() end
         if P.DiscardAppearanceGenerationCaches then P.DiscardAppearanceGenerationCaches() end
         if QC.Notify then
             QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
@@ -166,7 +167,8 @@ function Wardrobe.Scan(force, trigger)
             cache.dirtyReason = "EMPTY_COLLECTION_RESPONSE"
             if scanStartedPrecise and GetTime then cache.scanDurationMS = math.floor(((GetTime() - scanStartedPrecise) * 1000) + 0.5) end
             P.RestoreAppearanceMetadataWatchIndex(cache)
-        if P.DiscardAppearanceGenerationCaches then P.DiscardAppearanceGenerationCaches() end
+            if P.FinishPersistentGenerationCacheScan then P.FinishPersistentGenerationCacheScan() end
+            if P.DiscardAppearanceGenerationCaches then P.DiscardAppearanceGenerationCaches() end
             if QC.Notify then
                 QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
             end

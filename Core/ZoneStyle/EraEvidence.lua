@@ -240,38 +240,48 @@ local function CacheEraResult(source, result, candidateCount)
     source.eraEvidenceState = result.expansionID ~= nil and "RESOLVED"
         or (result.pending and "PENDING" or "UNKNOWN")
     source.eraEvidenceRetryAt = result.pending and (EraNow() + 30) or nil
+    local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
+    if wardrobePrivate and wardrobePrivate.StorePersistentEraEvidence then
+        wardrobePrivate.StorePersistentEraEvidence(
+            source, result, candidateCount, P.ERA_EVIDENCE_VERSION
+        )
+    end
     return result
 end
 
 local function ReadCachedEvidence(source)
-    if not source
-        or source.eraEvidenceVersion ~= P.ERA_EVIDENCE_VERSION
-        or source.eraEvidenceVisualID ~= source.visualID
-        or source.eraEvidenceManifestVersion ~= source.eraManifestVersion
-        or source.eraEvidenceManifestSignature ~= ManifestSignature(source)
-        or (tonumber(source.eraEvidenceMetadataRevision) or 0) ~= (tonumber(source.metadataRevision) or 0)
-        or source.eraEvidenceState == nil
-    then
-        return nil
+    local localValid = source
+        and source.eraEvidenceVersion == P.ERA_EVIDENCE_VERSION
+        and source.eraEvidenceVisualID == source.visualID
+        and source.eraEvidenceManifestVersion == source.eraManifestVersion
+        and source.eraEvidenceManifestSignature == ManifestSignature(source)
+        and (tonumber(source.eraEvidenceMetadataRevision) or 0) == (tonumber(source.metadataRevision) or 0)
+        and source.eraEvidenceState ~= nil
+    if localValid then
+        local pendingExpired = source.eraEvidenceState == "PENDING"
+            and tonumber(source.eraEvidenceRetryAt)
+            and EraNow() >= tonumber(source.eraEvidenceRetryAt)
+        if not pendingExpired then
+            return {
+                expansionID = source.eraEvidenceExpansionID,
+                method = source.eraEvidenceMethod,
+                label = source.eraEvidenceLabel,
+                sourceID = source.eraEvidenceSourceID,
+                itemID = source.eraEvidenceItemID,
+                candidateCount = source.eraEvidenceCandidateCount,
+                reason = source.eraEvidenceReason,
+                pending = source.eraEvidencePending == true,
+                unknown = source.eraEvidenceUnknown == true,
+                cached = true,
+            }
+        end
     end
-    if source.eraEvidenceState == "PENDING"
-        and tonumber(source.eraEvidenceRetryAt)
-        and EraNow() >= tonumber(source.eraEvidenceRetryAt)
-    then
-        return nil
+
+    local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
+    if wardrobePrivate and wardrobePrivate.GetPersistentEraEvidence then
+        return wardrobePrivate.GetPersistentEraEvidence(source, P.ERA_EVIDENCE_VERSION)
     end
-    return {
-        expansionID = source.eraEvidenceExpansionID,
-        method = source.eraEvidenceMethod,
-        label = source.eraEvidenceLabel,
-        sourceID = source.eraEvidenceSourceID,
-        itemID = source.eraEvidenceItemID,
-        candidateCount = source.eraEvidenceCandidateCount,
-        reason = source.eraEvidenceReason,
-        pending = source.eraEvidencePending == true,
-        unknown = source.eraEvidenceUnknown == true,
-        cached = true,
-    }
+    return nil
 end
 
 local function FinalizeEraWork(work)
