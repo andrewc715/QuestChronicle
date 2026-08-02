@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0a3
+# Quest Chronicle v1.9.0a4
 
 > **Live appearance metadata:** item names, era evidence, quality colors, icons, and eligibility now update as soon as WoW finishes loading the relevant item data. Visible rows update in place without waiting for a click or rebuilding the entire Outfits page.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a3 preserves the calibrated Traveler Cohesion instrumentation and cooperative wardrobe worker while removing Blizzard's blocking global transmog-usability recalculation from Generate Outfit, Scan Collection, and equipment/spec refresh paths. Traveler selection rules remain unchanged.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a4 preserves the calibrated Traveler Cohesion instrumentation and cooperative wardrobe scanner while preparing Generate Outfit and Reroll Unlocked across bounded timer-frame work units. Completed outfits remain atomic, and Traveler selection rules remain unchanged.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

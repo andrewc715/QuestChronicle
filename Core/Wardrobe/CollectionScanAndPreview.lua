@@ -65,6 +65,7 @@ function P.ScheduleLoginRefresh()
 end
 
 function Wardrobe.MarkDirty(reason)
+    if Wardrobe.CancelGeneration then Wardrobe.CancelGeneration("Outfit generation was cancelled because the wardrobe collection changed.") end
     Wardrobe.InvalidateWeaponAppearanceRoutes()
     local cache = P.EnsureCache()
     cache.dirty = true
@@ -76,6 +77,9 @@ function Wardrobe.MarkDirty(reason)
 end
 
 function Wardrobe.Scan(force, trigger)
+    if Wardrobe.IsGenerating and Wardrobe.IsGenerating() then
+        return false, "Wait for outfit generation to finish before scanning the wardrobe."
+    end
     if Wardrobe.scanning then
         return false, "A wardrobe scan is already running."
     end

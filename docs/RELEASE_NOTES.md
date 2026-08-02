@@ -1,55 +1,26 @@
-# Quest Chronicle v1.9.0a3 — Non-Blocking Foreground Wardrobe Actions
+# Quest Chronicle v1.9.0a4 — Cooperative Outfit Generation
 
-v1.9.0a3 preserves the calibrated Traveler Cohesion instrumentation and cooperative background collection scan from v1.9.0a2. It removes the remaining synchronous Blizzard collection recalculation that could freeze the client when generating an outfit or starting a manual scan.
+v1.9.0a4 preserves the calibrated Traveler Cohesion instrumentation from v1.9.0a1 and the cooperative wardrobe scan from v1.9.0a2. It removes the remaining foreground hitch from **Generate Outfit** and **Reroll Unlocked** by preparing armor candidates in bounded timer-frame work units and committing the completed outfit atomically.
 
-## Root cause
+## Performance
 
-Three foreground paths still called:
+- Added `Core/Wardrobe/GenerationWorker.lua` as the cooperative generation coordinator.
+- Evaluates at most 30 appearance candidates per worker slice and aims for approximately 2.5 ms of Quest Chronicle work per frame.
+- Spreads armor eligibility, coherence, and weighted scoring across timer frames instead of evaluating the full wardrobe in the button-click frame.
+- Runs weapon-route generation in its own frame and commits the finished armor-and-weapon bundle in a later frame.
+- Applies the embedded model preview and performs the full Outfits UI refresh on separate subsequent frames.
+- Reports the number of preparation frames and the longest measured Quest Chronicle worker step in the completion status.
 
-```lua
-C_TransmogCollection.UpdateUsableAppearances()
-```
+## Atomicity and safety
 
-The call was made before Quest Chronicle's cooperative work began:
-
-- `Generate Outfit`, while creating the weapon-generation context;
-- `Scan Collection`, immediately after applying temporary collection filters;
-- equipment and specialization refresh events.
-
-On a collection containing more than 5,000 visuals, Blizzard can execute that global usability recalculation synchronously. The Lua scan worker cannot yield until Blizzard returns, so the game appears frozen even though the later scan stages are cooperative.
-
-## Corrected capability flow
-
-Quest Chronicle no longer forces the global usability index to rebuild.
-
-```text
-Equipment/spec change
-→ invalidate weapon appearance routes
-→ query Blizzard's live slot-and-option APIs
-→ repeat once after a short settling delay
-```
-
-Weapon Appearance Routes already use current per-hand transmog outfit slots, enabled weapon options, and category permissions. Those live APIs are sufficient for generation and do not require rebuilding the entire collection index.
-
-Collection scans now proceed directly from temporary collection-filter setup into the existing readiness wait and cooperative slot workers.
-
-## Guardrail
-
-The package adds:
-
-```text
-tools/verify_no_blocking_usability_refresh.py
-```
-
-Packaging fails if runtime Lua reintroduces a call to `UpdateUsableAppearances`.
+- Builds the outfit against a private draft state. The visible preview state is unchanged until every armor and weapon selection succeeds.
+- Cancels the draft rather than overwriting changes if the player modifies selections, locks, hidden slots, weapon families, weapon subtypes, hand linking, or style mode during preparation.
+- Prevents a wardrobe scan from starting while generation is active and cancels generation if the collection becomes dirty.
+- Keeps the original synchronous `Wardrobe.GenerateOutfit()` API as a fallback when WoW timer scheduling is unavailable.
 
 ## Preserved behavior
 
-- Traveler cohesion formulas and calibrated diagnostics are unchanged.
-- Traveler outfit selection remains instrumentation-only and unchanged.
-- Cooperative scan limits remain 18 appearances or approximately 3 ms per worker step.
-- Weapon Appearance Routes, linked hands, era evidence, live metadata updates, concepts, and Custom Sets are unchanged.
-- SavedVariables schema remains `2`.
-- Courier format remains `1`.
-- Wardrobe cache format remains `7`.
-- No cache migration or additional rescan is required.
+- Traveler generation rules remain unchanged and the v1.9.0a1 cohesion system remains instrumentation-only.
+- The weighted selection formulas, slot order, existing set/motif coherence, era restrictions, Heritage restrictions, promotional exclusions, and zone preferences are unchanged.
+- Weapon Appearance Routes, linked and unlinked hands, concepts, Custom Sets, live metadata updates, wardrobe cache format 7, SavedVariables schema 2, and Courier format 1 are unchanged.
+- No wardrobe rescan or data migration is required.

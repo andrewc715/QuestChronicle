@@ -166,9 +166,10 @@ P.builders[#P.builders + 1] = function(C)
         else
             C.sourceTitle:SetText((definition and definition.label or "Appearance") .. " Appearances")
         end
-        C.scanButton:SetEnabled(not Wardrobe.IsScanning())
+        local generating = Wardrobe.IsGenerating and Wardrobe.IsGenerating()
+        C.scanButton:SetEnabled(not Wardrobe.IsScanning() and not generating)
         C.scanButton:SetText(Wardrobe.IsScanning() and "Scanning..." or "Scan Collection")
-        C.staleHitbox:SetShown(cache.dirty == true and not Wardrobe.IsScanning())
+        C.staleHitbox:SetShown(cache.dirty == true and not Wardrobe.IsScanning() and not generating)
 
         local selected = Wardrobe.GetSelectedSource(slotKey)
         local hidden = Wardrobe.IsSlotHidden(slotKey)
@@ -201,9 +202,11 @@ P.builders[#P.builders + 1] = function(C)
         local diagnostics = Wardrobe.GetSlotDiagnostics(slotKey)
         C.statusText:SetText(message or P.CacheSummary(cache, diagnostics, #sources))
 
-        local canGenerate = not Wardrobe.IsScanning() and cache.totalVisuals > 0
+        local canGenerate = not Wardrobe.IsScanning() and not generating and cache.totalVisuals > 0
         C.generateButton:SetEnabled(canGenerate)
         C.rerollUnlocked:SetEnabled(canGenerate)
+        C.generateButton:SetText(generating and "Generating..." or "Generate Outfit")
+        C.rerollUnlocked:SetText(generating and "Please Wait..." or "Reroll Unlocked")
         local concepts = Wardrobe.GetConcepts()
         C.saveConcept:SetEnabled(next(P.GetState().selections) ~= nil or next(P.GetState().locks) ~= nil or next(P.GetState().hidden) ~= nil)
         C.loadConcept:SetEnabled(#concepts > 0)
@@ -224,6 +227,55 @@ P.builders[#P.builders + 1] = function(C)
         local modeInfo = ZoneStyle.GetModeInfo(styleMode)
         C.subtitle:SetText(string.format("%s appearances for %s • %s • %s%s%s. Preview only; no outfit is applied.", UI.FormatNumber(#sources), definition and definition.label or slotKey, modeInfo.label, styleContext.profileLabel or "Azeroth Adventurer", generatedText, conceptText))
     end
+
+    QC.RegisterCallback("WARDROBE_GENERATION_STARTED", C.pane, function(reroll)
+        if not C.pane:IsShown() then return end
+        C.generateButton:SetEnabled(false)
+        C.rerollUnlocked:SetEnabled(false)
+        C.scanButton:SetEnabled(false)
+        C.generateButton:SetText(reroll and "Rerolling..." or "Generating...")
+        C.rerollUnlocked:SetText("Please Wait...")
+        C.statusText:SetText(reroll and "Rerolling unlocked pieces in the background..." or "Preparing outfit in the background...")
+    end)
+    QC.RegisterCallback("WARDROBE_GENERATION_PROGRESS", C.pane, function(index, total, slotKey)
+        if not C.pane:IsShown() then return end
+        local definition = Wardrobe.GetSlotDefinition(slotKey)
+        C.statusText:SetText(string.format("Preparing outfit %d of %d: %s", index or 0, total or 0, definition and definition.label or tostring(slotKey or "appearance")))
+    end)
+    QC.RegisterCallback("WARDROBE_GENERATION_COMPLETE", C.pane, function(success, message, performance)
+        if performance then
+            message = string.format(
+                "%s Prepared across %d frame%s; longest Quest Chronicle step %.1f ms.",
+                tostring(message or (success and "Outfit generated." or "Outfit generation failed.")),
+                tonumber(performance.steps) or 0,
+                tonumber(performance.steps) == 1 and "" or "s",
+                tonumber(performance.maxStepMs) or 0
+            )
+        end
+        if not C.pane:IsShown() then return end
+        C.generateButton:SetText("Generate Outfit")
+        C.rerollUnlocked:SetText("Reroll Unlocked")
+        if success then
+            local function RefreshAfterPreview()
+                if C.pane:IsShown() then C.pane:Refresh(message) end
+            end
+            local function ApplyThenRefresh()
+                Wardrobe.ApplyPreview(C.model)
+                if C_Timer and type(C_Timer.After) == "function" then
+                    C_Timer.After(0, RefreshAfterPreview)
+                else
+                    RefreshAfterPreview()
+                end
+            end
+            if C_Timer and type(C_Timer.After) == "function" then
+                C_Timer.After(0, ApplyThenRefresh)
+            else
+                ApplyThenRefresh()
+            end
+        else
+            C.pane:Refresh(message)
+        end
+    end)
 
     QC.RegisterCallback("WARDROBE_SCAN_PROGRESS", C.pane, function(index, total, slotKey, count, diagnostics)
         if C.pane:IsShown() then

@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0a3 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0a4 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -57,7 +57,10 @@ These tables are runtime implementation details. Other subsystems should use pub
 : Candidate validation, weighted weapon selection, linked hands, and route eligibility.
 
 `Core/Wardrobe/GenerationAndConcepts.lua`
-: Atomic weapon bundles, full outfit generation, rerolls, and concept persistence.
+: Synchronous generation primitives, atomic weapon bundles, rerolls, and concept persistence.
+
+`Core/Wardrobe/GenerationWorker.lua`
+: Cooperative foreground generation, private draft state, frame budgets, progress callbacks, and performance measurements.
 
 `Core/Wardrobe/CustomSetBuild.lua`
 : Collected-source rebinding and native Custom Set payload construction.

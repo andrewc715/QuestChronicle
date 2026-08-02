@@ -396,16 +396,18 @@ P.builders[#P.builders + 1] = function(C)
     UI.SetTooltip(C.loadConcept, "Outfit Concepts", "Open the Outfit Concepts manager to inspect, load, overwrite, or delete this character's saved concepts.")
     UI.SetTooltip(C.clearAll, "Reset Outfit", "Clear selections, locks, and hidden-slot choices, returning the preview to currently equipped gear.")
 
-    C.generateButton:SetScript("OnClick", function()
-        local ok, message = Wardrobe.GenerateOutfit(false, ZoneStyle.GetMode())
-        if ok then Wardrobe.ApplyPreview(C.model) end
-        C.pane:Refresh(message)
-    end)
-    C.rerollUnlocked:SetScript("OnClick", function()
-        local ok, message = Wardrobe.GenerateOutfit(true, ZoneStyle.GetMode())
-        if ok then Wardrobe.ApplyPreview(C.model) end
-        C.pane:Refresh(message)
-    end)
+    local function StartGeneration(reroll)
+        local starter = Wardrobe.StartGenerateOutfit or Wardrobe.GenerateOutfit
+        local ok, message = starter(reroll == true, ZoneStyle.GetMode())
+        if not ok then
+            C.pane:Refresh(message)
+        elseif not Wardrobe.StartGenerateOutfit then
+            Wardrobe.ApplyPreview(C.model)
+            C.pane:Refresh(message)
+        end
+    end
+    C.generateButton:SetScript("OnClick", function() StartGeneration(false) end)
+    C.rerollUnlocked:SetScript("OnClick", function() StartGeneration(true) end)
     C.clearAll:SetScript("OnClick", function()
         Wardrobe.ClearAllSelections()
         Wardrobe.ApplyPreview(C.model)

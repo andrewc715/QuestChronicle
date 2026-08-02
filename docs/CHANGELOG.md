@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.9.0a4 - 2026-08-02
+
+### Performance
+
+- Added cooperative foreground outfit generation with bounded candidate and time budgets per timer frame.
+- Prepared armor slots against a private draft and committed the complete armor-and-weapon bundle atomically.
+- Isolated weapon-route generation, preview-model dressing, and full Outfits UI refresh onto separate frames.
+- Added workbench-change cancellation and generation performance reporting.
+- Preserved Traveler cohesion calibration and all generation rules unchanged.
+
 ## 1.9.0a3 - 2026-08-02
 
 ### Performance
