@@ -1,8 +1,8 @@
-# Quest Chronicle v1.8.4
+# Quest Chronicle v1.8.5
 
-> **Era evidence rebuild:** v1.8.4 advances the wardrobe cache to format 7 and rebuilds every appearance with provenance-bearing era evidence gathered across its complete visual source family. Unknown or partially loaded eras fail closed.
+> **Live appearance metadata:** item names, era evidence, quality colors, icons, and eligibility now update as soon as WoW finishes loading the relevant item data. Visible rows update in place without waiting for a click or rebuilding the entire Outfits page.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.8.4 preserves the normalized architecture, Heritage Armor progression rule, and Weapon Appearance Routes while rebuilding the wardrobe around broader source-era evidence.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.8.5 preserves the normalized architecture, Heritage Armor progression rule, Weapon Appearance Routes, and wardrobe cache format 7 while making source metadata event-driven.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

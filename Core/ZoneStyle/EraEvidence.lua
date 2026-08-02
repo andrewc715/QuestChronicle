@@ -3,7 +3,7 @@ local ZoneStyle = QC.ZoneStyle
 local P = ZoneStyle._Private
 
 P.ERA_EVIDENCE_VERSION = 2
-P.ERA_MANIFEST_VERSION = 2
+P.ERA_MANIFEST_VERSION = 3
 
 -- Exact corrections remain intentionally small and reviewable. They protect
 -- known legacy item records whose sparse expansion field is incorrect while

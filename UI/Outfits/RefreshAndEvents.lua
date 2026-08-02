@@ -7,6 +7,52 @@ local P = UI._Outfits
 
 P.builders = P.builders or {}
 P.builders[#P.builders + 1] = function(C)
+    function C.pane:RefreshSourceRow(row, source, slotKey, selected, styleMode, styleContext)
+        row.source = source
+        row:SetShown(source ~= nil)
+        if not source then return end
+
+        row.icon:SetTexture(source.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+        row.name:SetText(P.SourceLabel(source))
+        local valid, reason = Wardrobe.ValidateSource(source, slotKey)
+        local isSelected = selected and selected.sourceID == source.sourceID
+        local marker = isSelected and (UI.green .. "Selected|r") or (valid and "Collected" or (UI.red .. "Unavailable|r"))
+        local eligible, eligibilityKind = ZoneStyle.GetEligibilitySummary(source, styleMode, styleContext)
+        local sourceZonePreference = Wardrobe.GetSourceZonePreference(source, styleContext)
+        local generatedMarker = sourceZonePreference == "favorite" and (" • " .. UI.gold .. "Zone favorite|r")
+            or (sourceZonePreference == "excluded" and (" • " .. UI.red .. "Zone excluded|r")
+            or (eligible and "" or (eligibilityKind == "pending" and " • Loading era" or (eligibilityKind == "promotional" and " • Promo excluded" or (eligibilityKind == "heritage" and " • Heritage locked" or " • Not generated")))))
+        row.detail:SetText(string.format("%s • Source %d%s%s", marker, source.sourceID or 0, valid and "" or (" • " .. tostring(reason)), generatedMarker))
+        row:SetEnabled(valid)
+        P.SetSourceRowBackground(row, isSelected, sourceZonePreference)
+
+        if GameTooltip and GameTooltip.GetOwner and GameTooltip:GetOwner() == row then
+            P.ShowAppearanceTooltip(row, source, slotKey)
+        end
+    end
+
+    function C.pane:RefreshVisibleAppearanceMetadata(payload)
+        if not self:IsShown() then return end
+        local slotKey = P.GetCurrentSlot()
+        local selected = Wardrobe.GetSelectedSource(slotKey)
+        local styleMode = ZoneStyle.GetMode()
+        local styleContext = ZoneStyle.GetCurrentContext()
+        local changedSourceIDs = payload and payload.sourceIDs
+
+        for _, row in ipairs(self.sourceRows or {}) do
+            local source = row.source
+            if source and (not changedSourceIDs or changedSourceIDs[source.sourceID]) then
+                self:RefreshSourceRow(row, source, slotKey, selected, styleMode, styleContext)
+            end
+        end
+
+        local hidden = Wardrobe.IsSlotHidden(slotKey)
+        local locked = Wardrobe.IsSlotLocked(slotKey)
+        local selectedLabel = selected and P.GetSourceDisplayName(selected) or "currently equipped appearance"
+        C.selectedText:SetText(string.format("Selected: %s%s%s", selectedLabel, locked and " • Locked" or "", hidden and " • Hidden" or ""))
+        if C.lookPanel and C.lookPanel:IsShown() then self:RefreshCurrentLook() end
+    end
+
     function C.pane:Refresh(message)
         local cache = Wardrobe.GetCache()
         local slotKey = P.GetCurrentSlot()
@@ -127,7 +173,7 @@ P.builders[#P.builders + 1] = function(C)
         local selected = Wardrobe.GetSelectedSource(slotKey)
         local hidden = Wardrobe.IsSlotHidden(slotKey)
         local locked = Wardrobe.IsSlotLocked(slotKey)
-        local selectedLabel = selected and tostring(selected.name or selected.sourceID) or "currently equipped appearance"
+        local selectedLabel = selected and P.GetSourceDisplayName(selected) or "currently equipped appearance"
         C.selectedText:SetText(string.format("Selected: %s%s%s", selectedLabel, locked and " • Locked" or "", hidden and " • Hidden" or ""))
         C.clearSlot:SetEnabled(selected ~= nil or hidden or locked)
         C.clearSlot:SetText((selected or hidden or locked) and "Clear Slot" or "No Selection")
@@ -166,23 +212,7 @@ P.builders[#P.builders + 1] = function(C)
         local startIndex = ((page - 1) * P.SOURCE_ROWS) + 1
         for rowIndex, row in ipairs(self.sourceRows) do
             local source = sources[startIndex + rowIndex - 1]
-            row.source = source
-            row:SetShown(source ~= nil)
-            if source then
-                row.icon:SetTexture(source.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-                row.name:SetText(P.SourceLabel(source))
-                local valid, reason = Wardrobe.ValidateSource(source, slotKey)
-                local isSelected = selected and selected.sourceID == source.sourceID
-                local marker = isSelected and (UI.green .. "Selected|r") or (valid and "Collected" or (UI.red .. "Unavailable|r"))
-                local eligible, eligibilityKind = ZoneStyle.GetEligibilitySummary(source, styleMode, styleContext)
-                local sourceZonePreference = Wardrobe.GetSourceZonePreference(source, styleContext)
-                local generatedMarker = sourceZonePreference == "favorite" and (" • " .. UI.gold .. "Zone favorite|r")
-                    or (sourceZonePreference == "excluded" and (" • " .. UI.red .. "Zone excluded|r")
-                    or (eligible and "" or (eligibilityKind == "pending" and " • Loading era" or (eligibilityKind == "promotional" and " • Promo excluded" or (eligibilityKind == "heritage" and " • Heritage locked" or " • Not generated")))))
-                row.detail:SetText(string.format("%s • Source %d%s%s", marker, source.sourceID or 0, valid and "" or (" • " .. tostring(reason)), generatedMarker))
-                row:SetEnabled(valid)
-                P.SetSourceRowBackground(row, isSelected, sourceZonePreference)
-            end
+            self:RefreshSourceRow(row, source, slotKey, selected, styleMode, styleContext)
         end
 
         C.pageText:SetText(string.format("Page %d of %d", page, pageCount))
@@ -221,6 +251,9 @@ P.builders[#P.builders + 1] = function(C)
             local recovered = (recovery.previewRecovered or 0) + (recovery.conceptRecovered or 0)
             C.pane:Refresh(string.format("Collection scan complete • %d changed appearance source%s recovered.", recovered, recovered == 1 and "" or "s"))
         end
+    end)
+    QC.RegisterCallback("WARDROBE_SOURCE_METADATA_UPDATED", C.pane, function(payload)
+        C.pane:RefreshVisibleAppearanceMetadata(payload)
     end)
     QC.RegisterCallback("WARDROBE_SELECTION_CHANGED", C.pane, function()
         if C.pane:IsShown() then C.pane:Refresh() end

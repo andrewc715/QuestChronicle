@@ -61,6 +61,7 @@ function P.ScanSlot(definition)
 
                 if acceptedForAppearance and bestSource then
                     P.AttachEraSourceManifest(bestSource)
+                    P.TrackAppearanceMetadata(bestSource)
                     -- One entry per Blizzard appearance row. Resolving a source
                     -- chooses how to preview that row; it does not define or
                     -- deduplicate the catalog itself.
@@ -228,6 +229,7 @@ function Wardrobe.Scan(force, trigger)
         cache.dirty = true
         cache.dirtyReason = "SCAN_FAILED"
         if scanStartedPrecise and GetTime then cache.scanDurationMS = math.floor(((GetTime() - scanStartedPrecise) * 1000) + 0.5) end
+        P.RebuildAppearanceMetadataIndex(cache, false, false)
         if QC.Notify then
             QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
         end
@@ -245,6 +247,7 @@ function Wardrobe.Scan(force, trigger)
             cache.dirty = true
             cache.dirtyReason = "EMPTY_COLLECTION_RESPONSE"
             if scanStartedPrecise and GetTime then cache.scanDurationMS = math.floor(((GetTime() - scanStartedPrecise) * 1000) + 0.5) end
+            P.RebuildAppearanceMetadataIndex(cache, false, false)
             if QC.Notify then
                 QC.Notify("WARDROBE_SCAN_COMPLETE", cache)
             end
@@ -279,6 +282,7 @@ function Wardrobe.Scan(force, trigger)
         -- sources are intentionally excluded. Do not flag a healthy non-empty
         -- cache merely because those totals differ.
         cache.scanWarning = nil
+        P.RebuildAppearanceMetadataIndex(cache, true, false)
 
         if QC.Notify then
             QC.Notify("WARDROBE_SCAN_COMPLETE", cache)

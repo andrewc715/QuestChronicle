@@ -35,10 +35,17 @@ function P.SetPage(slotKey, value)
     P.GetState().pages[slotKey] = math.max(1, tonumber(value) or 1)
 end
 
+function P.GetSourceDisplayName(source)
+    if not source then return "Appearance" end
+    local name = source.styleName or source.name
+    if name and not tostring(name):match("^Appearance %d+$") then return tostring(name) end
+    return tostring(name or ("Appearance " .. tostring(source.sourceID or 0)))
+end
+
 function P.SourceLabel(source)
     local qualityColor = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[source.quality or 1]
     local color = qualityColor and qualityColor.hex or UI.white
-    return string.format("%s%s|r", color, source.name or ("Appearance " .. tostring(source.sourceID or 0)))
+    return string.format("%s%s|r", color, P.GetSourceDisplayName(source))
 end
 
 function P.ShowAppearanceTooltip(owner, source, slotKey, leadText)
@@ -46,7 +53,7 @@ function P.ShowAppearanceTooltip(owner, source, slotKey, leadText)
     local styleMode = ZoneStyle.GetMode()
     local styleContext = ZoneStyle.GetCurrentContext()
     GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
-    GameTooltip:SetText(source.name or "Appearance", 1, 0.82, 0)
+    GameTooltip:SetText(P.GetSourceDisplayName(source), 1, 0.82, 0)
     GameTooltip:AddLine(leadText or "Click to preview this collected appearance.", 1, 1, 1, true)
     GameTooltip:AddLine("Source ID: " .. tostring(source.sourceID or 0), 0.65, 0.65, 0.65)
     if source.itemID then

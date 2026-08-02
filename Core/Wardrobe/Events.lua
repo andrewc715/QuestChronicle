@@ -12,6 +12,8 @@ pcall(P.eventFrame.RegisterEvent, P.eventFrame, "PLAYER_EQUIPMENT_CHANGED")
 pcall(P.eventFrame.RegisterEvent, P.eventFrame, "PLAYER_SPECIALIZATION_CHANGED")
 pcall(P.eventFrame.RegisterEvent, P.eventFrame, "ACTIVE_TALENT_GROUP_CHANGED")
 pcall(P.eventFrame.RegisterEvent, P.eventFrame, "TRAIT_CONFIG_UPDATED")
+pcall(P.eventFrame.RegisterEvent, P.eventFrame, "GET_ITEM_INFO_RECEIVED")
+pcall(P.eventFrame.RegisterEvent, P.eventFrame, "ITEM_DATA_LOAD_RESULT")
 P.eventFrame:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_ENTERING_WORLD" then
         local cache = P.EnsureCache()
@@ -24,7 +26,15 @@ P.eventFrame:SetScript("OnEvent", function(_, event, ...)
             P.ResetCache(cache, "STALE")
             cache.dirtyReason = "CHARACTER_CHANGED"
         end
+        if C_Timer and C_Timer.After then
+            C_Timer.After(0, function() P.RebuildAppearanceMetadataIndex(cache, false, true) end)
+        else
+            P.RebuildAppearanceMetadataIndex(cache, false, true)
+        end
         P.ScheduleLoginRefresh()
+    elseif event == "GET_ITEM_INFO_RECEIVED" or event == "ITEM_DATA_LOAD_RESULT" then
+        local itemID, success = ...
+        Wardrobe.QueueItemMetadataUpdate(itemID, success, event)
     elseif event == "PLAYER_EQUIPMENT_CHANGED"
         or event == "PLAYER_SPECIALIZATION_CHANGED"
         or event == "ACTIVE_TALENT_GROUP_CHANGED"

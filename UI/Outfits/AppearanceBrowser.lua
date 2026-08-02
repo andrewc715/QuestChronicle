@@ -121,7 +121,8 @@ P.builders[#P.builders + 1] = function(C)
                 else
                     UIErrorsFrame:AddMessage(reason or "Appearance cannot be previewed.", 1, 0.25, 0.25)
                 end
-                C.pane:Refresh()
+                -- WARDROBE_SELECTION_CHANGED refreshes the workbench. Avoid a
+                -- second full refresh from the click handler.
             end
         end)
         row:SetScript("OnEnter", function(self)

@@ -1,22 +1,20 @@
 # Changelog
 
-## 1.8.4 - 2026-08-02
+## 1.8.5 - 2026-08-02
 
-### Changed
+### Fixed
 
-- Advanced the wardrobe cache format from 6 to 7, forcing one complete collection rebuild after login or `/reload`.
-- Replaced representative-item-only era validation with evidence gathered across every source sharing the collapsed visual.
-- Added era evidence from native transmog sets, appearance tracking maps, encounter data, and item metadata.
-- Stored evidence method, source ID, item ID, and candidate count for transparent tooltips and diagnostics.
-- Made unknown, partially loaded, and weak provisional era conclusions fail closed for automatic generation.
-- Added reviewed corrections for the confirmed Mists of Pandaria belt metadata regressions, items 89561 and 89565.
-- Preserved manual browsing and preview for era-excluded appearances.
+- Hydrated appearance names, icons, quality, item metadata, and era evidence from WoW item-data events.
+- Updated affected visible appearance rows immediately instead of waiting for a click.
+- Refreshed an open appearance tooltip and selected-source label when its metadata completes.
+- Batched item-data events and refreshed only affected rows rather than rebuilding the entire Outfits workbench.
+- Removed the duplicate full workbench refresh after selecting an appearance.
+- Rebuilt the metadata watch index after login and successful scans while preserving wardrobe cache format 7.
 
 ### Compatibility
 
-- Preserves SavedVariables schema 2 and Courier format 1.
-- Preserves concepts, Custom Set links, selections, locks, hidden slots, and Chronicle data.
-- Performs the normal single automatic wardrobe scan after the cache migration.
+- Preserves SavedVariables schema 2, Courier format 1, and wardrobe cache format 7.
+- Requires no additional cache migration beyond the v1.8.4 format-7 rebuild.
 
 ## 1.8.3 - 2026-08-01
 

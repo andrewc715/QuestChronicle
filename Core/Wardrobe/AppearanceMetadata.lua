@@ -2,8 +2,11 @@ local QC = QuestChronicle
 local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
 
-P.ERA_MANIFEST_VERSION = 2
+P.ERA_MANIFEST_VERSION = 3
 P.eraItemRequests = P.eraItemRequests or {}
+P.itemMetadataWatch = P.itemMetadataWatch or {}
+P.pendingItemMetadata = P.pendingItemMetadata or {}
+P.itemMetadataBatchScheduled = false
 
 local function AddUnique(list, seen, value)
     value = tonumber(value)
@@ -11,6 +14,23 @@ local function AddUnique(list, seen, value)
         seen[value] = true
         table.insert(list, value)
     end
+end
+
+local function IsGenericName(value)
+    return value == nil or tostring(value):match("^Appearance %d+$") ~= nil
+end
+
+function P.InvalidateSourceEraEvidence(source)
+    if not source then return end
+    source.eraEvidenceVersion = nil
+    source.eraEvidenceVisualID = nil
+    source.eraEvidenceManifestVersion = nil
+    source.eraEvidenceExpansionID = nil
+    source.eraEvidenceMethod = nil
+    source.eraEvidenceLabel = nil
+    source.eraEvidenceSourceID = nil
+    source.eraEvidenceItemID = nil
+    source.eraEvidenceCandidateCount = nil
 end
 
 function P.BuildEraSourceManifest(source)
@@ -27,36 +47,216 @@ function P.BuildEraSourceManifest(source)
     return sourceIDs
 end
 
-function P.RequestEraManifestItems(sourceIDs)
-    if not C_Item or type(C_Item.RequestLoadItemDataByID) ~= "function" then return end
+function P.BuildEraItemManifest(sourceIDs)
+    local itemIDs, seen = {}, {}
     for _, sourceID in ipairs(sourceIDs or {}) do
         local itemID
         if C_TransmogCollection and type(C_TransmogCollection.GetSourceItemID) == "function" then
             itemID = P.SafeCall(C_TransmogCollection.GetSourceItemID, sourceID)
         end
-        itemID = tonumber(itemID)
-        if itemID and itemID > 0 and not P.eraItemRequests[itemID] then
-            P.eraItemRequests[itemID] = true
-            P.SafeCall(C_Item.RequestLoadItemDataByID, itemID)
-        end
+        AddUnique(itemIDs, seen, itemID)
     end
+    table.sort(itemIDs)
+    return itemIDs
+end
+
+function P.RequestAppearanceItemData(itemID)
+    itemID = tonumber(itemID)
+    if not itemID or itemID <= 0 or P.eraItemRequests[itemID] then return end
+    if not C_Item or type(C_Item.RequestLoadItemDataByID) ~= "function" then return end
+    P.eraItemRequests[itemID] = true
+    P.SafeCall(C_Item.RequestLoadItemDataByID, itemID)
+end
+
+function P.RequestEraManifestItems(itemIDs)
+    for _, itemID in ipairs(itemIDs or {}) do
+        P.RequestAppearanceItemData(itemID)
+    end
+end
+
+function P.EnsureEraSourceManifest(source, invalidate)
+    if not source then return end
+    local current = source.eraManifestVersion == P.ERA_MANIFEST_VERSION
+        and type(source.eraSourceIDs) == "table"
+        and type(source.eraItemIDs) == "table"
+    if current then return end
+
+    source.eraManifestVersion = P.ERA_MANIFEST_VERSION
+    source.eraSourceIDs = P.BuildEraSourceManifest(source)
+    source.eraItemIDs = P.BuildEraItemManifest(source.eraSourceIDs)
+    if invalidate ~= false then P.InvalidateSourceEraEvidence(source) end
 end
 
 function P.AttachEraSourceManifest(source)
     if not source then return end
-    source.eraManifestVersion = P.ERA_MANIFEST_VERSION
-    source.eraSourceIDs = P.BuildEraSourceManifest(source)
+    source.eraManifestVersion = nil
+    P.EnsureEraSourceManifest(source, true)
+    P.RequestEraManifestItems(source.eraItemIDs)
+end
 
-    -- Evidence is derived from this exact source manifest. A scan or schema
-    -- migration must invalidate any conclusion produced from an older list.
-    source.eraEvidenceVersion = nil
-    source.eraEvidenceVisualID = nil
-    source.eraEvidenceExpansionID = nil
-    source.eraEvidenceMethod = nil
-    source.eraEvidenceLabel = nil
-    source.eraEvidenceSourceID = nil
-    source.eraEvidenceItemID = nil
-    source.eraEvidenceCandidateCount = nil
+local function SetIfChanged(source, key, value)
+    if value ~= nil and source[key] ~= value then
+        source[key] = value
+        return true
+    end
+    return false
+end
 
-    P.RequestEraManifestItems(source.eraSourceIDs)
+function P.HydrateSourceItemMetadata(source)
+    if not source or not source.itemID then return false, false end
+    local itemID = tonumber(source.itemID)
+    local getter = C_Item and C_Item.GetItemInfo or GetItemInfo
+    if type(getter) ~= "function" then return false, false end
+
+    local ok, name, link, quality, itemLevel, requiredLevel, itemType, itemSubType,
+        stackCount, equipLocation, icon, sellPrice, classID, subclassID, bindType,
+        expansionID = pcall(getter, itemID)
+    if not ok or not name then
+        source.metadataPending = true
+        P.RequestAppearanceItemData(itemID)
+        return false, false
+    end
+
+    local changed = false
+    if IsGenericName(source.name) then changed = SetIfChanged(source, "name", name) or changed end
+    changed = SetIfChanged(source, "styleName", name) or changed
+    changed = SetIfChanged(source, "styleItemLink", link) or changed
+    changed = SetIfChanged(source, "quality", quality) or changed
+    changed = SetIfChanged(source, "styleItemType", itemType) or changed
+    changed = SetIfChanged(source, "styleItemSubType", itemSubType) or changed
+    changed = SetIfChanged(source, "styleEquipLocation", equipLocation) or changed
+    changed = SetIfChanged(source, "icon", icon) or changed
+
+    local numericExpansion = expansionID ~= nil and tonumber(expansionID) or nil
+    if source.expansionID ~= numericExpansion then
+        source.expansionID = numericExpansion
+        changed = true
+    end
+    if source.itemMetadataItemID ~= itemID or source.itemMetadataVerified ~= true then changed = true end
+    source.itemMetadataItemID = itemID
+    source.itemMetadataVerified = true
+    source.metadataPending = nil
+    if changed then
+        source.metadataRevision = (tonumber(source.metadataRevision) or 0) + 1
+        P.InvalidateSourceEraEvidence(source)
+    end
+    return true, changed
+end
+
+local function WatchItem(itemID, source)
+    itemID = tonumber(itemID)
+    if not itemID or itemID <= 0 or not source then return end
+    local watchers = P.itemMetadataWatch[itemID]
+    if not watchers then
+        watchers = setmetatable({}, { __mode = "k" })
+        P.itemMetadataWatch[itemID] = watchers
+    end
+    watchers[source] = true
+end
+
+function P.TrackAppearanceMetadata(source)
+    if not source then return false end
+    P.EnsureEraSourceManifest(source, true)
+    if source.itemID then WatchItem(source.itemID, source) end
+    for _, itemID in ipairs(source.eraItemIDs or {}) do
+        WatchItem(itemID, source)
+    end
+
+    local loaded, changed = P.HydrateSourceItemMetadata(source)
+    for _, itemID in ipairs(source.eraItemIDs or {}) do
+        if not loaded or tonumber(itemID) ~= tonumber(source.itemID) then
+            P.RequestAppearanceItemData(itemID)
+        end
+    end
+    return changed == true
+end
+
+local function SortSlotSources(sources)
+    table.sort(sources or {}, function(left, right)
+        local leftName = string.lower(left.styleName or left.name or "")
+        local rightName = string.lower(right.styleName or right.name or "")
+        if leftName == rightName then return (left.sourceID or 0) < (right.sourceID or 0) end
+        return leftName < rightName
+    end)
+end
+
+function P.RebuildAppearanceMetadataIndex(cache, sortSources, notify)
+    P.itemMetadataWatch = {}
+    P.eraItemRequests = {}
+    local changedSourceIDs = {}
+    local changedCount = 0
+    for _, sources in pairs(cache and cache.bySlot or {}) do
+        for _, source in ipairs(sources or {}) do
+            if P.TrackAppearanceMetadata(source) then
+                changedSourceIDs[source.sourceID] = true
+                changedCount = changedCount + 1
+            end
+        end
+        if sortSources then SortSlotSources(sources) end
+    end
+    if notify and changedCount > 0 and QC.Notify then
+        QC.Notify("WARDROBE_SOURCE_METADATA_UPDATED", {
+            sourceIDs = changedSourceIDs,
+            reason = "INDEX_REBUILD",
+            changedCount = changedCount,
+        })
+    end
+    return changedCount
+end
+
+local function ProcessItemMetadataBatch()
+    P.itemMetadataBatchScheduled = false
+    local pending = P.pendingItemMetadata
+    P.pendingItemMetadata = {}
+    local changedSourceIDs, changedItemIDs = {}, {}
+    local changedCount = 0
+
+    for itemID in pairs(pending) do
+        itemID = tonumber(itemID)
+        P.eraItemRequests[itemID] = nil
+        changedItemIDs[itemID] = true
+        for source in pairs(P.itemMetadataWatch[itemID] or {}) do
+            local sourceChanged = false
+            if tonumber(source.itemID) == itemID then
+                local _, changed = P.HydrateSourceItemMetadata(source)
+                sourceChanged = changed == true
+            end
+            P.InvalidateSourceEraEvidence(source)
+            if source.sourceID and not changedSourceIDs[source.sourceID] then
+                changedSourceIDs[source.sourceID] = true
+                changedCount = changedCount + 1
+            end
+            if sourceChanged then source.metadataUpdatedAt = time and time() or 0 end
+        end
+    end
+
+    if changedCount > 0 and QC.Notify then
+        QC.Notify("WARDROBE_SOURCE_METADATA_UPDATED", {
+            sourceIDs = changedSourceIDs,
+            itemIDs = changedItemIDs,
+            reason = "ITEM_DATA_LOADED",
+            changedCount = changedCount,
+        })
+    end
+end
+
+function Wardrobe.QueueItemMetadataUpdate(itemID, success, eventName)
+    itemID = tonumber(itemID)
+    if not itemID or itemID <= 0 then return end
+    P.eraItemRequests[itemID] = nil
+    P.pendingItemMetadata[itemID] = {
+        success = success,
+        eventName = eventName,
+    }
+    if P.itemMetadataBatchScheduled then return end
+    P.itemMetadataBatchScheduled = true
+    if C_Timer and type(C_Timer.After) == "function" then
+        C_Timer.After(0.05, ProcessItemMetadataBatch)
+    else
+        ProcessItemMetadataBatch()
+    end
+end
+
+function Wardrobe.RebuildAppearanceMetadataIndex(sortSources, notify)
+    return P.RebuildAppearanceMetadataIndex(P.EnsureCache(), sortSources == true, notify == true)
 end
