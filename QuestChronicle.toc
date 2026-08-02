@@ -2,7 +2,7 @@
 ## Title: Quest Chronicle
 ## Notes: Records quest lifecycle, objective progress, completions, and roleplay notes, with a native-styled Chronicle window.
 ## Author: OpenAI & Andrew
-## Version: 1.9.0a6
+## Version: 1.9.0a7
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## AddonCompartmentFunc: QuestChronicle_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: QuestChronicle_OnAddonCompartmentEnter
@@ -19,8 +19,10 @@ Core\Wardrobe\StateAndPreferences.lua
 Core\Wardrobe\EquipmentTopology.lua
 Core\Wardrobe\AppearanceRoutes.lua
 Core\Wardrobe\WeaponFilters.lua
+Core\Wardrobe\WeaponCandidateIndex.lua
 Core\Wardrobe\WeaponSelection.lua
 Core\Wardrobe\GenerationAndConcepts.lua
+Core\Wardrobe\WeaponPipeline.lua
 Core\Wardrobe\GenerationPerformance.lua
 Core\Wardrobe\GenerationWorker.lua
 Core\Wardrobe\CustomSetBuild.lua
@@ -35,6 +37,7 @@ Core\ZoneStyle\SourceMetadata.lua
 Core\ZoneStyle\EraEvidence.lua
 Core\ZoneStyle\ProgressionRestrictions.lua
 Core\ZoneStyle\Scoring.lua
+Core\ZoneStyle\GenerationEligibility.lua
 Core\ZoneStyle\Traveler\StyleLexicon.lua
 Core\ZoneStyle\Traveler\Descriptors.lua
 Core\ZoneStyle\Traveler\Cohesion.lua
@@ -47,6 +50,7 @@ UI\Outfits\OutfitsHelpers.lua
 UI\Outfits\Layout.lua
 UI\Outfits\ConceptManager.lua
 UI\Outfits\AppearanceBrowser.lua
+UI\Outfits\GenerationRefresh.lua
 UI\Outfits\RefreshAndEvents.lua
 UI\Outfits\OutfitsTab.lua
 UI\Settings.lua

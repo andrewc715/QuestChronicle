@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0a6
+# Quest Chronicle v1.9.0a7
 
-> **Adaptive generation:** cached candidates now run until the frame-time budget is consumed, while uncached visual-sibling era evidence yields incrementally. The performance line identifies the slowest measured phase and exposes a detailed breakdown on hover.
+> **Cache-and-pipeline repair:** resolved, unknown, and temporarily pending era results are reused safely; valid evidence survives wardrobe cache rebuilds; weapon routing now yields cooperatively; and generation completion refreshes only the affected workbench controls.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a6 repairs the fixed 30-candidate throttle exposed by v1.9.0a5 live testing, keeps completed outfits atomic, and adds phase-aware generation diagnostics without changing outfit-selection rules.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a7 repairs the repeated era-evidence workload and synchronous weapon/UI phases exposed by v1.9.0a6 live telemetry, while preserving outfit-selection rules and atomic completion.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -167,19 +167,30 @@ QuestChronicle\
 │   │   ├── EquipmentTopology.lua
 │   │   ├── AppearanceRoutes.lua
 │   │   ├── WeaponFilters.lua
+│   │   ├── WeaponCandidateIndex.lua
 │   │   ├── WeaponSelection.lua
 │   │   ├── GenerationAndConcepts.lua
+│   │   ├── WeaponPipeline.lua
 │   │   ├── GenerationPerformance.lua
 │   │   ├── GenerationWorker.lua
 │   │   ├── CustomSetBuild.lua
 │   │   ├── CustomSetSyncAndManifest.lua
+│   │   ├── AppearanceMetadata.lua
+│   │   ├── CollectionScanWorker.lua
 │   │   ├── CollectionScanAndPreview.lua
 │   │   └── Events.lua
 │   └── ZoneStyle\
 │       ├── Profiles.lua
 │       ├── Context.lua
 │       ├── SourceMetadata.lua
-│       └── Scoring.lua
+│       ├── EraEvidence.lua
+│       ├── ProgressionRestrictions.lua
+│       ├── Scoring.lua
+│       ├── GenerationEligibility.lua
+│       └── Traveler│           ├── StyleLexicon.lua
+│           ├── Descriptors.lua
+│           ├── Cohesion.lua
+│           └── Debug.lua
 ├── UI\
 │   ├── Shared.lua
 │   ├── ChronicleTab.lua
@@ -191,6 +202,7 @@ QuestChronicle\
 │   │   ├── Layout.lua
 │   │   ├── ConceptManager.lua
 │   │   ├── AppearanceBrowser.lua
+│   │   ├── GenerationRefresh.lua
 │   │   ├── RefreshAndEvents.lua
 │   │   └── OutfitsTab.lua
 │   ├── Settings.lua

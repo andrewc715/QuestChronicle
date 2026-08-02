@@ -6,7 +6,9 @@ function P.GenerateWeapons(state, reroll, styleMode, styleContext)
     if errorMessage then return false, errorMessage end
 
     local context = P.CreateWeaponGenerationContext()
+    if P.MaybeYieldWeaponGeneration then P.MaybeYieldWeaponGeneration("weaponContext") end
     local capabilities = P.NormalizeWeaponFamilyChoices(state, context.capabilities)
+    if P.MaybeYieldWeaponGeneration then P.MaybeYieldWeaponGeneration("weaponCapabilities") end
     local topology = capabilities.topology
 
     local lockedMainSource, lockedSubtype
@@ -29,6 +31,7 @@ function P.GenerateWeapons(state, reroll, styleMode, styleContext)
     local lastFailure
 
     for _, route in ipairs(candidateRoutes) do
+        if P.MaybeYieldWeaponGeneration then P.MaybeYieldWeaponGeneration("weaponRoute") end
         context.activeRoute = route
         local routeMainCapability = P.BuildRouteHandCapability(route, "PRIMARY", capabilities.main)
         local mainSource = lockedMainSource
@@ -104,6 +107,7 @@ function P.GenerateWeapons(state, reroll, styleMode, styleContext)
                     offSource = P.GetSourceByID("OFF_HAND", state.selections.OFF_HAND)
                     local companionValid = false
                     for _, companionRoute in ipairs(companionRoutes) do
+                        if P.MaybeYieldWeaponGeneration then P.MaybeYieldWeaponGeneration("weaponCompanionRoute") end
                         context.activeRoute = companionRoute
                         local valid = P.ValidateLockedSourceForRoute(offSource, companionRoute, "SECONDARY", context.offItem, context)
                         if valid then companionValid = true break end

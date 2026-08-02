@@ -385,14 +385,23 @@ function ZoneStyle.ChooseWeightedSource(candidates, definition, modeKey, context
 end
 
 function ZoneStyle.OrderWeaponCandidates(candidates, modeKey, context)
+    local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
     for index = #(candidates or {}), 1, -1 do
         local candidate = candidates[index]
-        local eligible = ZoneStyle.GetSourceEligibility(candidate.source, modeKey, context)
+        local eligible
+        if ZoneStyle.GetSourceEligibilityCached then
+            eligible = ZoneStyle.GetSourceEligibilityCached(candidate.source, modeKey, context)
+        else
+            eligible = ZoneStyle.GetSourceEligibility(candidate.source, modeKey, context)
+        end
         local coherenceScore, coherent, coherenceReason = ZoneStyle.GetSourceCoherence(candidate.source, context)
         candidate.coherenceScore = coherenceScore
         candidate.coherent = coherent
         candidate.coherenceReason = coherenceReason
         if not eligible or not coherent then table.remove(candidates, index) end
+        if wardrobePrivate and wardrobePrivate.MaybeYieldWeaponGeneration then
+            wardrobePrivate.MaybeYieldWeaponGeneration("weaponStyleEligibility")
+        end
     end
     for _, candidate in ipairs(candidates or {}) do
         local definition = QC.Wardrobe and QC.Wardrobe.GetSlotDefinition and QC.Wardrobe.GetSlotDefinition(candidate.slotKey)
@@ -410,6 +419,9 @@ function ZoneStyle.OrderWeaponCandidates(candidates, modeKey, context)
         candidate.coherenceReason = nil
         local roll = math.max(0.000001, math.random())
         candidate.stylePriority = math.log(roll) / weight
+        if wardrobePrivate and wardrobePrivate.MaybeYieldWeaponGeneration then
+            wardrobePrivate.MaybeYieldWeaponGeneration("weaponStyleScoring")
+        end
     end
     table.sort(candidates, function(left, right)
         return (left.stylePriority or -math.huge) > (right.stylePriority or -math.huge)

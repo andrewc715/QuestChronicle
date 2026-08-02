@@ -85,6 +85,7 @@ local function ProcessAppearance(worker, appearance)
     if acceptedForAppearance and bestSource then
         P.AttachEraSourceManifest(bestSource, false)
         P.TrackAppearanceMetadata(bestSource, false)
+        P.RestoreAppearanceGenerationCache(bestSource)
         local visualKey = appearance.visualID
         if visualKey and P.BetterSource(bestSource, worker.visuals[visualKey]) then
             worker.visuals[visualKey] = bestSource

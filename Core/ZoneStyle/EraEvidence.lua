@@ -206,34 +206,72 @@ function P.ResolveEraCandidate(candidate)
     return PreferStronger(best, item), itemPending
 end
 
-local function CacheEvidence(source, evidence, candidateCount)
+local function EraNow()
+    if type(time) == "function" then return time() end
+    if type(GetTimePreciseSec) == "function" then return GetTimePreciseSec() end
+    if type(GetTime) == "function" then return GetTime() end
+    return 0
+end
+
+local function ManifestSignature(source)
+    if not source then return "" end
+    if source.eraManifestSignature then return source.eraManifestSignature end
+    local parts = {}
+    for _, sourceID in ipairs(source.eraSourceIDs or {}) do parts[#parts + 1] = tostring(sourceID) end
+    return table.concat(parts, ",")
+end
+
+local function CacheEraResult(source, result, candidateCount)
+    if not source or not result then return result end
     source.eraEvidenceVersion = P.ERA_EVIDENCE_VERSION
     source.eraEvidenceVisualID = source.visualID
     source.eraEvidenceManifestVersion = source.eraManifestVersion
-    source.eraEvidenceExpansionID = evidence.expansionID
-    source.eraEvidenceMethod = evidence.method
-    source.eraEvidenceLabel = evidence.label
-    source.eraEvidenceSourceID = evidence.sourceID
-    source.eraEvidenceItemID = evidence.itemID
+    source.eraEvidenceManifestSignature = ManifestSignature(source)
+    source.eraEvidenceMetadataRevision = tonumber(source.metadataRevision) or 0
     source.eraEvidenceCandidateCount = candidateCount
+    source.eraEvidenceExpansionID = result.expansionID
+    source.eraEvidenceMethod = result.method
+    source.eraEvidenceLabel = result.label
+    source.eraEvidenceSourceID = result.sourceID
+    source.eraEvidenceItemID = result.itemID
+    source.eraEvidenceReason = result.reason
+    source.eraEvidencePending = result.pending == true
+    source.eraEvidenceUnknown = result.unknown == true
+    source.eraEvidenceState = result.expansionID ~= nil and "RESOLVED"
+        or (result.pending and "PENDING" or "UNKNOWN")
+    source.eraEvidenceRetryAt = result.pending and (EraNow() + 30) or nil
+    return result
 end
 
 local function ReadCachedEvidence(source)
-    if source
-        and source.eraEvidenceVersion == P.ERA_EVIDENCE_VERSION
-        and source.eraEvidenceVisualID == source.visualID
-        and source.eraEvidenceManifestVersion == source.eraManifestVersion
-        and source.eraEvidenceExpansionID ~= nil
+    if not source
+        or source.eraEvidenceVersion ~= P.ERA_EVIDENCE_VERSION
+        or source.eraEvidenceVisualID ~= source.visualID
+        or source.eraEvidenceManifestVersion ~= source.eraManifestVersion
+        or source.eraEvidenceManifestSignature ~= ManifestSignature(source)
+        or (tonumber(source.eraEvidenceMetadataRevision) or 0) ~= (tonumber(source.metadataRevision) or 0)
+        or source.eraEvidenceState == nil
     then
-        return {
-            expansionID = source.eraEvidenceExpansionID,
-            method = source.eraEvidenceMethod,
-            label = source.eraEvidenceLabel,
-            sourceID = source.eraEvidenceSourceID,
-            itemID = source.eraEvidenceItemID,
-            candidateCount = source.eraEvidenceCandidateCount,
-        }
+        return nil
     end
+    if source.eraEvidenceState == "PENDING"
+        and tonumber(source.eraEvidenceRetryAt)
+        and EraNow() >= tonumber(source.eraEvidenceRetryAt)
+    then
+        return nil
+    end
+    return {
+        expansionID = source.eraEvidenceExpansionID,
+        method = source.eraEvidenceMethod,
+        label = source.eraEvidenceLabel,
+        sourceID = source.eraEvidenceSourceID,
+        itemID = source.eraEvidenceItemID,
+        candidateCount = source.eraEvidenceCandidateCount,
+        reason = source.eraEvidenceReason,
+        pending = source.eraEvidencePending == true,
+        unknown = source.eraEvidenceUnknown == true,
+        cached = true,
+    }
 end
 
 local function FinalizeEraWork(work)
@@ -253,7 +291,6 @@ local function FinalizeEraWork(work)
                 reason = "WoW is still loading stronger source-era evidence.",
             }
         else
-            CacheEvidence(work.source, earliest, candidateCount)
             earliest.candidateCount = candidateCount
             earliest.partial = pending
             result = earliest
@@ -266,6 +303,7 @@ local function FinalizeEraWork(work)
             reason = pending and "WoW is still loading source-era evidence." or "WoW did not expose enough evidence to establish this appearance's era.",
         }
     end
+    CacheEraResult(work.source, result, candidateCount)
     work.done = true
     work.result = result
     return result
@@ -283,6 +321,10 @@ function ZoneStyle.CreateSourceEraEvidenceWork(source)
     end
     local cached = ReadCachedEvidence(source)
     if cached then
+        local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
+        if wardrobePrivate and wardrobePrivate.generationJob then
+            wardrobePrivate.generationJob.eraCacheHits = (wardrobePrivate.generationJob.eraCacheHits or 0) + 1
+        end
         return {
             source = source,
             sourceIDs = {},
@@ -320,6 +362,10 @@ function ZoneStyle.StepSourceEraEvidenceWork(work, maxCandidates)
         end
         work.sourceIndex = work.sourceIndex + 1
         processed = processed + 1
+        local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
+        if wardrobePrivate and wardrobePrivate.MaybeYieldWeaponGeneration then
+            wardrobePrivate.MaybeYieldWeaponGeneration("eraEvidence")
+        end
     end
 
     if work.sourceIndex > #work.sourceIDs then

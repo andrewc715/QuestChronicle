@@ -63,6 +63,9 @@ function P.CreateStyleGenerationContext(state, styleEngine, baseContext, exclude
             styleEngine.AddSourceToGenerationContext(context, P.GetSourceByID(slotKey, state.selections[slotKey]))
         end
     end
+    if styleEngine.PrepareGenerationEligibilityContext then
+        styleEngine.PrepareGenerationEligibilityContext(context)
+    end
     return context
 end
 
@@ -314,6 +317,7 @@ function Wardrobe.InvalidateWeaponAppearanceRoutes()
     P.weaponRouteCache = nil
     P.weaponRouteCacheKey = nil
     P.weaponRouteCacheExpiresAt = 0
+    if P.InvalidateWeaponCandidateIndex then P.InvalidateWeaponCandidateIndex() end
 end
 
 function P.GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)

@@ -456,6 +456,12 @@ P.builders[#P.builders + 1] = function(C)
             tonumber(performance.eraCandidates) or 0,
             tonumber(performance.selectedArmor) or 0
         ), 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(string.format(
+            "%d era-cache hits • %d eligibility-cache hits • %d weapon yields",
+            tonumber(performance.eraCacheHits) or 0,
+            tonumber(performance.eligibilityCacheHits) or 0,
+            tonumber(performance.weaponYields) or 0
+        ), 0.7, 0.7, 0.7, true)
         for _, detail in ipairs(Wardrobe.GetGenerationPerformanceDetails(performance)) do
             GameTooltip:AddDoubleLine(
                 detail.label,

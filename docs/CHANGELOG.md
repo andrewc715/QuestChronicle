@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.0a7 - 2026-08-02
+
+### Performance
+
+- Cached resolved, unknown, and temporarily pending visual-era results with metadata and manifest invalidation.
+- Preserved valid era evidence across successful wardrobe cache rebuilds and migrated legacy v1.9.0a6 positive results.
+- Added reusable generation eligibility records and a weapon-subtype candidate index.
+- Converted weapon routing into a resumable coroutine without changing route or weighted-selection behavior.
+- Replaced the final full Outfits workbench rebuild with a targeted generation-result refresh.
+- Added era-cache-hit, eligibility-cache-hit, and weapon-yield diagnostics.
+- Preserved atomic commits, Traveler instrumentation-only behavior, schema 2, Courier format 1, and wardrobe cache format 7.
+
 ## 1.9.0a6 - 2026-08-02
 
 ### Performance

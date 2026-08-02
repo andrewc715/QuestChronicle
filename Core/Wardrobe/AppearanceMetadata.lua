@@ -3,6 +3,7 @@ local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
 
 P.ERA_MANIFEST_VERSION = 3
+P.previousGenerationCachesByVisual = nil
 P.eraItemRequests = P.eraItemRequests or {}
 P.itemMetadataWatch = P.itemMetadataWatch or {}
 P.pendingItemMetadata = P.pendingItemMetadata or {}
@@ -26,12 +27,82 @@ function P.InvalidateSourceEraEvidence(source)
     source.eraEvidenceVersion = nil
     source.eraEvidenceVisualID = nil
     source.eraEvidenceManifestVersion = nil
+    source.eraEvidenceManifestSignature = nil
+    source.eraEvidenceMetadataRevision = nil
+    source.eraEvidenceState = nil
     source.eraEvidenceExpansionID = nil
     source.eraEvidenceMethod = nil
     source.eraEvidenceLabel = nil
     source.eraEvidenceSourceID = nil
     source.eraEvidenceItemID = nil
     source.eraEvidenceCandidateCount = nil
+    source.eraEvidenceReason = nil
+    source.eraEvidencePending = nil
+    source.eraEvidenceUnknown = nil
+    source.eraEvidenceRetryAt = nil
+    source.generationEligibilityKey = nil
+    source.generationEligibilityEligible = nil
+    source.generationEligibilityKind = nil
+    source.generationEligibilityReason = nil
+    source.generationPrecheckKey = nil
+    source.generationPrecheckEligible = nil
+    source.generationPrecheckKind = nil
+    source.generationPrecheckReason = nil
+end
+
+
+function P.GetEraManifestSignature(sourceIDs)
+    local parts = {}
+    for _, sourceID in ipairs(sourceIDs or {}) do
+        parts[#parts + 1] = tostring(sourceID)
+    end
+    return table.concat(parts, ",")
+end
+
+local generationCacheFields = {
+    "eraEvidenceVersion", "eraEvidenceVisualID", "eraEvidenceManifestVersion",
+    "eraEvidenceManifestSignature", "eraEvidenceMetadataRevision", "eraEvidenceState",
+    "eraEvidenceExpansionID", "eraEvidenceMethod", "eraEvidenceLabel",
+    "eraEvidenceSourceID", "eraEvidenceItemID", "eraEvidenceCandidateCount",
+    "eraEvidenceReason", "eraEvidencePending", "eraEvidenceUnknown", "eraEvidenceRetryAt",
+    "generationEligibilityKey", "generationEligibilityEligible", "generationEligibilityKind",
+    "generationEligibilityReason", "generationPrecheckKey", "generationPrecheckEligible",
+    "generationPrecheckKind", "generationPrecheckReason",
+}
+
+function P.CaptureAppearanceGenerationCaches(cache)
+    local snapshots = {}
+    for _, sources in pairs(cache and cache.bySlot or {}) do
+        for _, source in ipairs(sources or {}) do
+            local visualID = tonumber(source.visualID)
+            if visualID and (source.eraEvidenceVersion or source.generationPrecheckKey or source.generationEligibilityKey) then
+                local snapshot = { manifestSignature = source.eraManifestSignature
+                    or P.GetEraManifestSignature(source.eraSourceIDs) }
+                for _, field in ipairs(generationCacheFields) do snapshot[field] = source[field] end
+                snapshot.eraEvidenceManifestSignature = snapshot.eraEvidenceManifestSignature or snapshot.manifestSignature
+                if not snapshot.eraEvidenceState and snapshot.eraEvidenceExpansionID ~= nil then
+                    snapshot.eraEvidenceState = "RESOLVED"
+                end
+                snapshots[visualID] = snapshot
+            end
+        end
+    end
+    P.previousGenerationCachesByVisual = snapshots
+end
+
+function P.DiscardAppearanceGenerationCaches()
+    P.previousGenerationCachesByVisual = nil
+end
+
+function P.RestoreAppearanceGenerationCache(source)
+    local snapshot = source and P.previousGenerationCachesByVisual
+        and P.previousGenerationCachesByVisual[tonumber(source.visualID)]
+    if not snapshot then return false end
+    local signature = source.eraManifestSignature or P.GetEraManifestSignature(source.eraSourceIDs)
+    if snapshot.manifestSignature ~= signature then return false end
+    for _, field in ipairs(generationCacheFields) do source[field] = snapshot[field] end
+    source.eraEvidenceMetadataRevision = tonumber(source.metadataRevision) or 0
+    return true
 end
 
 function P.BuildEraSourceManifest(source)
@@ -84,6 +155,7 @@ function P.EnsureEraSourceManifest(source, invalidate)
 
     source.eraManifestVersion = P.ERA_MANIFEST_VERSION
     source.eraSourceIDs = P.BuildEraSourceManifest(source)
+    source.eraManifestSignature = P.GetEraManifestSignature(source.eraSourceIDs)
     source.eraItemIDs = P.BuildEraItemManifest(source.eraSourceIDs)
     if invalidate ~= false then P.InvalidateSourceEraEvidence(source) end
 end
@@ -177,6 +249,7 @@ function P.TrackAppearanceMetadata(source, requestManifestItems)
 end
 
 function P.BeginAppearanceMetadataRefresh()
+    P.CaptureAppearanceGenerationCaches(P.EnsureCache and P.EnsureCache() or nil)
     -- A collection scan reconstructs the watch index as it discovers sources.
     -- Clear it once here instead of rebuilding and hydrating the entire old
     -- cache before the scan, then doing the same work again afterward.
@@ -235,6 +308,7 @@ function P.RebuildAppearanceMetadataIndex(cache, sortSources, notify, requestMan
 end
 
 function P.FinalizeAppearanceMetadataRefresh(cache, sortSources)
+    P.DiscardAppearanceGenerationCaches()
     if sortSources then
         for _, sources in pairs(cache and cache.bySlot or {}) do
             SortSlotSources(sources)

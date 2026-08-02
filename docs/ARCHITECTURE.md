@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0a6 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0a7 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -53,11 +53,17 @@ These tables are runtime implementation details. Other subsystems should use pub
 `Core/Wardrobe/WeaponFilters.lua`
 : Route diagnostics, capability matrices, family/subtype controls, and browser filters.
 
+`Core/Wardrobe/WeaponCandidateIndex.lua`
+: Reusable subtype-to-source indexes for generated weapon routes.
+
 `Core/Wardrobe/WeaponSelection.lua`
-: Candidate validation, weighted weapon selection, linked hands, and route eligibility.
+: Candidate validation, weighted weapon selection, linked hands, route eligibility, and cooperative yield boundaries.
 
 `Core/Wardrobe/GenerationAndConcepts.lua`
 : Synchronous generation primitives, atomic weapon bundles, rerolls, and concept persistence.
+
+`Core/Wardrobe/WeaponPipeline.lua`
+: Coroutine adapter that resumes the unchanged weapon-route algorithm within the foreground generation budget.
 
 `Core/Wardrobe/GenerationPerformance.lua`
 : Generation phase measurements, persistent performance summaries, post-worker preview/UI timing, and tooltip-ready diagnostics.
@@ -100,6 +106,9 @@ These tables are runtime implementation details. Other subsystems should use pub
 `Core/ZoneStyle/Scoring.lua`
 : Outfit naming, coherence, eligibility, source weighting, and weapon ordering.
 
+`Core/ZoneStyle/GenerationEligibility.lua`
+: Context-keyed pre-era and final generation eligibility records reused across rerolls.
+
 `Core/ZoneStyle/Traveler/StyleLexicon.lua`
 : Traveler-only style vocabulary, compatibility relations, formula weights, visibility weights, and mismatch thresholds.
 
@@ -128,8 +137,11 @@ The Outfits tab uses a shared construction context so its formerly 1,700-line co
 `UI/Outfits/AppearanceBrowser.lua`
 : Source browser, Current Preview overlay, slot actions, and pagination.
 
+`UI/Outfits/GenerationRefresh.lua`
+: Targeted post-generation updates for the manifest, selected rows, slot icons, actions, and status text.
+
 `UI/Outfits/RefreshAndEvents.lua`
-: Refresh logic, callbacks, and OnShow behavior.
+: Full refresh logic, callbacks, and OnShow behavior.
 
 `UI/Outfits/OutfitsTab.lua`
 : Small public constructor that executes the ordered builders.
@@ -153,7 +165,7 @@ The command exits nonzero if any Lua file exceeds 500 physical lines.
 - `Cohesion.lua` computes pair compatibility, anchor profiles, accent echo, mismatch classes, and the diagnostic budget.
 - `Debug.lua` analyzes the current outfit and implements `/qc traveler debug`.
 
-In v1.9.0a6 this subsystem remains read-only. It does not participate in candidate selection or mutate the wardrobe preview.
+In v1.9.0a7 this subsystem remains read-only. It does not participate in candidate selection or mutate the wardrobe preview.
 
 
 ## Cooperative wardrobe refresh (v1.9.0a2)
@@ -178,4 +190,16 @@ Armor generation is governed primarily by a 2.5 ms addon-time budget. The worker
 Uncached era evidence uses `ZoneStyle.CreateSourceEraEvidenceWork()` and `ZoneStyle.StepSourceEraEvidenceWork()` to process one visual sibling per operation. Candidates rejected by zone preferences, promotional rules, or progression restrictions are discarded before that era work begins. The ordinary synchronous era API remains available for browser and compatibility callers.
 
 Generation diagnostics are divided among `GenerationPerformance.lua`, the worker, and the Outfits completion callback. Core phases are measured during preparation; preview-model application and the final full workbench refresh are measured on their later frames. The selected armor and weapon bundle remains private until the atomic state commit.
+
+## Cache-and-pipeline generation repair (v1.9.0a7)
+
+Era evidence is stored as an explicit `RESOLVED`, `UNKNOWN`, or `PENDING` result. Every result is keyed to the era-evidence version, visual identity, complete visual-source manifest, and representative metadata revision. Unknown results fail closed until metadata or the manifest changes. Pending results fail closed but reopen after 30 seconds if no item-data event invalidates them first.
+
+A collection scan builds new source tables in a staging cache. Before scanning, `AppearanceMetadata.lua` captures valid generation evidence by visual ID. Matching manifests receive that evidence after the new representative is hydrated. Legacy v1.9.0a6 resolved evidence is upgraded with an explicit state and manifest signature during this transfer. A changed manifest rejects the old evidence.
+
+`GenerationEligibility.lua` caches the inexpensive but frequently repeated result of promotion, Heritage/progression, zone-preference, era-limit, and provenance checks. Its key includes player identity, zone preference, era/provenance context, the restriction setting, source metadata, and the resolved evidence state.
+
+Weapon routing keeps the public and synchronous `GenerateWeapons()` implementation as its source of truth. During cooperative foreground generation, `WeaponPipeline.lua` runs that implementation inside a coroutine. Explicit yield boundaries in route enumeration, candidate indexing, style eligibility, scoring, Blizzard permission checks, and appearance validation return control to `GenerationWorker.lua` before the frame budget is monopolized.
+
+The successful completion callback applies the model on one frame and calls `RefreshGeneratedResult()` on the next. That targeted refresh updates only controls whose values can change after an atomic generated outfit commit, avoiding the expensive weapon-capability and full-layout work performed by the ordinary workbench refresh.
 

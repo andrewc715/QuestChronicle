@@ -236,7 +236,12 @@ local function ContinueArmorCandidate(job, work)
 
         if job.styleEngine.GetSourcePreEraEligibility then
             local eligibilityStarted = NowMilliseconds()
-            local eligible = job.styleEngine.GetSourcePreEraEligibility(source, job.styleContext)
+            local eligible
+            if job.styleEngine.GetSourcePreEraEligibilityCached then
+                eligible = job.styleEngine.GetSourcePreEraEligibilityCached(source, job.styleContext)
+            else
+                eligible = job.styleEngine.GetSourcePreEraEligibility(source, job.styleContext)
+            end
             RecordPhase(job, "eligibility", eligibilityStarted)
             if not eligible then return true end
             candidate.prechecked = true
@@ -265,13 +270,24 @@ local function ContinueArmorCandidate(job, work)
     end
 
     local eligibilityStarted = NowMilliseconds()
-    local eligible = job.styleEngine.GetSourceEligibility(
-        candidate.source,
-        job.styleMode,
-        job.styleContext,
-        candidate.eraEvidence,
-        candidate.prechecked
-    )
+    local eligible
+    if job.styleEngine.GetSourceEligibilityCached then
+        eligible = job.styleEngine.GetSourceEligibilityCached(
+            candidate.source,
+            job.styleMode,
+            job.styleContext,
+            candidate.eraEvidence,
+            candidate.prechecked
+        )
+    else
+        eligible = job.styleEngine.GetSourceEligibility(
+            candidate.source,
+            job.styleMode,
+            job.styleContext,
+            candidate.eraEvidence,
+            candidate.prechecked
+        )
+    end
     RecordPhase(job, "eligibility", eligibilityStarted)
     if not eligible then return true end
 
@@ -346,17 +362,35 @@ function P.StepGenerationJob(token)
     end
 
     if job.phase == "WEAPONS" then
-        local weaponStarted = NowMilliseconds()
-        local ok, countOrMessage, notice = P.GenerateWeapons(job.draft, job.reroll, job.styleMode, job.styleContext)
-        RecordPhase(job, "weaponRouting", weaponStarted)
-        job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
-        if not ok then
-            FinishJob(job, false, countOrMessage)
-            return
+        if not job.weaponWork and P.CreateWeaponGenerationWork then
+            job.weaponWork = P.CreateWeaponGenerationWork(job.draft, job.reroll, job.styleMode, job.styleContext)
         end
-        job.weaponCount = countOrMessage
-        job.weaponNotice = notice
-        job.phase = "COMMIT"
+        local operations = 0
+        while operations < P.GENERATION_OPERATION_SAFETY_CAP do
+            local weaponStarted = NowMilliseconds()
+            local done, ok, countOrMessage, notice
+            if job.weaponWork and P.StepWeaponGenerationWork then
+                done, ok, countOrMessage, notice = P.StepWeaponGenerationWork(job.weaponWork)
+            else
+                done = true
+                ok, countOrMessage, notice = P.GenerateWeapons(job.draft, job.reroll, job.styleMode, job.styleContext)
+            end
+            RecordPhase(job, "weaponRouting", weaponStarted)
+            operations = operations + 1
+            if done then
+                if not ok then
+                    FinishJob(job, false, countOrMessage)
+                    return
+                end
+                job.weaponCount = countOrMessage
+                job.weaponNotice = notice
+                job.phase = "COMMIT"
+                break
+            end
+            job.weaponYields = job.weaponYields + 1
+            if NowMilliseconds() - stepStarted >= P.GENERATION_TIME_BUDGET_MS then break end
+        end
+        job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
         if not ScheduleNextStep(token) then
             FinishJob(job, false, "Quest Chronicle could not schedule the cooperative outfit generator. Try /reload.")
         end
@@ -435,6 +469,9 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
         selectedArmor = 0,
         candidatesProcessed = 0,
         eraCandidatesProcessed = 0,
+        eraCacheHits = 0,
+        eligibilityCacheHits = 0,
+        weaponYields = 0,
         steps = 0,
         maxStepMs = 0,
         phaseStats = {},

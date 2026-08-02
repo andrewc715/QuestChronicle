@@ -1,6 +1,10 @@
 local QC = QuestChronicle
 local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
+
+local function YieldWeapon(phaseKey)
+    if P.MaybeYieldWeaponGeneration then P.MaybeYieldWeaponGeneration(phaseKey) end
+end
 function P.ValidateGeneratedWeaponSource(source, slotKey, equippedItem, context)
     local definition = P.slotByKey[slotKey]
     local cacheKey = table.concat({ tostring(slotKey), tostring(source and source.sourceID), tostring(equippedItem) }, ":")
@@ -15,6 +19,7 @@ function P.ValidateGeneratedWeaponSource(source, slotKey, equippedItem, context)
     end
 
     local basicValid, basicReason = Wardrobe.ValidateSource(source, slotKey)
+    YieldWeapon("weaponValidation")
     if not basicValid then
         return Finish(false, basicReason)
     end
@@ -30,6 +35,7 @@ function P.ValidateGeneratedWeaponSource(source, slotKey, equippedItem, context)
             equippedItem,
             context and context.activeRoute or nil
         )
+        YieldWeapon("weaponPermission")
         if permitted == nil then
             return Finish(false, "WoW's slot weapon-option compatibility check is unavailable.")
         end
@@ -45,6 +51,7 @@ function P.ValidateGeneratedWeaponSource(source, slotKey, equippedItem, context)
     -- is the authoritative answer. The older appearance usability flags can
     -- remain false even while the native Transmog UI permits the category.
     local appearance = P.GetGenerationAppearance(source, definition, context)
+    YieldWeapon("weaponAppearance")
     local nativeSlotRule = permissionDetails and (
         permissionDetails.method == "PROVENANCE_ROUTE"
         or permissionDetails.method == "PHYSICAL_TOPOLOGY_SINGLE_ROUTE"
@@ -71,6 +78,7 @@ function P.ValidateGeneratedWeaponSource(source, slotKey, equippedItem, context)
     -- isAnySourceValidForPlayer fields overrule the exact API Blizzard uses to
     -- populate its own weapon-category picker.
     local appearanceInfo = P.SafeCall(C_TransmogCollection.GetAppearanceInfoBySource, source.sourceID)
+    YieldWeapon("weaponSourceInfo")
     if appearanceInfo then
         if appearanceInfo.appearanceIsCollected == false then
             return Finish(false, "The weapon appearance is no longer collected.")
@@ -161,12 +169,15 @@ function P.ChooseGeneratedWeaponSource(familyKeys, equippedItem, context, exclud
         local subtype = Wardrobe.weaponSubtypeDefinitions[subtypeKey]
         local categoryID = P.ResolveWeaponSubtypeCategoryID(subtype)
         local candidates = {}
-        for _, source in ipairs(Wardrobe.GetSlotSources(subtype.familyKey)) do
+        local indexedSources = P.GetIndexedWeaponSources and P.GetIndexedWeaponSources(subtypeKey)
+            or Wardrobe.GetSlotSources(subtype.familyKey)
+        for _, source in ipairs(indexedSources) do
             if tonumber(source.categoryID) == tonumber(categoryID) then
                 local validationSlotKey = targetSlotKey or subtype.familyKey
                 local candidateSource = P.CopySourceForSlot(source, validationSlotKey)
                 local basicValid = Wardrobe.ValidateSource(candidateSource, validationSlotKey)
                 if basicValid then table.insert(candidates, { source = candidateSource, slotKey = validationSlotKey, familyKey = subtype.familyKey, subtypeKey = subtypeKey }) end
+                YieldWeapon("weaponCandidateBuild")
             end
         end
         if QC.ZoneStyle and QC.ZoneStyle.OrderWeaponCandidates then
@@ -176,6 +187,7 @@ function P.ChooseGeneratedWeaponSource(familyKeys, equippedItem, context, exclud
         end
         for _, candidate in ipairs(candidates) do
             local valid = P.ValidateGeneratedWeaponSource(candidate.source, candidate.slotKey, equippedItem, context)
+            YieldWeapon("weaponCandidateValidate")
             if valid then
                 local excludedID = excludedBySlot and (excludedBySlot[candidate.slotKey] or excludedBySlot[candidate.familyKey])
                 if excludedID == candidate.source.sourceID then
@@ -218,6 +230,7 @@ function P.ChooseLinkedWeaponSource(primarySource, equippedItem, context, exclud
 
     for _, candidate in ipairs(exactCandidates) do
         local valid = P.ValidateGeneratedWeaponSource(candidate, targetSlotKey, equippedItem, context)
+        YieldWeapon("weaponLinkedValidate")
         if valid then
             return candidate, "EXACT_VISUAL", nil
         end
@@ -252,6 +265,7 @@ function P.FindPrimaryRoutesForSource(source, capabilities, requireSameSubtype)
     local definition = subtypeKey and Wardrobe.weaponSubtypeDefinitions[subtypeKey]
     if not definition then return routes end
     for _, route in ipairs(capabilities.routesByFamily[definition.familyKey] or {}) do
+        YieldWeapon("weaponRouteFilter")
         local secondaryCompatible = route.targetsSecondary
             and (requireSameSubtype ~= true or route.secondarySubtypes[subtypeKey] ~= nil)
         if route.primarySubtypes[subtypeKey] and secondaryCompatible then
@@ -389,6 +403,7 @@ end
 function P.GetEnabledMainRoutes(state, capabilities, lockedMode, lockedSubtype)
     local routes = {}
     for _, route in ipairs(capabilities.routes.routes or {}) do
+        YieldWeapon("weaponRouteFilter")
         if route.familyKey ~= "OFF_HAND"
             and route.available == true
             and state.weaponFamilies[route.familyKey] == true
@@ -424,6 +439,7 @@ function P.GetEnabledCompanionRoutes(state, capabilities)
     local routes = {}
     if state.weaponFamilies.OFF_HAND ~= true then return routes end
     for _, route in ipairs(capabilities.companionRoutes or {}) do
+        YieldWeapon("weaponRouteFilter")
         if route.available and P.RouteHasEnabledSubtype(state, route, "SECONDARY") then table.insert(routes, route) end
     end
     return routes

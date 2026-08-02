@@ -270,7 +270,11 @@ P.builders[#P.builders + 1] = function(C)
             local function RefreshAfterPreview()
                 if not C.pane:IsShown() then return end
                 local refreshStarted = NowMilliseconds()
-                C.pane:Refresh(message)
+                if C.pane.RefreshGeneratedResult then
+                    C.pane:RefreshGeneratedResult(message)
+                else
+                    C.pane:Refresh(message)
+                end
                 if Wardrobe.RecordGenerationPostPhase then
                     Wardrobe.RecordGenerationPostPhase(performance, "uiRefresh", NowMilliseconds() - refreshStarted)
                 end
