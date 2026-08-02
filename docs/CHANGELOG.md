@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.0a9 - 2026-08-02
+
+### Performance
+
+- Tracked the exact pending item IDs and tracking-only pending state for each era-evidence result.
+- Ignored stable or unrelated item-data callbacks instead of invalidating reusable evidence.
+- Reopened only pending evidence whose specific missing item became available.
+- Added stable generation-relevant item fingerprints and genuine item-identity invalidation.
+- Coalesced duplicate item callbacks and suppressed metadata UI notifications when no visible row changed.
+- Added stable-ignored, pending-reopened, identity-change, failed-load, and coalesced event diagnostics.
+- Preserved the live-validated v1.9.0a8 persistent cache, cooperative pipelines, schema 2, Courier format 1, and wardrobe cache format 7.
+
 ## 1.9.0a8 - 2026-08-02
 
 ### Performance

@@ -170,9 +170,9 @@ local function GetEncounterEvidence(candidate)
 end
 
 local function GetItemEvidence(candidate)
-    if not candidate.itemID then return nil, false end
+    if not candidate.itemID then return nil, false, nil end
     local getter = C_Item and C_Item.GetItemInfo or GetItemInfo
-    if type(getter) ~= "function" then return nil, false end
+    if type(getter) ~= "function" then return nil, false, nil end
 
     -- C_Item.GetItemInfo returns expansionID as its fifteenth result after
     -- the item name. Keep the tuple explicit so future API changes are easier
@@ -182,13 +182,13 @@ local function GetItemEvidence(candidate)
         expansionID = pcall(getter, candidate.itemID)
     if ok and name and expansionID ~= nil then
         local info = ZoneStyle.expansions[tonumber(expansionID)]
-        return Evidence(expansionID, "item", "item metadata: " .. tostring(info and info.label or expansionID), candidate.sourceID, candidate.itemID), false
+        return Evidence(expansionID, "item", "item metadata: " .. tostring(info and info.label or expansionID), candidate.sourceID, candidate.itemID), false, nil
     end
     if C_Item and type(C_Item.RequestLoadItemDataByID) == "function" then
         P.SafeCall(C_Item.RequestLoadItemDataByID, candidate.itemID)
-        return nil, true
+        return nil, true, candidate.itemID
     end
-    return nil, false
+    return nil, false, nil
 end
 
 function P.ResolveEraCandidate(candidate)
@@ -199,11 +199,11 @@ function P.ResolveEraCandidate(candidate)
     best = PreferStronger(best, tracking)
     best = PreferStronger(best, GetEncounterEvidence(candidate))
 
-    if best and best.rank >= evidenceRanks.encounter then return best, false end
+    if best and best.rank >= evidenceRanks.encounter then return best, false, nil, false end
 
-    local item, itemPending = GetItemEvidence(candidate)
-    if trackingPending then return nil, true end
-    return PreferStronger(best, item), itemPending
+    local item, itemPending, pendingItemID = GetItemEvidence(candidate)
+    if trackingPending then return nil, true, pendingItemID, true end
+    return PreferStronger(best, item), itemPending, pendingItemID, false
 end
 
 local function EraNow()
@@ -237,6 +237,8 @@ local function CacheEraResult(source, result, candidateCount)
     source.eraEvidenceReason = result.reason
     source.eraEvidencePending = result.pending == true
     source.eraEvidenceUnknown = result.unknown == true
+    source.eraEvidencePendingItemIDs = result.pendingItemIDs
+    source.eraEvidenceTrackingPending = result.trackingPending == true
     source.eraEvidenceState = result.expansionID ~= nil and "RESOLVED"
         or (result.pending and "PENDING" or "UNKNOWN")
     source.eraEvidenceRetryAt = result.pending and (EraNow() + 30) or nil
@@ -272,6 +274,8 @@ local function ReadCachedEvidence(source)
                 reason = source.eraEvidenceReason,
                 pending = source.eraEvidencePending == true,
                 unknown = source.eraEvidenceUnknown == true,
+                pendingItemIDs = source.eraEvidencePendingItemIDs,
+                trackingPending = source.eraEvidenceTrackingPending == true,
                 cached = true,
             }
         end
@@ -313,6 +317,11 @@ local function FinalizeEraWork(work)
             reason = pending and "WoW is still loading source-era evidence." or "WoW did not expose enough evidence to establish this appearance's era.",
         }
     end
+    local pendingItemIDs = {}
+    for itemID in pairs(work.pendingItemIDs or {}) do pendingItemIDs[#pendingItemIDs + 1] = itemID end
+    table.sort(pendingItemIDs)
+    result.pendingItemIDs = #pendingItemIDs > 0 and pendingItemIDs or nil
+    result.trackingPending = work.trackingPending == true
     CacheEraResult(work.source, result, candidateCount)
     work.done = true
     work.result = result
@@ -350,6 +359,8 @@ function ZoneStyle.CreateSourceEraEvidenceWork(source)
         sourceIndex = 1,
         earliest = nil,
         pending = false,
+        pendingItemIDs = {},
+        trackingPending = false,
         done = false,
     }
 end
@@ -362,8 +373,11 @@ function ZoneStyle.StepSourceEraEvidenceWork(work, maxCandidates)
     local processed = 0
     while work.sourceIndex <= #work.sourceIDs and processed < maxCandidates do
         local sourceID = work.sourceIDs[work.sourceIndex]
-        local evidence, candidatePending = P.ResolveEraCandidate(P.BuildEraCandidate(work.source, sourceID))
+        local evidence, candidatePending, pendingItemID, trackingPending =
+            P.ResolveEraCandidate(P.BuildEraCandidate(work.source, sourceID))
         work.pending = work.pending or candidatePending
+        if pendingItemID then work.pendingItemIDs[tonumber(pendingItemID)] = true end
+        work.trackingPending = work.trackingPending or trackingPending == true
         if evidence and (not work.earliest
             or evidence.expansionID < work.earliest.expansionID
             or (evidence.expansionID == work.earliest.expansionID and evidence.rank > work.earliest.rank))

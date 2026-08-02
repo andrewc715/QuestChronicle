@@ -50,6 +50,11 @@ function Wardrobe.GetGenerationCacheDiagnostics()
         addedEligibility = stats.addedEligibility,
         invalidated = stats.invalidated,
         invalidationReasons = stats.invalidationReasons,
+        itemEventsIgnored = stats.itemEventsIgnored,
+        itemEventsCoalesced = stats.itemEventsCoalesced,
+        pendingEvidenceReopened = stats.pendingEvidenceReopened,
+        metadataIdentityChanges = stats.metadataIdentityChanges,
+        failedItemEventsIgnored = stats.failedItemEventsIgnored,
         retainedEvidenceAfterScan = stats.retainedEvidenceAfterScan,
         retainedPrechecksAfterScan = stats.retainedPrechecksAfterScan,
         retainedEligibilityAfterScan = stats.retainedEligibilityAfterScan,
@@ -66,6 +71,11 @@ function P.GetGenerationCacheCounterSnapshot()
         addedPrechecks = diagnostics.addedPrechecks,
         addedEligibility = diagnostics.addedEligibility,
         invalidated = diagnostics.invalidated,
+        itemEventsIgnored = diagnostics.itemEventsIgnored,
+        itemEventsCoalesced = diagnostics.itemEventsCoalesced,
+        pendingEvidenceReopened = diagnostics.pendingEvidenceReopened,
+        metadataIdentityChanges = diagnostics.metadataIdentityChanges,
+        failedItemEventsIgnored = diagnostics.failedItemEventsIgnored,
     }
 end
 
@@ -77,5 +87,10 @@ function P.BuildGenerationCachePerformance(startCounters)
         + (diagnostics.addedPrechecks - (startCounters.addedPrechecks or 0))
         + (diagnostics.addedEligibility - (startCounters.addedEligibility or 0))
     diagnostics.invalidatedDuringGeneration = diagnostics.invalidated - (startCounters.invalidated or 0)
+    diagnostics.itemEventsIgnoredDuringGeneration = diagnostics.itemEventsIgnored - (startCounters.itemEventsIgnored or 0)
+    diagnostics.itemEventsCoalescedDuringGeneration = diagnostics.itemEventsCoalesced - (startCounters.itemEventsCoalesced or 0)
+    diagnostics.pendingEvidenceReopenedDuringGeneration = diagnostics.pendingEvidenceReopened - (startCounters.pendingEvidenceReopened or 0)
+    diagnostics.metadataIdentityChangesDuringGeneration = diagnostics.metadataIdentityChanges - (startCounters.metadataIdentityChanges or 0)
+    diagnostics.failedItemEventsIgnoredDuringGeneration = diagnostics.failedItemEventsIgnored - (startCounters.failedItemEventsIgnored or 0)
     return diagnostics
 end

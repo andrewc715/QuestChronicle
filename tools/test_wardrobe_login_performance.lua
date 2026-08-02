@@ -25,6 +25,7 @@ function P.SafeCall(func, ...)
     if ok then return a, b, c, d, e, f end
 end
 function time() return 123 end
+assert(loadfile("Core/Wardrobe/GenerationCacheInvalidation.lua"))()
 assert(loadfile("Core/Wardrobe/AppearanceMetadata.lua"))()
 
 local cache = { bySlot = { CHEST = {} } }

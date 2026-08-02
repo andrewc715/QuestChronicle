@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0a8
+# Quest Chronicle v1.9.0a9
 
-> **Persistent generation cache:** era evidence and eligibility records now survive `/reload` and the automatic wardrobe scan through a dedicated versioned SavedVariables store, while the cooperative weapon pipeline and targeted completion refresh remain intact.
+> **Precise item-data invalidation:** stable Blizzard item-data callbacks are now ignored or coalesced instead of tearing down reusable era evidence. Only a relevant pending item becoming available or a genuine item-metadata identity change reopens affected evidence.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a8 makes the generation cache persistent across reloads and collection-cache rebuilds, using stable visual and context identities while preserving the responsive v1.9.0a7 pipeline.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a9 preserves the live-validated v1.9.0a8 persistent cache while preventing ordinary item-data completion events from repeatedly invalidating thousands of reusable records.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

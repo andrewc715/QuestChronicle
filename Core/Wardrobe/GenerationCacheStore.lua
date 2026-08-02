@@ -17,6 +17,18 @@ local function CountMap(values)
     for _ in pairs(values or {}) do count = count + 1 end
     return count
 end
+local function CopyNumericList(values)
+    local copy, seen = {}, {}
+    for _, value in ipairs(values or {}) do
+        value = tonumber(value)
+        if value and value > 0 and not seen[value] then
+            seen[value] = true
+            copy[#copy + 1] = value
+        end
+    end
+    table.sort(copy)
+    return #copy > 0 and copy or nil
+end
 local function VisualKey(sourceOrID)
     local visualID = type(sourceOrID) == "table" and sourceOrID.visualID or sourceOrID
     visualID = tonumber(visualID)
@@ -108,6 +120,11 @@ local function Stats()
             addedEligibility = 0,
             invalidated = 0,
             invalidationReasons = {},
+            itemEventsIgnored = 0,
+            itemEventsCoalesced = 0,
+            pendingEvidenceReopened = 0,
+            metadataIdentityChanges = 0,
+            failedItemEventsIgnored = 0,
             retainedEvidenceAfterScan = 0,
             retainedPrechecksAfterScan = 0,
             retainedEligibilityAfterScan = 0,
@@ -212,6 +229,8 @@ local function PutEvidenceRaw(store, source, result, candidateCount, evidenceVer
         reason = result.reason,
         pending = result.pending == true,
         unknown = result.unknown == true,
+        pendingItemIDs = CopyNumericList(result.pendingItemIDs),
+        trackingPending = result.trackingPending == true,
         retryAt = result.pending and (tonumber(source.eraEvidenceRetryAt) or (now + 30)) or nil,
         expiresAt = state == "UNKNOWN" and (now + P.GENERATION_CACHE_UNKNOWN_TTL_SECONDS) or nil,
         updatedAt = now,
@@ -249,6 +268,8 @@ local function MigrateLegacySourceFields(cache, store)
                     reason = source.eraEvidenceReason,
                     pending = source.eraEvidencePending == true,
                     unknown = source.eraEvidenceUnknown == true,
+                    pendingItemIDs = source.eraEvidencePendingItemIDs,
+                    trackingPending = source.eraEvidenceTrackingPending == true,
                 }, source.eraEvidenceCandidateCount, source.eraEvidenceVersion, true)
             end
         end
@@ -321,6 +342,8 @@ function P.GetPersistentEraEvidence(source, evidenceVersion)
         reason = record.reason,
         pending = record.pending == true,
         unknown = record.unknown == true,
+        pendingItemIDs = CopyNumericList(record.pendingItemIDs),
+        trackingPending = record.trackingPending == true,
         cached = true,
         persistent = true,
     }, record
@@ -408,13 +431,17 @@ function P.InvalidatePersistentGenerationCache(source, reason)
     NoteInvalidation(reason or "SOURCE_INVALIDATED", removed)
 end
 
-function P.InvalidatePersistentGenerationCacheForItemData(source, reason)
+function P.GetPersistentGenerationCacheRecord(source)
     local store, bucket, key = GetBucket(source, false)
-    if not bucket then return end
-    local evidence = bucket.evidence
-    if not evidence or evidence.state == "PENDING" or evidence.state == "UNKNOWN" then
-        InvalidateEvidence(store, key, bucket, reason or "ITEM_DATA_REOPENED_ERA")
-    end
+    return bucket and bucket.evidence or nil, bucket, store, key
+end
+
+function P.InvalidatePersistentEraEvidence(source, reason)
+    local store, bucket, key = GetBucket(source, false)
+    if not bucket or not bucket.evidence then return 0 end
+    local removed = 1 + CountMap(bucket.eligibility)
+    InvalidateEvidence(store, key, bucket, reason or "ERA_EVIDENCE_INVALIDATED")
+    return removed
 end
 
 function P.RestorePersistentGenerationFields(source, evidenceVersion)
@@ -435,6 +462,8 @@ function P.RestorePersistentGenerationFields(source, evidenceVersion)
         source.eraEvidenceReason = evidence.reason
         source.eraEvidencePending = evidence.pending == true
         source.eraEvidenceUnknown = evidence.unknown == true
+        source.eraEvidencePendingItemIDs = CopyNumericList(evidence.pendingItemIDs)
+        source.eraEvidenceTrackingPending = evidence.trackingPending == true
         source.eraEvidenceState = evidence.expansionID ~= nil and "RESOLVED"
             or (evidence.pending and "PENDING" or "UNKNOWN")
     end

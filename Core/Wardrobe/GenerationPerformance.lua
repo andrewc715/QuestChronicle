@@ -166,6 +166,13 @@ function Wardrobe.GetGenerationCachePerformanceLines(performance)
             tonumber(diagnostics.addedDuringGeneration) or 0,
             tonumber(diagnostics.invalidatedDuringGeneration) or 0
         ),
+        string.format(
+            "Item data: %d stable ignored • %d pending reopened • %d identity changes • %d coalesced",
+            tonumber(diagnostics.itemEventsIgnoredDuringGeneration) or 0,
+            tonumber(diagnostics.pendingEvidenceReopenedDuringGeneration) or 0,
+            tonumber(diagnostics.metadataIdentityChangesDuringGeneration) or 0,
+            tonumber(diagnostics.itemEventsCoalescedDuringGeneration) or 0
+        ),
     }
     local reasons = {}
     for reason, count in pairs(diagnostics.invalidationReasons or {}) do

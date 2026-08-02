@@ -1,50 +1,44 @@
-# Quest Chronicle v1.9.0a8 - Persistent Generation Cache
+# Quest Chronicle v1.9.0a9 - Precise Item-Data Invalidation
 
-v1.9.0a8 repairs the cache lifecycle exposed by the v1.9.0a7 Retail test. v1.9.0a7 successfully removed the large weapon and UI frame stalls, and its cache warmed within one session, but an automatic scan after `/reload` rebuilt the source tables and left generation with almost no reusable era or eligibility records.
+v1.9.0a9 is a focused cache-invalidation repair built from the live-validated v1.9.0a8 persistent-cache baseline. Retail testing confirmed that v1.9.0a8 preserved thousands of era and eligibility records across `/reload`, but ordinary `ITEM_DATA_LOAD_RESULT` and `GET_ITEM_INFO_RECEIVED` traffic still invalidated roughly 1,700 records during every generation.
 
-## Dedicated SavedVariables cache
+## Relevant pending-item tracking
 
-- Adds a versioned `wardrobe.generationCache` store inside the existing account-level `QuestChronicleDB` SavedVariables database.
-- Stores visual-level era evidence independently from the transient source tables rebuilt by each collection scan.
-- Stores reusable pre-era and final eligibility records under stable source and generation-context keys.
-- Updates the SavedVariables tables as evidence is learned; WoW writes them normally on `/reload`, logout, or exit.
-- Keeps SavedVariables schema 2, Courier format 1, and wardrobe cache format 7 unchanged.
+- Era evidence now records the exact item IDs that were unavailable when a visual entered the `PENDING` state.
+- Tracking-only pending evidence is distinguished from item-data pending evidence.
+- An item-data callback reopens evidence only when that exact pending item has become available.
+- Unknown evidence remains fail-closed under its existing six-hour expiry instead of being reopened by unrelated callbacks.
+- Existing v1.9.0a8 records without pending-item details remain compatible and continue to use the existing pending retry window.
 
-## Stable identity and migration
+## Stable metadata identity
 
-- Keys persistent era evidence to the visual ID, era resolver version, complete visual-source manifest, and complete sibling-item manifest.
-- Removes session-local `metadataRevision` and mutable display names from persistent eligibility identity.
-- Preserves source-specific safety by retaining representative source ID, item ID, zone preference, player progression, era, provenance, and mode in eligibility keys.
-- Migrates resolved, unknown, and pending era evidence already present on v1.9.0a7 wardrobe source records into the dedicated store before the first automatic scan.
-- Restores matching evidence while the scan constructs its staging cache rather than depending on the old source table to survive.
+- Adds a compact generation-relevant item fingerprint using item ID, expansion, item type, subtype, equip location, class, and subclass.
+- Presentation-only hydration such as names, links, icons, and quality no longer masquerades as a generation-identity change.
+- Item-derived era evidence is invalidated when its genuine metadata identity changes.
+- Set, tracking, encounter, and curated evidence survive unrelated representative-item metadata changes.
 
-## Fail-closed invalidation
+## Event coalescing and targeted refresh
 
-- A changed visual-source or sibling-item manifest invalidates the saved evidence and dependent final eligibility records.
-- WoW item-data events preserve resolved strong evidence while reopening affected pending or unknown evidence.
-- Pending evidence reopens after 30 seconds.
-- Persisted unknown evidence remains fail-closed but expires after six hours so newly available Blizzard metadata can be reconsidered.
-- Old generation contexts are bounded per visual and pruned by age and least-recently-used order.
+- Duplicate callbacks for the same item are coalesced inside the existing metadata batch.
+- Multiple callbacks affecting one visual stop after the first relevant reopening.
+- Stable callbacks no longer clear local era, eligibility, or precheck fields.
+- UI metadata notifications are emitted only when the representative appearance row actually changed.
+- Era-independent prechecks survive item-data reopening.
 
-## Cache lifecycle diagnostics
+## Diagnostics
 
 The Generation Performance tooltip now reports:
 
 ```text
-Persistent evidence, precheck, and eligibility entry counts
-Entries loaded from SavedVariables for this session
-v1.9.0a7 evidence migrated into the dedicated store
-Evidence retained through the automatic collection scan
-Entries added or invalidated during the current generation
-Exact invalidation reasons and counts
+Item data: <stable ignored> • <pending reopened> • <identity changes> • <coalesced>
 ```
 
-These diagnostics accompany the existing candidate, era-source-check, cache-hit, weapon-yield, and phase-timing measurements.
+Exact invalidation reasons distinguish `ITEM_DATA_PENDING_RESOLVED` from `ITEM_METADATA_IDENTITY_CHANGED`.
 
 ## Preserved behavior
 
-- Cooperative armor generation and cooperative weapon routing are unchanged.
-- Targeted completion refreshes are unchanged.
-- Outfit selection, weighting, locks, hidden slots, linked hands, artifacts, and atomic commits are unchanged.
+- Persistent cache format remains backward-compatible; no cache reset is required.
+- Cooperative armor generation, cooperative weapon routing, weighted selection, locks, hidden slots, linked hands, artifacts, atomic commits, and targeted UI refreshes are unchanged.
 - Traveler cohesion remains calibrated instrumentation only.
+- SavedVariables schema 2, Courier format 1, and wardrobe cache format 7 remain unchanged.
 - Quest Chronicle still applies no transmog and spends no gold.

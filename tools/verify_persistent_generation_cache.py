@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guard the v1.9.0a8 persistent generation-cache lifecycle."""
+"""Guard the persistent generation-cache lifecycle."""
 from pathlib import Path
 import sys
 
@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 store = (ROOT / "Core/Wardrobe/GenerationCacheStore.lua").read_text(encoding="utf-8")
 diagnostics = (ROOT / "Core/Wardrobe/GenerationCacheDiagnostics.lua").read_text(encoding="utf-8")
 metadata = (ROOT / "Core/Wardrobe/AppearanceMetadata.lua").read_text(encoding="utf-8")
+invalidation = (ROOT / "Core/Wardrobe/GenerationCacheInvalidation.lua").read_text(encoding="utf-8")
 era = (ROOT / "Core/ZoneStyle/EraEvidence.lua").read_text(encoding="utf-8")
 eligibility = (ROOT / "Core/ZoneStyle/GenerationEligibility.lua").read_text(encoding="utf-8")
 performance = (ROOT / "Core/Wardrobe/GenerationPerformance.lua").read_text(encoding="utf-8")
@@ -21,7 +22,8 @@ checks = {
     "eligibility reads and writes persistent records": "StorePersistentGenerationPrecheck" in eligibility and "StorePersistentGenerationEligibility" in eligibility,
     "scan lifecycle preserves persistent records": "BeginPersistentGenerationCacheScan" in metadata and "FinishPersistentGenerationCacheScan" in metadata,
     "metadata events reopen only affected evidence": "ITEM_DATA_LOADED" in metadata
-        and "InvalidatePersistentGenerationCacheForItemData" in store,
+        and "InvalidatePersistentGenerationCacheForItemData" in invalidation
+        and "ITEM_DATA_PENDING_RESOLVED" in invalidation,
     "performance exposes cache lifecycle": "BuildGenerationCachePerformance" in diagnostics
         and "GetGenerationCachePerformanceLines" in performance,
     "unknown and pending records expire safely": "UNKNOWN_TTL_EXPIRED" in store and "PENDING_RETRY_EXPIRED" in store,

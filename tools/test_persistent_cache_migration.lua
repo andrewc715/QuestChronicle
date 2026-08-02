@@ -56,4 +56,4 @@ local rebuilt = {
 }
 local evidence = P.GetPersistentEraEvidence(rebuilt, 2)
 assert(evidence and evidence.expansionID == 2, "migrated a7 evidence was not reusable after rebuild")
-print("PASS persistent cache migration: v1.9.0a7 source evidence enters the v1.9.0a8 SavedVariables store")
+print("PASS persistent cache migration: legacy source evidence enters the dedicated SavedVariables store")

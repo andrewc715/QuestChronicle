@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0a8 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0a9 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -208,9 +208,17 @@ Persistent evidence identity uses the era resolver version, visual ID, visual-so
 
 At the start of an automatic or manual scan, the store migrates any v1.9.0a7 evidence still embedded on old source records. Each matching source discovered by the staging scan can then restore evidence from the persistent store. The old transient visual snapshot remains as a compatibility bridge, but it is no longer the persistence boundary.
 
-Item-data events invalidate the affected visual record and dependent eligibility records. Manifest changes also invalidate evidence. Pending records retry after 30 seconds, while unknown fail-closed records expire after six hours. Context maps are bounded and age-pruned to prevent unbounded SavedVariables growth.
+Item-data events are classified by `GenerationCacheInvalidation.lua`. Ordinary stable callbacks do not invalidate evidence. A pending record reopens only when the exact missing item recorded by its era work becomes available, while genuine generation-relevant metadata identity changes invalidate item-derived evidence. Manifest changes still invalidate evidence. Pending records retry after 30 seconds, while unknown fail-closed records expire after six hours. Context maps are bounded and age-pruned to prevent unbounded SavedVariables growth.
 
 The generation performance record snapshots cache lifecycle counters. Its tooltip reports loaded, migrated, retained, added, and invalidated entries plus exact invalidation reasons, allowing a post-`/reload` test to distinguish a genuine persistent hit from a fresh session-only warmup.
+
+## Precise item-data invalidation (v1.9.0a9)
+
+`EraEvidence.lua` records `pendingItemIDs` separately from `trackingPending`. This distinction prevents a sibling item callback from repeatedly reopening a visual that is waiting on Blizzard content-tracking data rather than item metadata.
+
+`GenerationCacheInvalidation.lua` classifies each batched callback against the persistent evidence record. Resolved, unknown, tracking-only pending, unrelated pending, failed, and duplicate events are no-ops for cache state. A relevant pending item becoming available removes only era evidence and dependent final eligibility; era-independent prechecks remain reusable. A genuine stable metadata-fingerprint change removes item-derived evidence but preserves stronger set, tracking, encounter, or curated evidence.
+
+`AppearanceMetadata.lua` coalesces duplicate item IDs before processing and stops source-level reopening after the first relevant event. Presentation hydration continues to update visible rows, but a metadata notification is emitted only when the representative row actually changes. Generation diagnostics count stable events ignored, pending records reopened, identity changes, failed loads, and coalesced callbacks.
 
 ## Cache-and-pipeline generation repair (v1.9.0a7)
 
