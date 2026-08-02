@@ -60,6 +60,7 @@ function P.ScanSlot(definition)
                 end
 
                 if acceptedForAppearance and bestSource then
+                    P.AttachEraSourceManifest(bestSource)
                     -- One entry per Blizzard appearance row. Resolving a source
                     -- chooses how to preview that row; it does not define or
                     -- deduplicate the catalog itself.

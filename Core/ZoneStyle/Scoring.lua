@@ -143,9 +143,8 @@ function P.GetDropOrigin(source)
 end
 
 function ZoneStyle.GetSourceExpansionID(source)
-    local nativeExpansionID = P.LoadItemMetadata(source)
-    local curatedOrigin = P.GetCuratedSourceOrigin(source, nativeExpansionID)
-    return curatedOrigin and curatedOrigin.expansionID or nativeExpansionID
+    local evidence = ZoneStyle.GetSourceEraEvidence(source)
+    return evidence and evidence.expansionID or nil
 end
 
 function ZoneStyle.GetSourceEligibility(source, modeKey, context)
@@ -167,20 +166,23 @@ function ZoneStyle.GetSourceEligibility(source, modeKey, context)
     end
     local eraMax, eraLabel = context.eraMax, context.eraLabel
 
-    local nativeExpansionID = P.LoadItemMetadata(source)
-    local curatedOrigin = P.GetCuratedSourceOrigin(source, nativeExpansionID)
-    local expansionID = curatedOrigin and curatedOrigin.expansionID or nativeExpansionID
-    if expansionID == nil then
-        return false, "pending", "Waiting for WoW to load this item's era."
+    local eraEvidence = ZoneStyle.GetSourceEraEvidence(source)
+    if not eraEvidence or eraEvidence.expansionID == nil then
+        local reason = eraEvidence and eraEvidence.reason or "WoW did not expose source-era evidence."
+        return false, "pending", reason
     end
+    local expansionID = eraEvidence.expansionID
+    local curatedOrigin = P.GetCuratedSourceOrigin(source, expansionID)
+    local evidenceText = ZoneStyle.FormatEraEvidence(eraEvidence)
     local settings = QC.GetSettings and QC.GetSettings() or {}
     local restrictToZoneEra = settings.restrictOutfitsToZoneEra ~= false
     local eraEligibilityText = restrictToZoneEra and ("through " .. tostring(eraLabel)) or "with the zone era limit disabled"
     if restrictToZoneEra and expansionID > eraMax then
         local expansion = ZoneStyle.expansions[expansionID]
         return false, "era", string.format(
-            "%s item; this zone permits Classic through %s.",
+            "%s appearance (%s); this zone permits Classic through %s.",
             expansion and expansion.label or ("Expansion " .. tostring(expansionID)),
+            evidenceText,
             eraLabel
         )
     end
@@ -233,8 +235,8 @@ function ZoneStyle.GetSourceEligibility(source, modeKey, context)
     end
 
     return true, "eligible", restrictToZoneEra
-        and "Era eligible; no conflicting source zone is reported by WoW."
-        or "Zone era limit disabled; no conflicting source zone is reported by WoW."
+        and ("Era verified: " .. evidenceText .. "; no conflicting source zone is reported by WoW.")
+        or ("Zone era limit disabled; era evidence: " .. evidenceText .. ".")
 end
 
 function ZoneStyle.GetContextRestrictionLabel(context)

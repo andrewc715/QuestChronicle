@@ -1,32 +1,49 @@
-# Quest Chronicle v1.8.3: Era Metadata Revalidation
+# Quest Chronicle v1.8.4: Era Evidence Rebuild
 
-Version 1.8.3 fixes a progression leak where a later-expansion appearance could enter an earlier-zone generation pool because a stale `expansionID` persisted on the cached wardrobe source.
+Version 1.8.4 replaces the representative-item-only era shortcut with a provenance-bearing evidence resolver and advances the wardrobe cache format from 6 to 7. The cache migration deliberately forces one complete wardrobe rebuild after login or `/reload`.
 
-## Live symptom
+## Live regressions addressed
 
-While questing in Outland, automatic generation selected **Green Belt of Quiet Understanding** (item 89561), a Mists of Pandaria reward. Its tooltip incorrectly reported:
+Two Mists of Pandaria belt appearances were admitted into an Outland generation pool:
 
-```text
-Generated pool: Era eligible; no conflicting source zone is reported by WoW.
-```
+- Green Belt of Quiet Understanding, item 89561
+- Biting Yellow Belt, item 89565
 
-## Root cause
+Both displayed `Era eligible` because older cache records either carried stale era metadata or lacked enough source evidence and were treated as safe.
 
-Wardrobe sources persist in SavedVariables. Earlier versions cached `source.expansionID` but did not record which representative item ID had supplied that value. `LoadItemMetadata()` returned any existing value immediately, so an unverified or stale era could survive indefinitely.
+## New era evidence model
 
-## Correction
+Each collapsed visual now records all source IDs exposed by Blizzard rather than only the currently selected representative source. Quest Chronicle can establish an era from:
 
-- Item metadata is now keyed to `itemMetadataItemID`.
-- Cached era data is trusted only when `itemMetadataVerified` is true for that exact item ID.
-- Older unverified values are re-read through `C_Item.GetItemInfo` the next time the source is evaluated.
-- If WoW has not loaded the item yet, the source fails closed as **Loading era**.
-- Unverified SavedVariables era data is never used to admit an appearance into generation.
-- No curated item-name blacklist was added. The repair applies to every appearance.
+1. reviewed exact-source corrections for confirmed legacy metadata defects;
+2. native transmog-set expansion metadata;
+3. Blizzard appearance-tracking map provenance;
+4. encounter-journal source and tier text;
+5. item expansion metadata for every available visual sibling.
 
-## Compatibility
+The chosen conclusion stores its expansion, method, source ID, item ID, and number of source candidates examined. Tooltips can therefore explain how the era was established instead of merely saying `Era eligible`.
 
-- SavedVariables schema: 2
-- Courier format: 1
-- Wardrobe cache format: 6
-- No collection rescan is required solely for this update.
-- Existing concepts, selections, weapon routes, Custom Set links, and Chronicle data are preserved.
+## Fail-closed behavior
+
+Unknown, unverified, or partially loading era evidence is excluded from automatic generation until Blizzard finishes supplying the required data. The appearance remains browseable and manually previewable.
+
+A weak item-only conclusion is not cached while another visual sibling is still loading potentially stronger source evidence.
+
+## Cache migration
+
+- Wardrobe cache format: **6 → 7**
+- SavedVariables schema: **2**, unchanged
+- Courier format: **1**, unchanged
+
+The v1.8.4 cache migration clears and rebuilds only the wardrobe appearance cache. It preserves Chronicle history, active quests, notes, settings, outfit concepts, appearance locks, hidden slots, Custom Set links, and current selections.
+
+Quest Chronicle retains the deliberate refresh policy: the migration produces the normal single automatic wardrobe scan after login or `/reload`; later collection changes only mark the cache stale until **Scan Collection** is clicked.
+
+## Normalization policy
+
+The new logic remains split across focused modules:
+
+- `Core/Wardrobe/AppearanceMetadata.lua`
+- `Core/ZoneStyle/EraEvidence.lua`
+
+Every runtime Lua file remains at or below 500 physical lines.

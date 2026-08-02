@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.8.3 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.8.4 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -65,6 +65,9 @@ These tables are runtime implementation details. Other subsystems should use pub
 `Core/Wardrobe/CustomSetSyncAndManifest.lua`
 : Native save verification, concept synchronization, Current Preview manifest, and source normalization.
 
+`Core/Wardrobe/AppearanceMetadata.lua`
+: Full visual-source manifests, item-data prefetching, and era-evidence cache invalidation.
+
 `Core/Wardrobe/CollectionScanAndPreview.lua`
 : Collection scanning, deliberate refresh policy, manual selections, and model preview application.
 
@@ -80,7 +83,13 @@ These tables are runtime implementation details. Other subsystems should use pub
 : Live location detection, profile selection, suggestion state, and zone changes.
 
 `Core/ZoneStyle/SourceMetadata.lua`
-: Item/source metadata, promotion detection, Chronicle Intelligence, and source signals.
+: Item/source metadata, promotion detection, Chronicle Intelligence, tracking origins, and source signals.
+
+`Core/ZoneStyle/EraEvidence.lua`
+: Provenance-bearing era resolution across curated corrections, native sets, tracked maps, encounter data, item metadata, and visual siblings.
+
+`Core/ZoneStyle/ProgressionRestrictions.lua`
+: Character-progression restrictions such as below-cap Heritage Armor exclusion.
 
 `Core/ZoneStyle/Scoring.lua`
 : Outfit naming, coherence, eligibility, source weighting, and weapon ordering.

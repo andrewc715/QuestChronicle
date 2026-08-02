@@ -1,8 +1,8 @@
-# Quest Chronicle v1.8.3
+# Quest Chronicle v1.8.4
 
-> **Era metadata repair:** v1.8.3 revalidates every cached appearance era against its current representative item. Unverified metadata now fails closed instead of allowing later-expansion gear into earlier-zone generation pools.
+> **Era evidence rebuild:** v1.8.4 advances the wardrobe cache to format 7 and rebuilds every appearance with provenance-bearing era evidence gathered across its complete visual source family. Unknown or partially loaded eras fail closed.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.8.3 preserves the normalized architecture, Heritage Armor progression rule, and Weapon Appearance Routes while repairing persistent item-era metadata validation.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.8.4 preserves the normalized architecture, Heritage Armor progression rule, and Weapon Appearance Routes while rebuilding the wardrobe around broader source-era evidence.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -145,7 +145,7 @@ Bare `/qc` toggles the main window. `/qc help` displays command help.
 - Addon schema remains version 2 because the recorded data model is unchanged.
 - Courier export `formatVersion` remains 1.
 - Warcraft Quest Chronicle Courier v1.0.0 remains compatible.
-- Wardrobe cache format 6 rebuilds preview representatives around sources WoW confirms are actually collected; saved concepts and visual identities are preserved.
+- Wardrobe cache format 7 forces one full collection rebuild and records all visual sibling sources plus the evidence that established each appearance era; saved concepts and visual identities are preserved.
 
 ## File layout
 

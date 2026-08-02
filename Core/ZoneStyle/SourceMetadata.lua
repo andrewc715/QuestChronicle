@@ -127,7 +127,7 @@ end
 
 function P.GetTrackedSourceOrigin(source)
     local sourceID = tonumber(source and source.sourceID)
-    if not sourceID or tonumber(source.sourceType) ~= 2 then return nil end
+    if not sourceID then return nil end
     if P.trackedOriginCache[sourceID] ~= nil then return P.trackedOriginCache[sourceID] or nil end
 
     local trackingType = P.GetAppearanceTrackingType()
@@ -153,10 +153,17 @@ function P.GetTrackedSourceOrigin(source)
                 mapTrail = P.BuildMapTrail(mapID),
             }
             local provenance, provenanceKey = ZoneStyle.ResolveProvenance(originContext)
+            -- Do not call ResolveEra here: its conservative context fallback is
+            -- Classic, which is correct for zone presentation but unsafe as
+            -- source-era evidence. Tracking evidence must be explicit.
+            local eraText = table.concat(originContext.mapTrail or {}, " ") .. " " .. tostring(mapName or "")
+            local expansionID = P.ResolveEraFromText and P.ResolveEraFromText(eraText) or nil
             local origin = {
                 provenanceKey = provenanceKey,
                 label = provenance and provenance.label or mapName,
                 mapID = mapID,
+                mapName = mapName,
+                expansionID = expansionID,
                 result = result,
                 method = "WoW appearance tracking",
             }

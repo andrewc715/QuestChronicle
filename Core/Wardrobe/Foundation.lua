@@ -5,7 +5,7 @@ Wardrobe._Private = Wardrobe._Private or {}
 local P = Wardrobe._Private
 
 
-Wardrobe.CACHE_VERSION = 6
+Wardrobe.CACHE_VERSION = 7
 Wardrobe.PAGE_SIZE = 7
 
 Wardrobe.WEAPON_FAMILY_ORDER = { "ONE_HAND", "TWO_HAND", "RANGED", "OFF_HAND" }
@@ -139,7 +139,7 @@ function P.EnsureCache()
         local previousCacheVersion = cache.cacheVersion
         P.ResetCache(cache, "STALE")
         cache.migratedFromCacheVersion = previousCacheVersion
-        cache.dirtyReason = "VISUAL_IDENTITY_UPGRADE"
+        cache.dirtyReason = "ERA_EVIDENCE_SCHEMA_UPGRADE"
     end
     cache.bySlot = cache.bySlot or {}
     cache.slotDiagnostics = cache.slotDiagnostics or {}
