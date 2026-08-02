@@ -1,8 +1,8 @@
-# Quest Chronicle v1.8.1
+# Quest Chronicle v1.8.2
 
-> **Normalization hotfix:** v1.8.1 repairs three private-helper calls that lost their namespace during the v1.8.0 file split. The normalized module layout and 500-line cap remain unchanged.
+> **Heritage progression rule:** v1.8.2 excludes race Heritage Armor from automatic outfit generation while the character is below the maximum level reachable by the account. Manual browsing and preview remain available.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.8.1 preserves the structure-only v1.8 normalization and restores the validated v1.7.2 behavior by correcting split-module helper references. No feature, UI, generation-rule, SavedVariables, Courier, or cache behavior is intentionally changed.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.8.2 preserves the normalized architecture and adds one progression rule: race Heritage Armor remains browseable and previewable but cannot be selected by automatic outfit generation until the character reaches the account's current maximum reachable level.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

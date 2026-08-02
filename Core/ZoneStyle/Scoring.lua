@@ -158,6 +158,10 @@ function ZoneStyle.GetSourceEligibility(source, modeKey, context)
     if promotionReason then
         return false, "promotional", promotionReason
     end
+    local progressionReason = P.GetProgressionRestrictionReason(source)
+    if progressionReason then
+        return false, "heritage", progressionReason
+    end
     if context.eraMax == nil then
         context.eraMax, context.eraLabel, context.eraShortLabel = ZoneStyle.ResolveEra(context)
     end

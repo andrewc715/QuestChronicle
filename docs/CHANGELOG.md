@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.8.2 - 2026-08-01
+
+### Added
+
+- Excludes race Heritage Armor from automatic outfit generation while the character is below the account's maximum reachable level.
+- Detects Heritage Armor through Blizzard transmog-set membership and set metadata rather than item-name blacklists.
+- Keeps Heritage appearances visible and manually previewable, with a `Heritage locked` browser label below max level.
+- Adds a dedicated progression-restriction module while preserving the 500-line Lua-file cap.
+
+### Preserved
+
+- SavedVariables schema 2, Courier format 1, and wardrobe cache format 6.
+- Weapon Appearance Routes, concepts, Custom Sets, and existing wardrobe data.
+
 ## 1.8.1 - 2026-08-01
 
 ### Fixed
