@@ -1,8 +1,8 @@
-# Quest Chronicle v1.8.0
+# Quest Chronicle v1.8.1
 
-> **Code normalization:** v1.8.0 preserves the live-validated v1.7.2 behavior while splitting every oversized Lua monolith into focused modules capped at 500 physical lines.
+> **Normalization hotfix:** v1.8.1 repairs three private-helper calls that lost their namespace during the v1.8.0 file split. The normalized module layout and 500-line cap remain unchanged.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.8.0 is a structure-only maintenance release: no feature, UI, generation-rule, SavedVariables, Courier, or cache behavior is intentionally changed.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.8.1 preserves the structure-only v1.8 normalization and restores the validated v1.7.2 behavior by correcting split-module helper references. No feature, UI, generation-rule, SavedVariables, Courier, or cache behavior is intentionally changed.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

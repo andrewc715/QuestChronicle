@@ -430,7 +430,7 @@ function P.ApplyScanCollectionState()
     -- Ask WoW for the broadest possible collection view and filter collected
     -- appearances locally. This avoids an empty result when the native Wardrobe
     -- has a stale collected-only/search filter that has not finished rebuilding.
-    SafeCall(C_TransmogCollection.SetCollectedShown, true)
+    P.SafeCall(C_TransmogCollection.SetCollectedShown, true)
     P.SafeCall(C_TransmogCollection.SetUncollectedShown, true)
     P.SafeCall(C_TransmogCollection.SetAllFactionsShown, true)
     P.SafeCall(C_TransmogCollection.SetAllRacesShown, true)

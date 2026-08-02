@@ -1,99 +1,37 @@
-# Quest Chronicle v1.8.0: Code Normalization
+# Quest Chronicle v1.8.1: Normalization Namespace Hotfix
 
-Version 1.8.0 is a structure-only maintenance release built from the live-validated v1.7.2 baseline.
+Version 1.8.1 repairs a runtime regression introduced by the v1.8.0 code-only module split. It contains no intended feature, UI, generation-rule, SavedVariables, Courier, wardrobe-cache, or gameplay behavior changes.
 
-## Mandate
+## Root cause
 
-No runtime Lua file may exceed 500 physical lines.
+Before normalization, `SafeCall` and `Shuffle` were local functions inside the large `Core/Wardrobe.lua` file. The normalized modules expose those shared private helpers through `Wardrobe._Private`, locally named `P`.
 
-The v1.7.2 addon contained four oversized implementation files:
+Three call sites retained the old unqualified names after the split:
 
-- `Core/Wardrobe.lua`: 4,626 lines
-- `Core/ZoneStyle.lua`: 1,736 lines
-- `UI/OutfitsTab.lua`: 1,717 lines
-- `QuestChronicle.lua`: 1,535 lines
+- `Foundation.lua` called `SafeCall()` while preparing collection filters.
+- `CollectionScanAndPreview.lua` called `SafeCall()` while resetting the preview model.
+- `GenerationAndConcepts.lua` called `Shuffle()` while randomizing route candidates.
 
-v1.8.0 replaces those monoliths with focused modules. The largest Lua file in the release is 474 lines.
+Those names no longer existed as module globals, so the first automatic wardrobe scan failed immediately after login or `/reload`.
 
-## Runtime behavior
+## Corrections
 
-This release intentionally makes no feature, generation-rule, SavedVariables, Courier, UI, or gameplay behavior changes.
+The affected calls now use their normalized private namespace:
 
-Preserved unchanged from v1.7.2:
+```lua
+P.SafeCall(...)
+P.Shuffle(...)
+```
 
-- Chronicle event recording and quest lifecycle behavior
-- Courier export format and synchronization workflow
-- Wardrobe scanning and cache policy
-- Zone and Chronicle outfit scoring
-- Weapon Appearance Routes
-- Fury One-Hand and Two-Hand pair generation
-- linked and unlinked hand behavior
-- Current Preview Main Hand and Off Hand labels
-- Custom Set creation, updating, replacement, and verification
-- window, minimap, AddOn Compartment, and settings behavior
+A new repository check, `tools/verify_split_helper_references.py`, scans every normalized subsystem and fails when a helper declared as `P.Helper()` is later called as an orphaned global `Helper()`.
 
-## New module layout
+## Preserved
 
-### Chronicle core
-
-- `Foundation.lua`: constants, JSON helpers, database/session initialization, Courier snapshot construction
-- `QuestLifecycle.lua`: quest snapshots, objective/state transitions, removal classification
-- `Commands.lua`: synchronization, event recording, status output, slash-command handling
-- `PublicAPI.lua`: public API completion, abandon hooks, and event dispatch
-
-### Wardrobe core
-
-- `Foundation.lua`
-- `StateAndPreferences.lua`
-- `EquipmentTopology.lua`
-- `AppearanceRoutes.lua`
-- `WeaponFilters.lua`
-- `WeaponSelection.lua`
-- `GenerationAndConcepts.lua`
-- `CustomSetBuild.lua`
-- `CustomSetSyncAndManifest.lua`
-- `CollectionScanAndPreview.lua`
-- `Events.lua`
-
-### Zone style engine
-
-- `Profiles.lua`
-- `Context.lua`
-- `SourceMetadata.lua`
-- `Scoring.lua`
-
-### Outfits UI
-
-- `OutfitsHelpers.lua`
-- `Layout.lua`
-- `ConceptManager.lua`
-- `AppearanceBrowser.lua`
-- `RefreshAndEvents.lua`
-- `OutfitsTab.lua`
-
-Private cross-module implementation state is held in namespace-private tables. Public Quest Chronicle, Wardrobe, ZoneStyle, and UI APIs remain unchanged.
-
-## Compatibility
-
+- Every runtime Lua file remains at or below 500 physical lines.
+- The v1.7.2 feature behavior remains the target baseline.
+- Weapon Appearance Routes and linked/unlinked hand generation are unchanged.
+- Main Hand and Off Hand Current Preview labels are unchanged.
 - SavedVariables schema remains 2.
 - Courier format remains 1.
 - Wardrobe cache format remains 6.
-- Existing concepts, Custom Set links, selections, locks, hidden slots, preferences, and Chronicle records are preserved.
-- No wardrobe scan, concept migration, or Custom Set rebuild is required.
-
-## Validation
-
-The release passed:
-
-- a hard line-count check across every Lua file
-- Lua syntax loading for every runtime module
-- TOC path and load-order validation
-- full addon loading under a mocked WoW environment
-- public API shape comparison against v1.7.2
-- representative Chronicle event-summary equivalence
-- zone-era and provenance equivalence
-- weapon-family and concept-summary equivalence
-- slot and subtype definition equivalence
-- Outfits pane construction for both builds
-- Outfits pane public-structure equivalence
-- ZIP integrity validation
+- No collection rescan, concept migration, or Custom Set rebuild is required beyond the normal one automatic scan for the new login or `/reload` session.

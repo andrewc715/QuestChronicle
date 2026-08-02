@@ -24,7 +24,7 @@ function P.GenerateWeapons(state, reroll, styleMode, styleContext)
     -- A locked source may be valid in more than one artifact route. Shuffle the
     -- route candidates, then accept the first route that validates the complete
     -- main/secondary bundle. Nothing is committed until the bundle is complete.
-    Shuffle(candidateRoutes)
+    P.Shuffle(candidateRoutes)
     local selectedRoute, selectedMain, selectedOff, mainFamily, mainSubtype, notice
     local lastFailure
 

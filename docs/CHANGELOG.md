@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.8.1 - 2026-08-01
+
+### Fixed
+
+- Qualified three shared Wardrobe helpers through `Wardrobe._Private` after the v1.8.0 module split.
+- Restored the automatic collection scan by changing the orphaned `SafeCall()` in `Foundation.lua` to `P.SafeCall()`.
+- Restored preview reset behavior by changing the orphaned `SafeCall()` in `CollectionScanAndPreview.lua` to `P.SafeCall()`.
+- Restored route randomization by changing the orphaned `Shuffle()` in `GenerationAndConcepts.lua` to `P.Shuffle()`.
+- Added `tools/verify_split_helper_references.py` to prevent private-helper namespace regressions in normalized modules.
+- Preserved the 500-line Lua file limit and all v1.7.2 gameplay behavior.
+
 ## 1.8.0 - 2026-08-01
 
 ### Normalized

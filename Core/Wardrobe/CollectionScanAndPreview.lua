@@ -425,7 +425,7 @@ function Wardrobe.ApplyPreview(model)
     -- before the v1.6.3/v1.6.4 preview experiments. SetUnit establishes the
     -- equipped actor, then TryOn overlays the selected appearances without
     -- replacing the actor or scheduling competing model-load callbacks.
-    SafeCall(model.SetUnit, model, "player")
+    P.SafeCall(model.SetUnit, model, "player")
     local applied = 0
     local failedSlots = {}
     local state = P.EnsurePreviewState()
