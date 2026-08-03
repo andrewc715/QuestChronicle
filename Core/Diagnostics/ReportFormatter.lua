@@ -73,6 +73,9 @@ local function FormatSource(component, rawIDs)
     if component.locked then markers[#markers + 1] = "Locked" end
     if component.hidden then markers[#markers + 1] = "Hidden" end
     local text = component.hidden and "Hidden" or tostring(component.name or "None")
+    if not component.hidden and (component.slotKey == "ONE_HAND" or component.slotKey == "TWO_HAND" or component.slotKey == "RANGED" or component.slotKey == "OFF_HAND") and component.itemSubtype then
+        text = text .. " • " .. tostring(component.itemSubtype)
+    end
     if #markers > 0 and not component.hidden then text = text .. " [" .. table.concat(markers, ", ") .. "]" end
     if rawIDs then
         local ids = {}
@@ -121,14 +124,28 @@ local function AddOverview(lines, report, rich)
     if location then Add(lines, "Context: " .. tostring(location) .. (context.eraLabel and (" • through " .. tostring(context.eraLabel)) or "")) end
     local performance = report.performance or {}
     Add(lines, string.format("Prepared: %s frames • %.1f sec", N(performance.steps), (tonumber(performance.elapsedMs) or 0) / 1000))
-    Add(lines, string.format("Worst step: %.1f ms • Slowest: %s %.1f ms", tonumber(performance.maxStepMs) or 0, PHASE_LABELS[performance.slowestPhase] or tostring(performance.slowestPhase or "Unknown"), tonumber(performance.slowestPhaseMs) or 0))
+    Add(lines, string.format("Longest worker slice: %.1f ms", tonumber(performance.longestWorkerSliceMs) or tonumber(performance.maxStepMs) or 0))
+    Add(lines, string.format("Largest instrumented call: %s %.1f ms", PHASE_LABELS[performance.largestInstrumentedCallPhase or performance.slowestPhase] or tostring(performance.largestInstrumentedCallPhase or performance.slowestPhase or "Unknown"), tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0))
     Add(lines, "Fallback: " .. tostring(report.skeleton and report.skeleton.fallbackReason or "None"))
 end
 
 local function AddSkeleton(lines, report, rawIDs, rich)
     AddHeading(lines, "Anchor Skeleton", rich)
     local skeleton = report.skeleton or {}
-    Add(lines, string.format("Chosen: rank %d/%d • score %.1f • cohesion %.3f • hard clashes %d", tonumber(skeleton.chosenRank) or 0, tonumber(skeleton.shortlistSize) or 0, tonumber(skeleton.score) or 0, tonumber(skeleton.meanPairCohesion) or 0, tonumber(skeleton.hardClashes) or 0))
+    Add(lines, string.format("Chosen: rank %d/%d • score %.1f • cohesion %.3f • hard clashes %d", tonumber(skeleton.chosenRank) or 0, tonumber(skeleton.shortlistSize) or 0, tonumber(skeleton.baseSkeletonScore or skeleton.score) or 0, tonumber(skeleton.meanPairCohesion) or 0, tonumber(skeleton.hardClashes) or 0))
+    if skeleton.noveltyClass then
+        local noveltyLabel = ({ INITIAL = "Initial Generation", MEANINGFULLY_NEW = "Meaningfully New", PARTIAL_CHANGE = "Partial Change", EXACT_REPEAT = "Exact Repeat" })[skeleton.noveltyClass] or tostring(skeleton.noveltyClass)
+        Add(lines, "Novelty: " .. noveltyLabel)
+        Add(lines, "Compared: " .. (#(skeleton.comparedComponents or {}) > 0 and table.concat(skeleton.comparedComponents, ", ") or "Not applicable"))
+        Add(lines, "Changed: " .. (#(skeleton.changedComponents or {}) > 0 and table.concat(skeleton.changedComponents, ", ") or "None"))
+        Add(lines, "Repeated: " .. (#(skeleton.repeatedComponents or {}) > 0 and table.concat(skeleton.repeatedComponents, ", ") or "None"))
+        Add(lines, string.format("Selection score: %.2f base %+0.2f repeat penalty = %.2f adjusted", tonumber(skeleton.baseSkeletonScore or skeleton.score) or 0, tonumber(skeleton.repeatPenalty) or 0, tonumber(skeleton.adjustedSelectionScore or skeleton.score) or 0))
+        if skeleton.exactRepeatAccepted then Add(lines, "Exact repeat accepted: " .. tostring(skeleton.exactRepeatReason or "No suitable alternative remained.")) end
+    elseif report.version == "1.9.0.3" then
+        Add(lines, "Novelty data: Not recorded by this version")
+    elseif not skeleton.fallbackReason then
+        Add(lines, "Novelty data: Not applicable")
+    end
     for _, slotKey in ipairs({ "CHEST", "LEGS", "SHOULDER", "ONE_HAND", "TWO_HAND", "RANGED", "OFF_HAND" }) do
         local component = FindComponent(report, slotKey)
         if component and (component.sourceID or component.visualID or component.locked or component.hidden) then
@@ -168,12 +185,16 @@ local function AddScore(lines, report, rich)
     for _, entry in ipairs({
         { "armorBase", "Armor relevance" }, { "weaponBase", "Weapon relevance" },
         { "armorRelationships", "Armor cohesion bonus" }, { "weaponRelationships", "Weapon/body cohesion bonus" },
-        { "hardClashPenalty", "Hard-clash penalty" }, { "repeatPenalty", "Immediate-repeat selection penalty" },
+        { "hardClashPenalty", "Hard-clash penalty" },
     }) do
         local value = breakdown[entry[1]]
         if value ~= nil then Add(lines, string.format("%-36s %+8.2f", entry[2], tonumber(value) or 0)) any = true end
     end
-    if any then Add(lines, string.format("%-36s %8.2f", "Skeleton total", tonumber(skeleton.score) or 0)) end
+    if any then
+        Add(lines, string.format("%-36s %8.2f", "Base skeleton total", tonumber(skeleton.baseSkeletonScore or skeleton.score) or 0))
+        Add(lines, string.format("%-36s %+8.2f", "Current-skeleton repeat penalty", tonumber(skeleton.repeatPenalty or breakdown.repeatPenalty) or 0))
+        Add(lines, string.format("%-36s %8.2f", "Adjusted selection score", tonumber(skeleton.adjustedSelectionScore or skeleton.score) or 0))
+    end
     local components = skeleton.cohesionComponents or {}
     if next(components) then
         Add(lines, "")
@@ -222,7 +243,8 @@ local function AddComparison(lines, report, rich)
     AddHeading(lines, "Compared with Previous Completed Run", rich)
     Add(lines, "Changed: " .. (#comparison.changed > 0 and table.concat(comparison.changed, ", ") or "None"))
     Add(lines, "Unchanged: " .. (#comparison.unchanged > 0 and table.concat(comparison.unchanged, ", ") or "None"))
-    if comparison.previousScore ~= nil or comparison.score ~= nil then Add(lines, string.format("Skeleton score: %.1f → %.1f", tonumber(comparison.previousScore) or 0, tonumber(comparison.score) or 0)) end
+    if comparison.previousScore ~= nil or comparison.score ~= nil then Add(lines, string.format("Base skeleton score: %.1f → %.1f", tonumber(comparison.previousScore) or 0, tonumber(comparison.score) or 0)) end
+    if comparison.previousAdjustedScore ~= nil or comparison.adjustedScore ~= nil then Add(lines, string.format("Adjusted selection score: %.1f → %.1f", tonumber(comparison.previousAdjustedScore) or tonumber(comparison.previousScore) or 0, tonumber(comparison.adjustedScore) or tonumber(comparison.score) or 0)) end
     if comparison.previousCohesion ~= nil or comparison.cohesion ~= nil then Add(lines, string.format("Cohesion: %.3f → %.3f", tonumber(comparison.previousCohesion) or 0, tonumber(comparison.cohesion) or 0)) end
 end
 

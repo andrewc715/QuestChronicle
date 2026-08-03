@@ -87,6 +87,7 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         elapsedMs = math.max(0, (finishedAtMs or 0) - (job and job.startedAtMs or finishedAtMs or 0)),
         steps = job and job.steps or 0,
         maxStepMs = job and job.maxStepMs or 0,
+        longestWorkerSliceMs = job and job.maxStepMs or 0,
         candidates = job and job.candidatesProcessed or 0,
         eraCandidates = job and job.eraCandidatesProcessed or 0,
         eraCacheHits = job and job.eraCacheHits or 0,
@@ -102,6 +103,8 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         phaseStats = job and job.phaseStats or {},
         slowestPhase = slowestKey,
         slowestPhaseMs = slowestMax,
+        largestInstrumentedCallPhase = slowestKey,
+        largestInstrumentedCallMs = slowestMax,
     }
 end
 
@@ -109,9 +112,12 @@ function Wardrobe.RecordGenerationPostPhase(performance, phaseKey, elapsedMs)
     if not performance then return end
     P.RecordGenerationPhase(performance, phaseKey, elapsedMs)
     performance.maxStepMs = math.max(tonumber(performance.maxStepMs) or 0, tonumber(elapsedMs) or 0)
+    performance.longestWorkerSliceMs = performance.maxStepMs
     local slowestKey, slowestMax = ResolveSlowestPhase(performance.phaseStats)
     performance.slowestPhase = slowestKey
     performance.slowestPhaseMs = slowestMax
+    performance.largestInstrumentedCallPhase = slowestKey
+    performance.largestInstrumentedCallMs = slowestMax
     if performance.startedAtMs then
         performance.elapsedMs = math.max(tonumber(performance.elapsedMs) or 0, P.GenerationNowMilliseconds() - performance.startedAtMs)
     end
@@ -127,7 +133,7 @@ function Wardrobe.FormatGenerationPerformance(performance)
         or tostring(performance.slowestPhase or "Unknown")
     local slowestMs = tonumber(performance.slowestPhaseMs) or 0
     return string.format(
-        "Prepared in %d frame%s • %.1f sec • worst %.1f ms • slowest %s %.1f ms",
+        "Prepared in %d frame%s • %.1f sec • worker slice %.1f ms • largest call %s %.1f ms",
         steps,
         steps == 1 and "" or "s",
         elapsedSeconds,
@@ -177,7 +183,8 @@ function Wardrobe.GetAnchorSkeletonPerformanceLines(performance)
         string.format("Anchor pools: %d chest • %d legs • %d shoulders", pools.CHEST or 0, pools.LEGS or 0, pools.SHOULDER or 0),
         string.format("Beam expansions: %d chest • %d legs • %d shoulders", expansions.CHEST or 0, expansions.LEGS or 0, expansions.SHOULDER or 0),
         string.format("Beam retained: %d chest • %d legs • %d shoulders • %d weapon bundles", retained.CHEST or 0, retained.LEGS or 0, retained.SHOULDER or 0, stats.weaponBundles or 0),
-        string.format("Chosen skeleton: rank %d/%d • score %.1f • cohesion %.3f • hard clashes %d", stats.chosenRank or 0, stats.shortlistSize or 0, stats.chosenScore or 0, stats.meanPairCohesion or 0, stats.hardClashes or 0),
+        string.format("Chosen skeleton: rank %d/%d • base %.1f • adjusted %.1f • cohesion %.3f • hard clashes %d", stats.chosenRank or 0, stats.shortlistSize or 0, stats.baseSkeletonScore or stats.chosenScore or 0, stats.adjustedSelectionScore or stats.chosenScore or 0, stats.meanPairCohesion or 0, stats.hardClashes or 0),
+        stats.noveltyClass and string.format("Novelty: %s • repeat penalty %.1f", P.GetAnchorNoveltyClassLabel and P.GetAnchorNoveltyClassLabel(stats.noveltyClass) or tostring(stats.noveltyClass), stats.repeatPenalty or 0) or "Novelty: not applicable",
         string.format("Pair cache: %d hits • %d misses", stats.pairCacheHits or 0, stats.pairCacheMisses or 0),
     }
 end

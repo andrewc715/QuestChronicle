@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guard the cooperative anchor-skeleton generation pipeline in v1.9.0.3."""
+"""Guard the cooperative anchor-skeleton generation pipeline in v1.9.0.4."""
 from pathlib import Path
 import sys
 
@@ -17,7 +17,7 @@ commands = (ROOT / "Core/Chronicle/Commands.lua").read_text(encoding="utf-8")
 foundation = (ROOT / "Core/Wardrobe/Foundation.lua").read_text(encoding="utf-8")
 
 checks = {
-    "version is v1.9.0.3": version == "1.9.0.3" and "## Version: 1.9.0.3" in toc,
+    "version is v1.9.0.4": version == "1.9.0.4" and "## Version: 1.9.0.4" in toc,
     "anchor modules load in TOC": all(name in toc for name in (
         "AnchorSkeletonCache.lua", "AnchorSkeletonSearch.lua", "AnchorSkeletonWorker.lua")),
     "anchor slot order is explicit": 'P.ANCHOR_SLOT_ORDER = { "CHEST", "LEGS", "SHOULDER" }' in cache,

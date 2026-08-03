@@ -82,6 +82,7 @@ end
 
 math.randomseed(9)
 dofile("Core/Wardrobe/AnchorSkeletonCache.lua")
+dofile("Core/Wardrobe/AnchorSkeletonNovelty.lua")
 dofile("Core/Wardrobe/AnchorSkeletonSearch.lua")
 dofile("Core/Wardrobe/AnchorSkeletonWorker.lua")
 
@@ -107,6 +108,33 @@ assert(P.GetSourceByID("ONE_HAND", draft.selections.ONE_HAND).group == "A", "wea
 assert(job.anchorStats and job.anchorStats.weaponBundles > 0, "worker should expose skeleton diagnostics")
 assert(job.weaponYields > 0, "weapon shortlist generation should remain cooperative")
 assert(job.draft.lastAnchorSkeletonSignature, "chosen skeleton signature should be retained for reroll diversity")
+
+local currentState = {
+    selections = { CHEST = 2, LEGS = 4, SHOULDER = 6, ONE_HAND = 101 },
+    selectionVisuals = { CHEST = 2, LEGS = 4, SHOULDER = 6, ONE_HAND = 101 },
+    locks = {}, hidden = {}, weaponFamilies = { ONE_HAND = true }, weaponSubtypes = {}, linkWeaponHands = true,
+    lastAnchorSkeletonSignature = "current-b",
+}
+local noveltyDraft = {
+    selections = P.CopyPrimitiveMap(currentState.selections), selectionVisuals = P.CopyPrimitiveMap(currentState.selectionVisuals),
+    locks = {}, hidden = {}, weaponFamilies = { ONE_HAND = true }, weaponSubtypes = {}, linkWeaponHands = true,
+    lastAnchorSkeletonSignature = currentState.lastAnchorSkeletonSignature,
+}
+local noveltyJob = {
+    action = "GENERATE_OUTFIT", liveState = currentState, draft = noveltyDraft,
+    currentAnchorNovelty = P.BuildAnchorNoveltyContext(currentState),
+    reroll = false, styleEngine = QC.ZoneStyle, styleMode = "TRAVELER",
+    styleContext = P.CreateStyleGenerationContext(), selectedArmor = 0, candidatesProcessed = 0,
+    eraCandidatesProcessed = 0, weaponYields = 0, phaseStats = {},
+}
+math.randomseed(17)
+for _ = 1, 10000 do
+    result = P.StepAnchorSkeletonJob(noveltyJob, 0)
+    if result ~= "RUNNING" then break end
+end
+assert(result == "READY", "repeated Generate Outfit should still produce a complete skeleton")
+assert(noveltyJob.anchorStats.noveltyClass == "MEANINGFULLY_NEW", "Generate Outfit should select a meaningfully new skeleton when one remains inside the quality window")
+assert(#(noveltyJob.anchorStats.changedComponents or {}) >= 2, "integrated novelty selection should record at least two changed logical anchors")
 
 local lockedDraft = {
     selections = { CHEST = 2, SHOULDER = 6 }, selectionVisuals = { CHEST = 2, SHOULDER = 6 },

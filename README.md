@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0.3
+# Quest Chronicle v1.9.0.4
 
-> **Phase B Diagnostics Workbench:** a dedicated Debug tab now preserves the last ten immutable generation reports with anchor skeletons, beam statistics, score ledgers, performance phases, cache activity, warnings, and copyable plain-text output.
+> **Phase B Diversity Calibration:** repeated Generate Outfit actions now prefer meaningfully new unlocked anchor skeletons while preserving the existing quality window, legality, locks, and weighted variety.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.3 adds read-only diagnostics around the v1.9.0.2 Anchor Skeleton generator without changing its selection, scoring, weapon-route, cache, or atomic-commit behavior.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.4 uses the v1.9.0.3 Debug Workbench to make repeated Generate Outfit actions seek a meaningfully different anchor foundation without sacrificing legality or the existing quality floor.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -87,6 +87,7 @@ The Debug Workbench keeps the ten newest generation attempts as bounded immutabl
 Each selected report includes:
 
 - action, mode, context, result, timing, and fallback status;
+- novelty class, compared anchors, repeated anchors, repeat penalty, and adjusted selection score;
 - the chosen Chest, Legs, Shoulders, and physical weapon appearances;
 - beam candidate pools, expansions, retained nodes, pair-cache activity, shortlist, and chosen rank;
 - the score ledger and pair-cohesion dimensions recorded during generation;
@@ -208,6 +209,7 @@ QuestChronicle\
 │   │   ├── GenerationAndConcepts.lua
 │   │   ├── WeaponPipeline.lua
 │   │   ├── AnchorSkeletonCache.lua
+│   │   ├── AnchorSkeletonNovelty.lua
 │   │   ├── AnchorSkeletonSearch.lua
 │   │   ├── GenerationPerformance.lua
 │   │   ├── AnchorSkeletonWorker.lua

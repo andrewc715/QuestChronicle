@@ -102,6 +102,7 @@ end
 
 math.randomseed(1902)
 dofile("Core/Wardrobe/AnchorSkeletonCache.lua")
+dofile("Core/Wardrobe/AnchorSkeletonNovelty.lua")
 dofile("Core/Wardrobe/AnchorSkeletonSearch.lua")
 dofile("Core/Wardrobe/AnchorSkeletonWorker.lua")
 

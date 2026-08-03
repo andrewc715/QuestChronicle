@@ -12,6 +12,7 @@ QC.ZoneStyle.ScoreSource = function(source, _, mode)
 end
 
 dofile("Core/Wardrobe/AnchorSkeletonCache.lua")
+dofile("Core/Wardrobe/AnchorSkeletonNovelty.lua")
 dofile("Core/Wardrobe/AnchorSkeletonSearch.lua")
 
 local modes = { "ZONE", "TRAVELER", "CLASS", "ECHO" }

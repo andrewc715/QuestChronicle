@@ -12,6 +12,8 @@ local function CopyTable(value)
 end
 
 local function SlotLabel(slotKey)
+    if slotKey == "ONE_HAND" or slotKey == "TWO_HAND" or slotKey == "RANGED" then return "Main Hand" end
+    if slotKey == "OFF_HAND" then return "Off Hand" end
     local definition = Wardrobe and Wardrobe.GetSlotDefinition and Wardrobe.GetSlotDefinition(slotKey)
     return definition and definition.label or tostring(slotKey or "Unknown")
 end
@@ -35,6 +37,7 @@ local function SourceSnapshot(source, slotKey, state, candidate)
         categoryID = source and tonumber(source.categoryID) or nil,
         quality = source and tonumber(source.quality) or nil,
         itemSubtype = source and source.styleItemSubType or nil,
+        weaponFamily = source and source.styleWeaponFamily or nil,
         locked = state and state.locks and state.locks[slotKey] == true or false,
         hidden = state and state.hidden and state.hidden[slotKey] == true or false,
         baseScore = candidate and tonumber(candidate.baseScore) or nil,
@@ -71,6 +74,17 @@ local function BuildSkeleton(state, job)
         chosenRank = stats and stats.chosenRank or sourceDiagnostics and sourceDiagnostics.chosenRank,
         shortlistSize = stats and stats.shortlistSize or sourceDiagnostics and sourceDiagnostics.shortlistSize,
         score = stats and stats.chosenScore or sourceDiagnostics and sourceDiagnostics.score,
+        baseSkeletonScore = stats and stats.baseSkeletonScore or sourceDiagnostics and sourceDiagnostics.baseSkeletonScore
+            or stats and stats.chosenScore or sourceDiagnostics and sourceDiagnostics.score,
+        repeatPenalty = stats and stats.repeatPenalty or sourceDiagnostics and sourceDiagnostics.repeatPenalty or 0,
+        adjustedSelectionScore = stats and stats.adjustedSelectionScore or sourceDiagnostics and sourceDiagnostics.adjustedSelectionScore
+            or stats and stats.chosenScore or sourceDiagnostics and sourceDiagnostics.score,
+        noveltyClass = stats and stats.noveltyClass or sourceDiagnostics and sourceDiagnostics.noveltyClass,
+        comparedComponents = CopyTable(stats and stats.comparedComponents or sourceDiagnostics and sourceDiagnostics.comparedComponents),
+        changedComponents = CopyTable(stats and stats.changedComponents or sourceDiagnostics and sourceDiagnostics.changedComponents),
+        repeatedComponents = CopyTable(stats and stats.repeatedComponents or sourceDiagnostics and sourceDiagnostics.repeatedComponents),
+        exactRepeatAccepted = stats and stats.exactRepeatAccepted == true or sourceDiagnostics and sourceDiagnostics.exactRepeatAccepted == true,
+        exactRepeatReason = stats and stats.exactRepeatReason or sourceDiagnostics and sourceDiagnostics.exactRepeatReason,
         meanPairCohesion = stats and stats.meanPairCohesion or sourceDiagnostics and sourceDiagnostics.meanPairCohesion,
         hardClashes = stats and stats.hardClashes or sourceDiagnostics and sourceDiagnostics.hardClashes,
         signature = sourceDiagnostics and sourceDiagnostics.signature or state and state.lastAnchorSkeletonSignature,
@@ -187,6 +201,7 @@ local function PerformanceSnapshot(performance)
         elapsedMs = tonumber(performance.elapsedMs) or 0,
         steps = tonumber(performance.steps) or 0,
         maxStepMs = tonumber(performance.maxStepMs) or 0,
+        longestWorkerSliceMs = tonumber(performance.longestWorkerSliceMs) or tonumber(performance.maxStepMs) or 0,
         candidates = tonumber(performance.candidates) or 0,
         eraCandidates = tonumber(performance.eraCandidates) or 0,
         eraCacheHits = tonumber(performance.eraCacheHits) or 0,
@@ -195,6 +210,8 @@ local function PerformanceSnapshot(performance)
         selectedArmor = tonumber(performance.selectedArmor) or 0,
         slowestPhase = performance.slowestPhase,
         slowestPhaseMs = tonumber(performance.slowestPhaseMs) or 0,
+        largestInstrumentedCallPhase = performance.largestInstrumentedCallPhase or performance.slowestPhase,
+        largestInstrumentedCallMs = tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0,
         weaponSlowYieldPhase = performance.weaponSlowYieldPhase,
         weaponSlowYieldMs = tonumber(performance.weaponSlowYieldMs) or 0,
         phaseStats = CopyTable(performance.phaseStats),
@@ -219,14 +236,32 @@ end
 
 local function AddWarningsAndComparison(report)
     local performance = report.performance or {}
-    local worst = tonumber(performance.maxStepMs) or 0
-    if worst > 16 then
-        AddWarning(report, "SEVERE_PERFORMANCE_STEP", "SEVERE", string.format("Quest Chronicle reached a %.1f ms step in %s.", worst, tostring(performance.slowestPhase or "an unknown phase")))
-    elseif worst > 8 then
-        AddWarning(report, "PERFORMANCE_STEP", "WARNING", string.format("Quest Chronicle reached a %.1f ms step in %s.", worst, tostring(performance.slowestPhase or "an unknown phase")))
+    local workerSlice = tonumber(performance.longestWorkerSliceMs) or tonumber(performance.maxStepMs) or 0
+    local callMs = tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0
+    local callPhase = tostring(performance.largestInstrumentedCallPhase or performance.slowestPhase or "an unknown phase")
+    if workerSlice > 16 then
+        AddWarning(report, "SEVERE_WORKER_SLICE", "SEVERE", string.format("Quest Chronicle reached a %.1f ms worker slice; the largest instrumented call was %s at %.1f ms.", workerSlice, callPhase, callMs))
+    elseif workerSlice > 8 then
+        AddWarning(report, "WORKER_SLICE", "WARNING", string.format("Quest Chronicle reached a %.1f ms worker slice; the largest instrumented call was %s at %.1f ms.", workerSlice, callPhase, callMs))
+    end
+    if callMs > 16 then
+        AddWarning(report, "SEVERE_INSTRUMENTED_CALL", "SEVERE", string.format("%s contained a %.1f ms instrumented call.", callPhase, callMs))
+    elseif callMs > 8 then
+        AddWarning(report, "INSTRUMENTED_CALL", "WARNING", string.format("%s contained a %.1f ms instrumented call.", callPhase, callMs))
     end
     if report.skeleton and report.skeleton.fallbackReason then
         AddWarning(report, "LEGACY_FALLBACK", "WARNING", "Anchor search used the legacy generator: " .. tostring(report.skeleton.fallbackReason))
+    end
+    local skeleton = report.skeleton or {}
+    if report.action == "GENERATE_OUTFIT" and skeleton.noveltyClass == "EXACT_REPEAT" then
+        AddWarning(report, "EXACT_SKELETON_REPEATED", "WARNING", "Generate Outfit accepted an exact unlocked-skeleton repeat. " .. tostring(skeleton.exactRepeatReason or "No stronger novelty candidate was available."))
+    elseif report.action == "GENERATE_OUTFIT" and skeleton.noveltyClass == "PARTIAL_CHANGE" then
+        AddWarning(report, "PARTIAL_CHANGE_ONLY", "INFO", "Generate Outfit found only a partial anchor change inside the quality window.")
+    end
+    local repeated = {}
+    for _, label in ipairs(skeleton.repeatedComponents or {}) do repeated[label] = true end
+    if repeated.Chest and repeated.Shoulders then
+        AddWarning(report, "REPEATED_CHEST_AND_SHOULDERS", "INFO", "Chest and Shoulders were retained after novelty scoring.")
     end
 
     local previous
@@ -242,8 +277,10 @@ local function AddWarningsAndComparison(report)
         previousTimestamp = previous.timestamp,
         changed = {},
         unchanged = {},
-        previousScore = previous.skeleton and previous.skeleton.score,
-        score = report.skeleton and report.skeleton.score,
+        previousScore = previous.skeleton and (previous.skeleton.baseSkeletonScore or previous.skeleton.score),
+        score = report.skeleton and (report.skeleton.baseSkeletonScore or report.skeleton.score),
+        previousAdjustedScore = previous.skeleton and previous.skeleton.adjustedSelectionScore,
+        adjustedScore = report.skeleton and report.skeleton.adjustedSelectionScore,
         previousCohesion = previous.skeleton and previous.skeleton.meanPairCohesion,
         cohesion = report.skeleton and report.skeleton.meanPairCohesion,
     }

@@ -219,6 +219,7 @@ local function StepWeaponExpansions(job, work)
         ok, value, notice = P.GenerateWeapons(expansion.draft, job.reroll, job.styleMode, expansion.styleContext)
     end
     RecordPhase(job, "anchorWeaponExpansion", weaponStarted)
+    work.weaponCallExceededBudget = NowMilliseconds() - weaponStarted >= P.GENERATION_TIME_BUDGET_MS
     if expansion.weaponWork and (tonumber(expansion.weaponWork.maxResumeMs) or 0) > (tonumber(job.anchorWeaponSlowYieldMs) or 0) then
         job.anchorWeaponSlowYieldMs = expansion.weaponWork.maxResumeMs
         job.anchorWeaponSlowYieldPhase = expansion.weaponWork.slowestYieldPhase
@@ -255,7 +256,7 @@ local function CandidateName(candidate)
     return source and (source.styleName or source.name or source.sourceID) or "Unknown"
 end
 
-local function BuildSelectedDiagnostics(selected, previousSignature)
+local function BuildSelectedDiagnostics(selected, selectionDetails)
     local candidates = {}
     for slotKey, candidate in pairs(selected.armorNode.sourceBySlot or {}) do candidates[slotKey] = candidate end
     for _, candidate in ipairs(selected.weaponCandidates or {}) do candidates[candidate.slotKey] = candidate end
@@ -295,15 +296,21 @@ local function BuildSelectedDiagnostics(selected, previousSignature)
             weaponBase = weaponBase,
             armorRelationships = armorNode.relationshipBonus or 0,
             weaponRelationships = selected.relationshipBonus or 0,
-            hardClashPenalty = -(((armorNode.hardClashes or 0) + (selected.hardClashes or 0)) * 18),
-            repeatPenalty = previousSignature and selected.signature == previousSignature and -35 or 0,
+            hardClashPenalty = -((selected.hardClashes or 0) * 18),
+            repeatPenalty = selectionDetails and selectionDetails.repeatPenalty or 0,
         },
     }
 end
 
 local function CommitSelectedSkeleton(job, work)
     local previousSignature = job.draft.lastAnchorSkeletonSignature
-    local selected, chosenRank, shortlistSize = P.ChooseAnchorSkeleton(work.finalists, previousSignature)
+    local noveltyContext = job.currentAnchorNovelty
+        or (P.BuildAnchorNoveltyContext and P.BuildAnchorNoveltyContext(job.liveState or job.draft))
+    local selected, chosenRank, shortlistSize, selectionDetails = P.ChooseAnchorSkeleton(work.finalists, {
+        action = job.action,
+        noveltyContext = noveltyContext,
+        previousSignature = previousSignature,
+    })
     if not selected or selected.activeComponents < 2 then
         work.fallbackReason = work.lastWeaponFailure or "fewer than two legal anchor components"
         return false
@@ -329,7 +336,7 @@ local function CommitSelectedSkeleton(job, work)
     RebuildSelectedStyleContext(job, selected)
 
     local pairSnapshot = P.GetAnchorPairCacheSnapshot()
-    local selectedDiagnostics = BuildSelectedDiagnostics(selected, previousSignature)
+    local selectedDiagnostics = BuildSelectedDiagnostics(selected, selectionDetails)
     job.anchorStats = {
         poolSizes = work.poolSizes,
         expansions = work.beamWork.expansions,
@@ -338,6 +345,15 @@ local function CommitSelectedSkeleton(job, work)
         chosenRank = chosenRank,
         shortlistSize = shortlistSize,
         chosenScore = selected.score,
+        baseSkeletonScore = selectionDetails and selectionDetails.baseScore or selected.score,
+        adjustedSelectionScore = selectionDetails and selectionDetails.adjustedScore or selected.score,
+        repeatPenalty = selectionDetails and selectionDetails.repeatPenalty or 0,
+        noveltyClass = selectionDetails and selectionDetails.class or nil,
+        comparedComponents = selectionDetails and selectionDetails.comparedComponents or {},
+        changedComponents = selectionDetails and selectionDetails.changedComponents or {},
+        repeatedComponents = selectionDetails and selectionDetails.repeatedComponents or {},
+        exactRepeatAccepted = selectionDetails and selectionDetails.exactRepeatAccepted == true or false,
+        exactRepeatReason = selectionDetails and selectionDetails.exactRepeatReason or nil,
         meanPairCohesion = selected.meanPairCohesion,
         hardClashes = selected.hardClashes,
         pairCacheHits = pairSnapshot.hits - (work.pairCacheStarted.hits or 0),
@@ -351,6 +367,15 @@ local function CommitSelectedSkeleton(job, work)
         mainSource = selected.mainSource,
         offSource = selected.offSource,
         score = selected.score,
+        baseSkeletonScore = selectionDetails and selectionDetails.baseScore or selected.score,
+        adjustedSelectionScore = selectionDetails and selectionDetails.adjustedScore or selected.score,
+        repeatPenalty = selectionDetails and selectionDetails.repeatPenalty or 0,
+        noveltyClass = selectionDetails and selectionDetails.class or nil,
+        comparedComponents = selectionDetails and selectionDetails.comparedComponents or {},
+        changedComponents = selectionDetails and selectionDetails.changedComponents or {},
+        repeatedComponents = selectionDetails and selectionDetails.repeatedComponents or {},
+        exactRepeatAccepted = selectionDetails and selectionDetails.exactRepeatAccepted == true or false,
+        exactRepeatReason = selectionDetails and selectionDetails.exactRepeatReason or nil,
         meanPairCohesion = selected.meanPairCohesion,
         hardClashes = selected.hardClashes,
         chosenRank = chosenRank,
@@ -426,7 +451,9 @@ function P.StepAnchorSkeletonJob(job, stepStarted)
                 work.stage = "WEAPONS"
             end
         elseif work.stage == "WEAPONS" then
+            work.weaponCallExceededBudget = false
             if StepWeaponExpansions(job, work) then work.stage = "SELECT" end
+            if work.weaponCallExceededBudget then return "RUNNING" end
         elseif work.stage == "SELECT" then
             local selectionStarted = NowMilliseconds()
             local committed = CommitSelectedSkeleton(job, work)

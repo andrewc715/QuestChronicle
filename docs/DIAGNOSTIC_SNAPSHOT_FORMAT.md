@@ -33,7 +33,7 @@ Every report includes:
     sequence = 1,
     timestamp = 0,
     timestampText = "YYYY-MM-DD HH:MM:SS",
-    version = "1.9.0.3",
+    version = "1.9.0.4",
     action = "GENERATE_OUTFIT",
     result = "COMPLETED",
     success = true,
@@ -96,7 +96,9 @@ Each appearance may contain stable display and identity fields:
 }
 ```
 
-The skeleton also records chosen rank, shortlist size, total score, mean pair cohesion, hard clashes, fallback reason, score breakdown, cohesion dimensions, strongest bridge, and weakest relationship when available.
+The skeleton also records chosen rank, shortlist size, base score, repeat penalty, adjusted selection score, novelty class, compared/changed/repeated logical anchors, mean pair cohesion, hard clashes, fallback reason, score breakdown, cohesion dimensions, strongest bridge, and weakest relationship when available.
+
+Weapon components retain their internal family key but use physical `Main Hand` and `Off Hand` labels. Weapon subtype is stored separately as presentation metadata.
 
 ## Beam report
 
@@ -122,7 +124,7 @@ Candidate arrays, beam nodes, source tables, and coroutine state are never persi
 
 ## Performance and cache
 
-`performance.phaseStats` stores the maximum, total, and call count already recorded by the generation pipeline. `cache` stores the generation-cache lifecycle snapshot already attached to the performance record.
+`performance.phaseStats` stores the maximum, total, and call count already recorded by the generation pipeline. `longestWorkerSliceMs` records the complete cooperative resume, while `largestInstrumentedCallMs` and `largestInstrumentedCallPhase` record the largest individually timed operation inside those slices. `cache` stores the generation-cache lifecycle snapshot already attached to the performance record.
 
 The Debug tab formats these values but does not recalculate generation outcomes.
 
@@ -130,7 +132,7 @@ The Debug tab formats these values but does not recalculate generation outcomes.
 
 Warnings are derived after the generation and UI completion pipeline settles. Current warnings include performance thresholds, legacy fallback, and repeated Chest/Shoulder foundations.
 
-The optional `comparison` table records changed and unchanged skeleton slots plus score and cohesion movement relative to the previous completed report.
+The optional `comparison` table records changed and unchanged skeleton slots plus immutable base score, adjusted score, and cohesion movement relative to the previous completed report. v1.9.0.3 reports remain valid and simply lack novelty fields.
 
 ## Immutability boundary
 

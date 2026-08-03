@@ -23,6 +23,7 @@ QC.ZoneStyle.GetSourceCoherence = function() return 0, true end
 QC.ZoneStyle.ScoreSource = function(source) return source.score end
 
 dofile("Core/Wardrobe/AnchorSkeletonCache.lua")
+dofile("Core/Wardrobe/AnchorSkeletonNovelty.lua")
 dofile("Core/Wardrobe/AnchorSkeletonSearch.lua")
 math.randomseed(42)
 

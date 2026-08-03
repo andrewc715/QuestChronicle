@@ -299,3 +299,13 @@ Weapon routing keeps the public and synchronous `GenerateWeapons()` implementati
 
 The successful completion callback applies the model on one frame and calls `RefreshGeneratedResult()` on the next. That targeted refresh updates only controls whose values can change after an atomic generated outfit commit, avoiding the expensive weapon-capability and full-layout work performed by the ordinary workbench refresh.
 
+
+## Phase B Generate Outfit novelty (v1.9.0.4)
+
+`Core/Wardrobe/AnchorSkeletonNovelty.lua` snapshots the currently displayed unlocked Chest, Legs, Shoulders, and logical weapon bundle before generation. Identity is based on stable visual IDs rather than source IDs. Locked and hidden anchors are excluded from overlap scoring.
+
+The beam and legal weapon-route pipeline remain unchanged. After complete legal skeletons enter the existing 28-point quality window, `AnchorSkeletonSearch.lua` classifies them as Initial Generation, Meaningfully New, Partial Change, or Exact Repeat. Generate Outfit selects from the strongest available novelty class and applies centralized repeat penalties only to the final weighted selection score. Reroll Unlocked retains its existing candidate exclusion behavior.
+
+`AnchorSkeletonWorker.lua` records the base score, repeat penalty, adjusted score, compared anchors, changed anchors, repeated anchors, and exact-repeat exception in the immutable diagnostic source. No mutable candidate or beam tables cross the diagnostics boundary.
+
+Generation telemetry distinguishes the complete cooperative worker slice from the largest individually instrumented call inside that slice. Weapon expansion returns control immediately when a weapon operation consumes the time budget.

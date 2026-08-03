@@ -1,83 +1,84 @@
-# Quest Chronicle v1.9.0.3 - Phase B Diagnostics Workbench
+# Quest Chronicle v1.9.0.4 - Phase B Diversity Calibration
 
-v1.9.0.3 turns the growing Phase B telemetry into a dedicated in-game workbench. The anchor generator itself remains the v1.9.0.2 implementation. This release records what happened, why the skeleton won, where time was spent, and what the cache did without changing any selection result.
+v1.9.0.4 gives repeated **Generate Outfit** clicks their intended meaning: produce a meaningfully different complete outfit when a sufficiently strong alternative exists. The release also corrects the diagnostic ambiguities uncovered by the v1.9.0.3 Debug Workbench.
 
-## Debug tab
+## Generate Outfit novelty
 
-A new top-level **Debug** tab uses a two-column layout:
-
-- **Generation History** lists the ten newest attempts with time, action, mode, result, duration, and skeleton rank.
-- **Selected Report** shows the complete immutable snapshot for the chosen attempt.
-
-The tab opens through the main window or:
+Quest Chronicle compares each complete legal anchor skeleton with the currently displayed unlocked foundation:
 
 ```text
-/qc debug
+Chest
+Legs
+Shoulders
+Logical weapon bundle
 ```
 
-A new report never pulls the player away from the Outfits tab. Opening Debug selects the newest report.
+Locked and deliberately hidden anchors are excluded. Appearance identity is visual-based, so Blizzard resolving the same appearance through another collected source does not create false novelty.
 
-## Immutable generation snapshots
-
-Quest Chronicle records one bounded snapshot for:
+A candidate is classified as:
 
 ```text
-Generate Outfit
-Reroll Unlocked
-Reroll Slot
-Completed generation
-Legacy fallback
-Cancellation
-Failure
+Meaningfully New  two or more unlocked logical anchors changed
+Partial Change    exactly one unlocked logical anchor changed
+Exact Repeat      no unlocked logical anchor changed
+Initial Generation no current anchor foundation was available
 ```
 
-Snapshots copy only stable primitive data after the generation pipeline settles. They do not retain beam nodes, coroutine workers, candidate arrays, or live wardrobe tables.
+Generate Outfit selects from the strongest available novelty class inside the existing 28-point quality window. Weighted randomness remains active within that class. Novelty cannot make an illegal or dramatically weaker skeleton win.
 
-## Complete diagnostic report
+## Repeat penalties
 
-Each report can include:
-
-- version, character, action, mode, context, result, outfit name, and timing;
-- Chest, Legs, Shoulders, and physical weapon appearances;
-- locks, hidden anchors, chosen rank, score, cohesion, and hard clashes;
-- strongest and weakest anchor relationships;
-- candidate pools, expansions, retained beam nodes, legal weapon bundles, pair-cache activity, shortlist, and fallback;
-- recorded anchor score components and mean pair-cohesion dimensions;
-- every performance phase with maximum, total, and call count;
-- persistent cache, item dependency, evidence outcome, and invalidation metrics;
-- warnings for performance overruns, fallback, and repeated Chest/Shoulder foundations;
-- a lightweight comparison with the previous completed report.
-
-The compact Outfits tooltip now carries only headline timing and skeleton information, then points to the Debug tab for the full ledger.
-
-## History and persistence
-
-Diagnostic format 1 is stored under:
+The intrinsic Phase B score remains unchanged. Repetition affects only the final selection score:
 
 ```text
-QuestChronicleDB.debug
+Repeated Chest          -10
+Repeated Legs            -6
+Repeated Shoulders       -8
+Repeated weapon bundle  -10
+Exact unlocked repeat   -12 additional
 ```
 
-The store is deliberately bounded:
+An exact repeat remains legal when no meaningfully new or partial-change skeleton survives the quality window. The Debug report records the reason.
+
+## Reroll behavior
+
+**Reroll Unlocked** retains its existing hard replacement semantics and does not use Generate Outfit's novelty classes. **Reroll Slot** remains isolated to the requested slot.
+
+## Diagnostic corrections
+
+The Debug report now records immutable:
+
+- base skeleton score;
+- current-skeleton repeat penalty;
+- adjusted selection score;
+- novelty class;
+- compared, changed, and repeated logical anchors;
+- exact-repeat exception and reason.
+
+Previous-run comparisons read those stored values directly, so a historical score cannot drift after metadata hydration or a later generation context.
+
+Weapon appearances are always labeled by their physical slots:
 
 ```text
-Maximum reports:          10
-Maximum report size:      20 KB
-Maximum history size:     approximately 200 KB
-Pruning order:            oldest first
+Main Hand
+Off Hand
 ```
 
-History survives `/reload` and ordinary logout. **Clear History** removes only diagnostic reports. Chronicle events, wardrobe caches, concepts, selections, preferences, Custom Set links, and Courier data are untouched.
+Weapon subtype remains separate metadata, such as `Two-Handed Sword`.
 
-## Copy Report
+## Timing terminology
 
-**Copy Report** opens a multiline read-only report box with all text selected. Press `Ctrl+C` to copy it for a development report. **Show raw IDs** adds visual, source, item, and category identifiers. **Verbose diagnostics** includes otherwise hidden zero-count fields.
+The report now distinguishes:
 
-## Selection parity
+```text
+Longest worker slice
+Largest instrumented call
+Largest-call phase
+```
 
-v1.9.0.3 does not calibrate the Phase B beam. Seeded and deterministic harnesses produce the same anchor ranking, mode identity, worker result, selection parity, weapon result, and synthetic benchmark output as v1.9.0.2.
+This removes the apparent contradiction where a complete cooperative slice could be longer than any individually timed call inside it.
 
-The repeated Rugged Plate Vest and Expedition Defender's Shoulders, plus the observed Anchor weapon-expansion overrun, remain evidence for the planned v1.9.0.4 calibration release rather than changes hidden inside this patch.
+Anchor weapon expansion also yields immediately when one weapon operation consumes the frame budget. Legal routes and weighted weapon selection are unchanged.
 
 ## Compatibility
 
@@ -85,8 +86,8 @@ The repeated Rugged Plate Vest and Expedition Defender's Shoulders, plus the obs
 SavedVariables schema:   2
 Courier format:          1
 Wardrobe cache format:   7
-Diagnostic format:       1
 Generation-cache store:  2
+Diagnostic format:       1
 ```
 
-No reset is required. Quest Chronicle still applies no transmog and spends no gold.
+Existing v1.9.0.3 reports remain readable and show that novelty data was not recorded by that version. No reset or cache deletion is required. Quest Chronicle still applies no transmog and spends no gold.

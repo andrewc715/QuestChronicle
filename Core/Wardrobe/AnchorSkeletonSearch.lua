@@ -229,30 +229,88 @@ function P.ScoreWeaponBundleForAnchor(node, draft, styleMode, styleContext)
     }
 end
 
-function P.ChooseAnchorSkeleton(finalists, previousSignature)
+function P.ChooseAnchorSkeleton(finalists, options)
     if not finalists or #finalists == 0 then return nil end
+    if type(options) ~= "table" then
+        options = { previousSignature = options }
+    end
     table.sort(finalists, function(left, right) return (left.score or 0) > (right.score or 0) end)
-    local shortlist = {}
+
+    local quality = {}
     local bestScore = tonumber(finalists[1].score) or 0
     for index = 1, math.min(P.ANCHOR_FINAL_SHORTLIST, #finalists) do
         local entry = finalists[index]
         if index > 1 and (tonumber(entry.score) or 0) < bestScore - P.ANCHOR_FINAL_SCORE_WINDOW then break end
-        local adjustedScore = entry.score or 0
-        if previousSignature and entry.signature == previousSignature and #finalists > 1 then adjustedScore = adjustedScore - 35 end
-        shortlist[#shortlist + 1] = { entry = entry, adjustedScore = adjustedScore }
+        local novelty
+        if options.action == "GENERATE_OUTFIT" and P.EvaluateAnchorNovelty then
+            novelty = P.EvaluateAnchorNovelty(entry, options.noveltyContext)
+        else
+            novelty = {
+                class = nil,
+                classPriority = 0,
+                baseScore = tonumber(entry.score) or 0,
+                adjustedScore = tonumber(entry.score) or 0,
+                repeatPenalty = 0,
+                comparedComponents = {}, changedComponents = {}, repeatedComponents = {},
+                comparedCount = 0, changedCount = 0, repeatedCount = 0,
+            }
+            if options.previousSignature and entry.signature == options.previousSignature and #finalists > 1 then
+                novelty.adjustedScore = novelty.adjustedScore - 35
+                novelty.repeatPenalty = -35
+            end
+        end
+        quality[#quality + 1] = {
+            entry = entry,
+            baseRank = index,
+            adjustedScore = novelty.adjustedScore,
+            novelty = novelty,
+        }
     end
-    local minimum = shortlist[#shortlist].adjustedScore
+
+    local choices = quality
+    local chosenClass
+    if options.action == "GENERATE_OUTFIT" and options.noveltyContext and options.noveltyContext.available then
+        local bestPriority = -math.huge
+        for _, choice in ipairs(quality) do
+            bestPriority = math.max(bestPriority, tonumber(choice.novelty.classPriority) or 0)
+        end
+        choices = {}
+        for _, choice in ipairs(quality) do
+            if (tonumber(choice.novelty.classPriority) or 0) == bestPriority then
+                choices[#choices + 1] = choice
+                chosenClass = choice.novelty.class
+            end
+        end
+    end
+
+    local minimum = tonumber(choices[#choices].adjustedScore) or 0
+    if options.action == "GENERATE_OUTFIT" and options.noveltyContext and options.noveltyContext.available then
+        minimum = math.huge
+        for _, choice in ipairs(choices) do minimum = math.min(minimum, tonumber(choice.adjustedScore) or 0) end
+    end
     local total = 0
-    for _, choice in ipairs(shortlist) do
-        choice.weight = math.max(1, choice.adjustedScore - minimum + 5) ^ 2
+    for _, choice in ipairs(choices) do
+        choice.weight = math.max(1, (tonumber(choice.adjustedScore) or 0) - minimum + 5) ^ 2
         total = total + choice.weight
     end
     local roll = math.random() * total
-    for rank, choice in ipairs(shortlist) do
+    local selectedChoice = choices[#choices]
+    for _, choice in ipairs(choices) do
         roll = roll - choice.weight
-        if roll <= 0 then return choice.entry, rank, #shortlist end
+        if roll <= 0 then selectedChoice = choice break end
     end
-    return shortlist[#shortlist].entry, #shortlist, #shortlist
+
+    local selection = selectedChoice.novelty or {}
+    selection.baseScore = tonumber(selectedChoice.entry.score) or 0
+    selection.adjustedScore = tonumber(selectedChoice.adjustedScore) or selection.baseScore
+    selection.repeatPenalty = tonumber(selection.repeatPenalty) or 0
+    selection.qualityShortlistSize = #quality
+    selection.noveltyClassSize = #choices
+    if chosenClass == "EXACT_REPEAT" then
+        selection.exactRepeatAccepted = true
+        selection.exactRepeatReason = "No meaningfully new or partial-change skeleton remained inside the quality window."
+    end
+    return selectedChoice.entry, selectedChoice.baseRank, #quality, selection
 end
 
 function Wardrobe.GetLastAnchorSkeletonDiagnostics()
@@ -272,7 +330,11 @@ function Wardrobe.PrintAnchorSkeletonDiagnostics()
         local source = d.sources and d.sources[slotKey]
         printLine(string.format("  %s: %s", P.slotByKey[slotKey].label, source and (source.styleName or source.name or source.sourceID) or "Hidden/unavailable"))
     end
-    printLine(string.format("  Weapons: %s%s", d.mainSource and (d.mainSource.styleName or d.mainSource.name or d.mainSource.sourceID) or "None", d.offSource and (" + " .. tostring(d.offSource.styleName or d.offSource.name or d.offSource.sourceID)) or ""))
+    printLine(string.format("  Main Hand: %s", d.mainSource and (d.mainSource.styleName or d.mainSource.name or d.mainSource.sourceID) or "None"))
+    printLine(string.format("  Off Hand: %s", d.offSource and (d.offSource.styleName or d.offSource.name or d.offSource.sourceID) or "None"))
+    if d.noveltyClass then
+        printLine(string.format("  Novelty: %s • changed %s • repeated %s • penalty %.1f", P.GetAnchorNoveltyClassLabel and P.GetAnchorNoveltyClassLabel(d.noveltyClass) or tostring(d.noveltyClass), #(d.changedComponents or {}), #(d.repeatedComponents or {}), tonumber(d.repeatPenalty) or 0))
+    end
     printLine(string.format("  Beam: %d chest • %d legs • %d shoulders • %d weapon bundles • fallback %s", d.expansions and d.expansions.CHEST or 0, d.expansions and d.expansions.LEGS or 0, d.expansions and d.expansions.SHOULDER or 0, d.weaponBundles or 0, tostring(d.fallbackReason or "none")))
     return d
 end

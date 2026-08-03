@@ -110,6 +110,9 @@ local function BuildGenerationMessage(job, generatedName, weaponCount, weaponNot
     )
     if job.anchorStats then
         message = message .. string.format(" Anchor skeleton rank %d/%d scored %.1f.", job.anchorStats.chosenRank or 0, job.anchorStats.shortlistSize or 0, job.anchorStats.chosenScore or 0)
+        if job.anchorStats.noveltyClass and P.GetAnchorNoveltyClassLabel then
+            message = message .. " Novelty: " .. P.GetAnchorNoveltyClassLabel(job.anchorStats.noveltyClass) .. "."
+        end
     elseif job.anchorFallbackReason then
         message = message .. " Anchor search used the legacy fallback: " .. tostring(job.anchorFallbackReason) .. "."
     end
@@ -463,6 +466,7 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
         reroll = reroll == true,
         liveState = liveState,
         draft = draft,
+        currentAnchorNovelty = P.BuildAnchorNoveltyContext and P.BuildAnchorNoveltyContext(liveState) or nil,
         styleEngine = styleEngine,
         styleMode = styleMode,
         styleContext = styleContext,

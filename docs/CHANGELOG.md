@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.9.0.4 - 2026-08-02
+
+### Changed
+
+- Made repeated Generate Outfit actions prefer meaningfully new unlocked anchor skeletons inside the existing quality window.
+- Added visual-identity overlap classification for Chest, Legs, Shoulders, and the logical weapon bundle.
+- Added centralized repeat penalties without changing intrinsic cohesion, relevance, legality, beam expansion, or candidate scores.
+- Preserved Reroll Unlocked hard replacement and Reroll Slot isolation.
+
+### Fixed
+
+- Stored immutable base and adjusted skeleton scores so previous-run Debug comparisons cannot drift.
+- Replaced weapon-family labels with physical Main Hand and Off Hand labels while retaining subtype metadata.
+- Distinguished longest cooperative worker slices from largest instrumented calls.
+- Yielded immediately after an anchor weapon operation exceeded the cooperative time budget.
+- Preserved v1.9.0.3 diagnostic reports without inventing missing novelty fields.
+
+### Compatibility
+
+- Preserved SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, and diagnostic format 1.
+
 ## 1.9.0.3 - 2026-08-02
 
 ### Added

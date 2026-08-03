@@ -459,12 +459,14 @@ P.builders[#P.builders + 1] = function(C)
         local anchor = performance.anchorStats
         if anchor then
             GameTooltip:AddLine(string.format(
-                "Skeleton rank %d/%d • score %.1f • cohesion %.3f",
+                "Skeleton rank %d/%d • base %.1f • adjusted %.1f • cohesion %.3f",
                 tonumber(anchor.chosenRank) or 0,
                 tonumber(anchor.shortlistSize) or 0,
-                tonumber(anchor.chosenScore) or 0,
+                tonumber(anchor.baseSkeletonScore or anchor.chosenScore) or 0,
+                tonumber(anchor.adjustedSelectionScore or anchor.chosenScore) or 0,
                 tonumber(anchor.meanPairCohesion) or 0
             ), 0.86, 0.72, 1, true)
+            if anchor.noveltyClass and P.GetAnchorNoveltyClassLabel then GameTooltip:AddLine("Novelty: " .. P.GetAnchorNoveltyClassLabel(anchor.noveltyClass), 0.72, 0.9, 0.72, true) end
         elseif performance.anchorFallbackReason then
             GameTooltip:AddLine("Anchor fallback: " .. tostring(performance.anchorFallbackReason), 1, 0.65, 0.3, true)
         end

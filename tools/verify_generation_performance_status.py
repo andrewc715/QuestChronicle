@@ -19,7 +19,7 @@ checks = {
     "refresh renders independent performance line": 'C.performanceText:SetText(self.generationPerformanceText or "")' in refresh,
     "completion does not concatenate result message": 'Prepared across' not in refresh,
     "phase-aware formatter": 'function Wardrobe.FormatGenerationPerformance' in performance,
-    "slowest phase shown": 'slowest %s %.1f ms' in performance,
+    "worker slice and largest call shown": 'worker slice %.1f ms • largest call %s %.1f ms' in performance,
     "preview application measured": 'RecordGenerationPostPhase(performance, "previewApply"' in refresh,
     "final UI refresh measured": 'RecordGenerationPostPhase(performance, "uiRefresh"' in refresh,
     "new generation clears prior measurement": 'C.pane.generationPerformance = nil' in refresh,
