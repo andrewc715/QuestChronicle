@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.9.0.7 - 2026-08-03
+
+### Added
+
+- Derived immutable outfit profiles from committed Phase B anchors.
+- Replaced independent support-slot selection with a bounded cooperative support beam for Waist, Hands, Feet, Head, Back, Wrists, Shirt, and Tabard.
+- Added cumulative mismatch budgets, protected future-slot reserves, borrowing, bridge scoring, neighbor cohesion, controlled accents, and outlier prevention.
+- Added contextual support-slot rerolls and support rebuilding after anchor or weapon rerolls.
+- Added complete Phase C Debug reporting and immutable previous-run support comparisons.
+
+### Preserved
+
+- Preserved Phase B anchor, novelty, and weapon-route parity with v1.9.0.5.
+- Preserved SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, and diagnostic format 1.
+
+## 1.9.0.5 - 2026-08-02
+
+### Fixed
+
+- Corrected hidden and locked anchor comparisons so excluded components cannot appear as unchanged or trigger repeated-foundation warnings.
+- Bound every diagnostic report to an immutable previous completed generation and rejected duplicate report insertion.
+- Added precise weapon subphase reporting for residual generation overruns.
+
+### Performance
+
+- Prewarmed weapon appearance indexes and compact collected-source metadata during wardrobe scans.
+- Reused weapon validation results across armor finalists without changing legal routes or selected bundles.
+
+### Compatibility
+
+- Preserved SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, and diagnostic format 1.
+
 ## 1.9.0.4 - 2026-08-02
 
 ### Changed

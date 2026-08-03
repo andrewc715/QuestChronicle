@@ -33,7 +33,7 @@ Every report includes:
     sequence = 1,
     timestamp = 0,
     timestampText = "YYYY-MM-DD HH:MM:SS",
-    version = "1.9.0.4",
+    version = "1.9.0.7",
     action = "GENERATE_OUTFIT",
     result = "COMPLETED",
     success = true,
@@ -141,3 +141,55 @@ Snapshot construction deep-copies supported primitive fields. The report never r
 ## Format changes
 
 A future incompatible diagnostic format increments `QuestChronicle.Diagnostics.FORMAT_VERSION`. Incompatible diagnostic history may be discarded without changing any other Quest Chronicle data.
+
+## v1.9.0.5 optional fields
+
+Diagnostic format 1 adds optional `lineageID`, `generationToken`, `parentCompletedReportID`, and stable reserved `sequence` fields. Comparisons may include an `excluded` list for Hidden, Locked, or Unavailable anchors. Existing v1.9.0.3 and v1.9.0.4 reports remain readable without these fields.
+
+
+## v1.9.0.7 contextual support fields
+
+Diagnostic format 1 adds an optional `support` table. Older reports remain valid and display `Contextual support data: Not recorded by this version`.
+
+The support snapshot contains only immutable selected decisions and aggregate counters:
+
+```lua
+support = {
+    version = 1,
+    profile = {
+        activeAnchors = {},
+        activeAnchorCount = 4,
+        meanAnchorCohesion = 0.68,
+        strongestRelationship = {},
+        weakestRelationship = {},
+        centers = {},
+        tolerance = {},
+        confidence = {},
+    },
+    startingBudget = 10.75,
+    lockedCommitment = 0,
+    generatedSpend = 0,
+    borrowed = 0,
+    overrun = 0,
+    remainingBudget = 10.75,
+    configurationScore = 0,
+    wholeOutfitCohesion = 0,
+    controlledAccents = 0,
+    outliers = 0,
+    fallbackSlots = 0,
+    emptySlots = 0,
+    chosenRank = 1,
+    shortlistSize = 6,
+    poolSizes = {},
+    expansions = {},
+    retained = {},
+    deduplicated = 0,
+    budgetRejections = 0,
+    decisions = {},
+    excluded = {},
+}
+```
+
+Each decision stores the selected slot and stable appearance identity plus role, profile fit, neighbor cohesion, bridge target and improvement, mismatch cost, budget state, outlier state, repeat penalty, lock state, fallback state, and recorded score. Candidate pools, beam nodes, source tables, and mutable budget objects are never persisted.
+
+Support comparisons add changed, unchanged, and excluded support slots plus immutable mismatch, whole-outfit cohesion, and outlier-count movement. A contextual-support legacy fallback may store `supportFallbackReason` on the report without changing the diagnostic format version.

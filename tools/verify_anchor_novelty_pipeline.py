@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static guard for the v1.9.0.4 anchor-novelty and diagnostic-correction pipeline."""
+"""Static guard for the v1.9.0.7 anchor-novelty and diagnostic-correction pipeline."""
 from pathlib import Path
 import sys
 
@@ -14,6 +14,7 @@ novelty = (ROOT / "Core/Wardrobe/AnchorSkeletonNovelty.lua").read_text(encoding=
 search = (ROOT / "Core/Wardrobe/AnchorSkeletonSearch.lua").read_text(encoding="utf-8")
 worker = (ROOT / "Core/Wardrobe/AnchorSkeletonWorker.lua").read_text(encoding="utf-8")
 snapshot = (ROOT / "Core/Diagnostics/SnapshotBuilder.lua").read_text(encoding="utf-8")
+comparison = (ROOT / "Core/Diagnostics/Comparison.lua").read_text(encoding="utf-8")
 formatter = (ROOT / "Core/Diagnostics/ReportFormatter.lua").read_text(encoding="utf-8")
 performance = (ROOT / "Core/Wardrobe/GenerationPerformance.lua").read_text(encoding="utf-8")
 
@@ -53,14 +54,10 @@ for token in (
     if token not in worker:
         fail(f"worker does not preserve novelty diagnostics: {token}")
 
-for token in (
-    'return "Main Hand"',
-    "previous.skeleton.baseSkeletonScore",
-    "longestWorkerSliceMs",
-    "largestInstrumentedCallMs",
-):
-    if token not in snapshot:
-        fail(f"snapshot correction missing: {token}")
+for token in ('return "Main Hand"', "longestWorkerSliceMs", "largestInstrumentedCallMs"):
+    if token not in snapshot: fail(f"snapshot correction missing: {token}")
+if "previous.skeleton.baseSkeletonScore" not in comparison or "parentCompletedReportID" not in comparison:
+    fail("immutable parent comparison is not wired")
 
 for token in (
     "Longest worker slice",

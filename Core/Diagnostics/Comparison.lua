@@ -1,0 +1,119 @@
+local QC = QuestChronicle
+local D = QC.Diagnostics
+local P = D._Private
+
+local ARMOR_KEYS = { "CHEST", "LEGS", "SHOULDER" }
+local MAIN_KEYS = { "ONE_HAND", "TWO_HAND", "RANGED" }
+
+local function AddWarning(report, key, severity, text, reportIDs)
+    report.warnings[#report.warnings + 1] = { key = key, severity = severity, text = text, reportIDs = reportIDs }
+end
+
+local function ComponentsBySlot(report)
+    local result = {}
+    for _, component in ipairs(report and report.skeleton and report.skeleton.components or {}) do result[component.slotKey] = component end
+    return result
+end
+
+local function Identity(component)
+    return component and tostring(component.visualID or component.sourceID or "") or ""
+end
+
+local function MainComponent(bySlot)
+    for _, key in ipairs(MAIN_KEYS) do if bySlot[key] then return bySlot[key] end end
+end
+
+local function AddState(comparison, component, old)
+    if not component then return end
+    local label = component.slotLabel or component.slotKey
+    if component.hidden then comparison.excluded[#comparison.excluded + 1] = label .. " (Hidden)" return end
+    if component.locked then comparison.excluded[#comparison.excluded + 1] = label .. " (Locked)" return end
+    if Identity(component) == "" then comparison.excluded[#comparison.excluded + 1] = label .. " (Unavailable)" return end
+    if old and not old.hidden and Identity(old) == Identity(component) then
+        comparison.unchanged[#comparison.unchanged + 1] = label
+    else
+        comparison.changed[#comparison.changed + 1] = label
+    end
+end
+
+local function BuildComparison(report, previous)
+    local comparison = {
+        previousReportID = previous.id, previousTimestamp = previous.timestamp,
+        changed = {}, unchanged = {}, excluded = {},
+        previousScore = previous.skeleton and (previous.skeleton.baseSkeletonScore or previous.skeleton.score),
+        score = report.skeleton and (report.skeleton.baseSkeletonScore or report.skeleton.score),
+        previousAdjustedScore = previous.skeleton and previous.skeleton.adjustedSelectionScore,
+        adjustedScore = report.skeleton and report.skeleton.adjustedSelectionScore,
+        previousCohesion = previous.skeleton and previous.skeleton.meanPairCohesion,
+        cohesion = report.skeleton and report.skeleton.meanPairCohesion,
+    }
+    local current, old = ComponentsBySlot(report), ComponentsBySlot(previous)
+    for _, key in ipairs(ARMOR_KEYS) do AddState(comparison, current[key], old[key]) end
+    local currentMain, oldMain = MainComponent(current), MainComponent(old)
+    if currentMain then AddState(comparison, currentMain, oldMain) end
+    if current.OFF_HAND then AddState(comparison, current.OFF_HAND, old.OFF_HAND) end
+    return comparison
+end
+
+local function Foundation(report)
+    local bySlot = ComponentsBySlot(report)
+    local chest, shoulder = bySlot.CHEST, bySlot.SHOULDER
+    if not chest or not shoulder or chest.hidden or shoulder.hidden or chest.locked or shoulder.locked then return nil end
+    if Identity(chest) == "" or Identity(shoulder) == "" then return nil end
+    local main = MainComponent(bySlot)
+    local topology = tostring(main and main.slotKey or "NONE") .. ":" .. tostring(bySlot.OFF_HAND and "PAIR" or "SINGLE")
+    return table.concat({ tostring(report.mode or ""), topology, Identity(chest), Identity(shoulder) }, "|")
+end
+
+local function AddFoundationWarning(report)
+    local signature = Foundation(report)
+    if not signature then return end
+    local consecutive, ids, parentID = 1, { report.id }, report.parentCompletedReportID
+    while parentID do
+        local previous = D.GetReportByID(parentID)
+        if not previous or Foundation(previous) ~= signature then break end
+        consecutive = consecutive + 1
+        ids[#ids + 1] = previous.id
+        parentID = previous.parentCompletedReportID
+    end
+    if consecutive >= 3 then
+        AddWarning(report, "REPEATED_FOUNDATION", "WARNING", string.format("The same unlocked Chest and Shoulders appeared in %d consecutive completed skeletons.", consecutive), ids)
+    end
+end
+
+function P.AttachWarningsAndComparison(report)
+    local performance = report.performance or {}
+    local workerSlice = tonumber(performance.longestWorkerSliceMs) or tonumber(performance.maxStepMs) or 0
+    local callMs = tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0
+    local callPhase = tostring(performance.largestInstrumentedCallPhase or performance.slowestPhase or "an unknown phase")
+    if workerSlice > 16 then
+        AddWarning(report, "SEVERE_WORKER_SLICE", "SEVERE", string.format("Quest Chronicle reached a %.1f ms worker slice; the largest instrumented call was %s at %.1f ms.", workerSlice, callPhase, callMs))
+    elseif workerSlice > 8 then
+        AddWarning(report, "WORKER_SLICE", "WARNING", string.format("Quest Chronicle reached a %.1f ms worker slice; the largest instrumented call was %s at %.1f ms.", workerSlice, callPhase, callMs))
+    end
+    if callMs > 16 then AddWarning(report, "SEVERE_INSTRUMENTED_CALL", "SEVERE", string.format("%s contained a %.1f ms instrumented call.", callPhase, callMs))
+    elseif callMs > 8 then AddWarning(report, "INSTRUMENTED_CALL", "WARNING", string.format("%s contained a %.1f ms instrumented call.", callPhase, callMs)) end
+    local skeleton = report.skeleton or {}
+    if skeleton.fallbackReason then AddWarning(report, "LEGACY_FALLBACK", "WARNING", "Anchor search used the legacy generator: " .. tostring(skeleton.fallbackReason)) end
+    if report.supportFallbackReason then AddWarning(report, "SUPPORT_LEGACY_FALLBACK", "WARNING", "Contextual support used the legacy selector: " .. tostring(report.supportFallbackReason)) end
+    if report.action == "GENERATE_OUTFIT" and skeleton.noveltyClass == "EXACT_REPEAT" then
+        AddWarning(report, "EXACT_SKELETON_REPEATED", "WARNING", "Generate Outfit accepted an exact unlocked-skeleton repeat. " .. tostring(skeleton.exactRepeatReason or "No stronger novelty candidate was available."))
+    elseif report.action == "GENERATE_OUTFIT" and skeleton.noveltyClass == "PARTIAL_CHANGE" then
+        AddWarning(report, "PARTIAL_CHANGE_ONLY", "INFO", "Generate Outfit found only a partial anchor change inside the quality window.")
+    end
+    local repeated = {}
+    for _, label in ipairs(skeleton.repeatedComponents or {}) do repeated[label] = true end
+    if repeated.Chest and repeated.Shoulders then AddWarning(report, "REPEATED_CHEST_AND_SHOULDERS", "INFO", "Unlocked Chest and Shoulders were retained after novelty scoring.") end
+
+    local previous = report.parentCompletedReportID and D.GetReportByID(report.parentCompletedReportID) or nil
+    if previous then
+        report.comparison = BuildComparison(report, previous)
+        if P.AttachSupportComparison then P.AttachSupportComparison(report, previous, report.comparison) end
+    end
+    local support = report.support
+    if support and (tonumber(support.overrun) or 0) > 0 then AddWarning(report, "SUPPORT_BUDGET_OVERRUN", "WARNING", string.format("Contextual support exceeded its mismatch budget by %.2f points.", tonumber(support.overrun) or 0)) end
+    if support and (tonumber(support.outliers) or 0) > 0 then AddWarning(report, "SUPPORT_OUTLIER", "WARNING", string.format("Contextual support retained %d visual outlier%s.", support.outliers, support.outliers == 1 and "" or "s")) end
+    if support and (tonumber(support.fallbackSlots) or 0) > 0 then AddWarning(report, "SUPPORT_FALLBACK", "INFO", string.format("Contextual support used %d slot-local fallback%s.", support.fallbackSlots, support.fallbackSlots == 1 and "" or "s")) end
+    if support and (tonumber(support.emptySlots) or 0) > 0 then AddWarning(report, "SUPPORT_EMPTY_SLOT", "INFO", string.format("Contextual support left %d active slot%s empty because no legal appearance was available.", support.emptySlots, support.emptySlots == 1 and "" or "s")) end
+    AddFoundationWarning(report)
+end

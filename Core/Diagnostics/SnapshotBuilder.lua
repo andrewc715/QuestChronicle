@@ -83,6 +83,7 @@ local function BuildSkeleton(state, job)
         comparedComponents = CopyTable(stats and stats.comparedComponents or sourceDiagnostics and sourceDiagnostics.comparedComponents),
         changedComponents = CopyTable(stats and stats.changedComponents or sourceDiagnostics and sourceDiagnostics.changedComponents),
         repeatedComponents = CopyTable(stats and stats.repeatedComponents or sourceDiagnostics and sourceDiagnostics.repeatedComponents),
+        excludedComponents = {},
         exactRepeatAccepted = stats and stats.exactRepeatAccepted == true or sourceDiagnostics and sourceDiagnostics.exactRepeatAccepted == true,
         exactRepeatReason = stats and stats.exactRepeatReason or sourceDiagnostics and sourceDiagnostics.exactRepeatReason,
         meanPairCohesion = stats and stats.meanPairCohesion or sourceDiagnostics and sourceDiagnostics.meanPairCohesion,
@@ -102,10 +103,12 @@ local function BuildSkeleton(state, job)
     for _, slotKey in ipairs(WEAPON_KEYS) do
         local source = SourceFor(state, slotKey)
         if source or (state and state.locks and state.locks[slotKey]) or (state and state.hidden and state.hidden[slotKey]) then
-            skeleton.components[#skeleton.components + 1] = SourceSnapshot(
-                source, slotKey, state, FindCandidate(sourceDiagnostics, slotKey)
-            )
+            skeleton.components[#skeleton.components + 1] = SourceSnapshot(source, slotKey, state, FindCandidate(sourceDiagnostics, slotKey))
         end
+    end
+    for _, component in ipairs(skeleton.components) do
+        if component.hidden then skeleton.excludedComponents[#skeleton.excludedComponents + 1] = component.slotLabel .. " (Hidden)"
+        elseif component.locked then skeleton.excludedComponents[#skeleton.excludedComponents + 1] = component.slotLabel .. " (Locked)" end
     end
     return skeleton
 end
@@ -173,21 +176,29 @@ local function BuildGenerationSeed(job, success, message)
     local action = job and job.action
     if not action then action = job and job.reroll and "REROLL_UNLOCKED" or "GENERATE_OUTFIT" end
     local timestamp = type(time) == "function" and time() or 0
+    local identity = job and job.diagnosticIdentity
+    if not identity and D.BeginGenerationAttempt then identity = D.BeginGenerationAttempt(action) end
+    identity = identity or {}
     return {
         formatVersion = D.FORMAT_VERSION,
+        id = identity.reportID, sequence = identity.sequence, startedAt = identity.startedAt,
+        lineageID = identity.lineageID, generationToken = identity.generationToken,
+        parentCompletedReportID = identity.parentCompletedReportID,
         timestamp = timestamp,
         timestampText = type(date) == "function" and date("%Y-%m-%d %H:%M:%S", timestamp) or tostring(timestamp),
         version = QC.version,
         action = action,
         actionSlotKey = job and job.actionSlotKey or nil,
         mode = job and job.styleMode or state.styleMode,
-        result = ResolveResult(success, message, job and job.anchorFallbackReason),
+        result = ResolveResult(success, message, job and (job.anchorFallbackReason or job.supportFallbackReason)),
         success = success == true,
         message = tostring(message or ""),
         character = BuildCharacter(),
         context = BuildContext(job),
         outfit = BuildOutfit(state),
         skeleton = BuildSkeleton(state, job),
+        support = DP.BuildSupportSnapshot and DP.BuildSupportSnapshot(state, job) or nil,
+        supportFallbackReason = job and job.supportFallbackReason or nil,
         beam = BuildBeam(job),
         cache = {},
         performance = {},
@@ -219,95 +230,13 @@ local function PerformanceSnapshot(performance)
     return result
 end
 
-local function AddWarning(report, key, severity, text)
-    report.warnings[#report.warnings + 1] = { key = key, severity = severity, text = text }
-end
-
-local function SkeletonFoundationSignature(report)
-    local values = {}
-    for _, component in ipairs(report and report.skeleton and report.skeleton.components or {}) do
-        if component.slotKey == "CHEST" or component.slotKey == "SHOULDER" then
-            values[#values + 1] = component.slotKey .. "=" .. tostring(component.visualID or component.sourceID or "")
-        end
-    end
-    table.sort(values)
-    return table.concat(values, "|")
-end
-
-local function AddWarningsAndComparison(report)
-    local performance = report.performance or {}
-    local workerSlice = tonumber(performance.longestWorkerSliceMs) or tonumber(performance.maxStepMs) or 0
-    local callMs = tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0
-    local callPhase = tostring(performance.largestInstrumentedCallPhase or performance.slowestPhase or "an unknown phase")
-    if workerSlice > 16 then
-        AddWarning(report, "SEVERE_WORKER_SLICE", "SEVERE", string.format("Quest Chronicle reached a %.1f ms worker slice; the largest instrumented call was %s at %.1f ms.", workerSlice, callPhase, callMs))
-    elseif workerSlice > 8 then
-        AddWarning(report, "WORKER_SLICE", "WARNING", string.format("Quest Chronicle reached a %.1f ms worker slice; the largest instrumented call was %s at %.1f ms.", workerSlice, callPhase, callMs))
-    end
-    if callMs > 16 then
-        AddWarning(report, "SEVERE_INSTRUMENTED_CALL", "SEVERE", string.format("%s contained a %.1f ms instrumented call.", callPhase, callMs))
-    elseif callMs > 8 then
-        AddWarning(report, "INSTRUMENTED_CALL", "WARNING", string.format("%s contained a %.1f ms instrumented call.", callPhase, callMs))
-    end
-    if report.skeleton and report.skeleton.fallbackReason then
-        AddWarning(report, "LEGACY_FALLBACK", "WARNING", "Anchor search used the legacy generator: " .. tostring(report.skeleton.fallbackReason))
-    end
-    local skeleton = report.skeleton or {}
-    if report.action == "GENERATE_OUTFIT" and skeleton.noveltyClass == "EXACT_REPEAT" then
-        AddWarning(report, "EXACT_SKELETON_REPEATED", "WARNING", "Generate Outfit accepted an exact unlocked-skeleton repeat. " .. tostring(skeleton.exactRepeatReason or "No stronger novelty candidate was available."))
-    elseif report.action == "GENERATE_OUTFIT" and skeleton.noveltyClass == "PARTIAL_CHANGE" then
-        AddWarning(report, "PARTIAL_CHANGE_ONLY", "INFO", "Generate Outfit found only a partial anchor change inside the quality window.")
-    end
-    local repeated = {}
-    for _, label in ipairs(skeleton.repeatedComponents or {}) do repeated[label] = true end
-    if repeated.Chest and repeated.Shoulders then
-        AddWarning(report, "REPEATED_CHEST_AND_SHOULDERS", "INFO", "Chest and Shoulders were retained after novelty scoring.")
-    end
-
-    local previous
-    for _, candidate in ipairs(D.GetReports()) do
-        if candidate.result == "COMPLETED" or candidate.result == "FALLBACK" then
-            previous = candidate
-            break
-        end
-    end
-    if not previous then return end
-    report.comparison = {
-        previousReportID = previous.id,
-        previousTimestamp = previous.timestamp,
-        changed = {},
-        unchanged = {},
-        previousScore = previous.skeleton and (previous.skeleton.baseSkeletonScore or previous.skeleton.score),
-        score = report.skeleton and (report.skeleton.baseSkeletonScore or report.skeleton.score),
-        previousAdjustedScore = previous.skeleton and previous.skeleton.adjustedSelectionScore,
-        adjustedScore = report.skeleton and report.skeleton.adjustedSelectionScore,
-        previousCohesion = previous.skeleton and previous.skeleton.meanPairCohesion,
-        cohesion = report.skeleton and report.skeleton.meanPairCohesion,
-    }
-    local previousBySlot = {}
-    for _, component in ipairs(previous.skeleton and previous.skeleton.components or {}) do previousBySlot[component.slotKey] = component end
-    for _, component in ipairs(report.skeleton and report.skeleton.components or {}) do
-        local old = previousBySlot[component.slotKey]
-        local same = old and tostring(old.visualID or old.sourceID or "") == tostring(component.visualID or component.sourceID or "")
-        local target = same and report.comparison.unchanged or report.comparison.changed
-        target[#target + 1] = component.slotLabel or component.slotKey
-    end
-
-    local signature = SkeletonFoundationSignature(report)
-    local consecutive = 1
-    for _, candidate in ipairs(D.GetReports()) do
-        if SkeletonFoundationSignature(candidate) == signature and signature ~= "" then consecutive = consecutive + 1 else break end
-    end
-    if consecutive >= 3 then
-        AddWarning(report, "REPEATED_FOUNDATION", "WARNING", string.format("The same Chest and Shoulders appeared in %d consecutive completed skeletons.", consecutive))
-    end
-end
-
 local function FinalizeSeed(seed, performance)
     seed.performance = PerformanceSnapshot(performance)
     seed.cache = CopyTable(performance and performance.cacheDiagnostics)
-    AddWarningsAndComparison(seed)
-    return D.AddReport(seed)
+    if DP.AttachWarningsAndComparison then DP.AttachWarningsAndComparison(seed) end
+    local report, message = D.AddReport(seed)
+    if DP.latestEligiblePendingReport and DP.latestEligiblePendingReport.id == seed.id then DP.latestEligiblePendingReport = nil end
+    return report, message
 end
 
 local function ScheduleAfterUI(callback)
@@ -321,6 +250,7 @@ end
 
 function D.QueueGenerationAttempt(job, success, message, performance)
     local seed = BuildGenerationSeed(job, success, message)
+    if seed.result == "COMPLETED" or seed.result == "FALLBACK" then DP.latestEligiblePendingReport = seed end
     DP.pendingReportToken = DP.pendingReportToken + 1
     local token = DP.pendingReportToken
     ScheduleAfterUI(function()
@@ -358,12 +288,15 @@ function D.InstallRerollSlotWrapper()
     if DP.rerollSlotWrapped or not Wardrobe or type(Wardrobe.RerollSlot) ~= "function" then return false end
     local original = Wardrobe.RerollSlot
     Wardrobe.RerollSlot = function(slotKey)
+        local identity = D.BeginGenerationAttempt and D.BeginGenerationAttempt("REROLL_SLOT") or nil
         local started = DP.NowMilliseconds()
         local ok, message = original(slotKey)
         local elapsed = math.max(0, DP.NowMilliseconds() - started)
         local state = WP and WP.EnsurePreviewState and WP.EnsurePreviewState() or nil
         local mode = state and state.styleMode or nil
-        D.RecordRerollSlotAttempt(slotKey, ok == true, message, elapsed, state, mode)
+        local job = { action = "REROLL_SLOT", actionSlotKey = slotKey, liveState = state, draft = state, styleMode = mode, diagnosticIdentity = identity }
+        local performance = { elapsedMs = elapsed, steps = 1, maxStepMs = elapsed, longestWorkerSliceMs = elapsed, slowestPhase = "rerollSlot", slowestPhaseMs = elapsed, phaseStats = { rerollSlot = { calls = 1, totalMs = elapsed, maxMs = elapsed } }, cacheDiagnostics = WP and WP.BuildGenerationCachePerformance and WP.BuildGenerationCachePerformance(nil) or nil }
+        D.RecordImmediateAttempt(job, ok == true, message, performance)
         return ok, message
     end
     DP.rerollSlotWrapped = true

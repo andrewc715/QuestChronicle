@@ -70,6 +70,7 @@ local function NewStore()
         formatVersion = D.FORMAT_VERSION,
         nextSequence = 1,
         reports = {},
+        counters = { reportsRecorded = 0, duplicateInsertionsIgnored = 0, malformedReportsDiscarded = 0 },
     }
 end
 
@@ -82,6 +83,10 @@ function P.EnsureStore()
     end
     store.reports = type(store.reports) == "table" and store.reports or {}
     store.nextSequence = math.max(1, math.floor(tonumber(store.nextSequence) or 1))
+    store.counters = type(store.counters) == "table" and store.counters or {}
+    store.counters.reportsRecorded = math.max(0, math.floor(tonumber(store.counters.reportsRecorded) or 0))
+    store.counters.duplicateInsertionsIgnored = math.max(0, math.floor(tonumber(store.counters.duplicateInsertionsIgnored) or 0))
+    store.counters.malformedReportsDiscarded = math.max(0, math.floor(tonumber(store.counters.malformedReportsDiscarded) or 0))
     return store
 end
 

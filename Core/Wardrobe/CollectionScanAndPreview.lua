@@ -65,6 +65,7 @@ function P.ScheduleLoginRefresh()
 end
 
 function Wardrobe.MarkDirty(reason)
+    if P.ClearWeaponGenerationMetadataCaches then P.ClearWeaponGenerationMetadataCaches() end
     if Wardrobe.CancelGeneration then Wardrobe.CancelGeneration("Outfit generation was cancelled because the wardrobe collection changed.") end
     Wardrobe.InvalidateWeaponAppearanceRoutes()
     local cache = P.EnsureCache()
@@ -100,6 +101,7 @@ function Wardrobe.Scan(force, trigger)
 
     P.loginRefreshToken = P.loginRefreshToken + 1
     cache.loginRefreshPending = false
+    if P.ClearWeaponGenerationMetadataCaches then P.ClearWeaponGenerationMetadataCaches() end
     P.BeginAppearanceMetadataRefresh()
     P.CaptureRecoveryIdentities()
     Wardrobe.scanning = true

@@ -1,5 +1,5 @@
 QuestChronicle = {
-    version = "1.9.0.4",
+    version = "1.9.0.7",
     Wardrobe = { _Private = {} },
     ZoneStyle = {},
     _Core = {},
@@ -45,6 +45,7 @@ end
 
 dofile("Core/Diagnostics/Foundation.lua")
 dofile("Core/Diagnostics/History.lua")
+dofile("Core/Diagnostics/Comparison.lua")
 dofile("Core/Diagnostics/SnapshotBuilder.lua")
 dofile("Core/Diagnostics/ReportFormatter.lua")
 local D = QC.Diagnostics

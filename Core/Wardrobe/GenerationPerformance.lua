@@ -21,7 +21,17 @@ P.GENERATION_PHASE_LABELS = {
     anchorBeamSearch = "Anchor beam search",
     anchorWeaponExpansion = "Anchor weapon expansion",
     anchorSelection = "Anchor selection",
+    supportProfile = "Support profile", supportLockedCommitments = "Locked support commitments",
+    supportValidation = "Support validation", supportEraEvidence = "Support era evidence",
+    supportEligibility = "Support eligibility", supportCandidateScoring = "Support candidate scoring",
+    supportBeamExpansion = "Support beam expansion", supportSelection = "Support selection",
     rerollSlot = "Reroll slot",
+    weaponContext = "Weapon context", weaponCapabilities = "Weapon capabilities", weaponRoute = "Weapon route",
+    weaponCandidateBuild = "Weapon candidate build", weaponCandidateValidate = "Weapon candidate validation",
+    weaponValidation = "Weapon source validation", weaponPermission = "Weapon permission",
+    weaponAppearance = "Weapon appearance index", weaponSourceInfo = "Weapon source metadata",
+    weaponLinkedValidate = "Linked-weapon validation", weaponRouteFilter = "Weapon route filtering",
+    weaponCompanionRoute = "Weapon companion route", weaponBundleCohesion = "Weapon bundle cohesion",
 }
 
 P.GENERATION_PHASE_SHORT_LABELS = {
@@ -39,6 +49,10 @@ P.GENERATION_PHASE_SHORT_LABELS = {
     anchorBeamSearch = "Anchor beam",
     anchorWeaponExpansion = "Anchor weapons",
     anchorSelection = "Anchor selection",
+    supportProfile = "Support profile", supportLockedCommitments = "Locked support commitments",
+    supportValidation = "Support validation", supportEraEvidence = "Support era evidence",
+    supportEligibility = "Support eligibility", supportCandidateScoring = "Support candidate scoring",
+    supportBeamExpansion = "Support beam expansion", supportSelection = "Support selection",
     rerollSlot = "Reroll slot",
 }
 
@@ -82,6 +96,12 @@ end
 
 function P.BuildGenerationPerformance(job, finishedAtMs)
     local slowestKey, slowestMax = ResolveSlowestPhase(job and job.phaseStats)
+    local weaponYieldMs = job and math.max(job.weaponWork and job.weaponWork.maxResumeMs or 0, job.anchorWeaponSlowYieldMs or 0) or 0
+    local weaponYieldPhase = job and ((job.weaponWork and job.weaponWork.slowestYieldPhase) or job.anchorWeaponSlowYieldPhase) or nil
+    local largestKey, largestMax = slowestKey, slowestMax
+    if weaponYieldPhase and (weaponYieldMs > largestMax or (slowestKey == "anchorWeaponExpansion" and weaponYieldMs >= largestMax * 0.75)) then
+        largestKey, largestMax = weaponYieldPhase, weaponYieldMs
+    end
     return {
         startedAtMs = job and job.startedAtMs or finishedAtMs,
         elapsedMs = math.max(0, (finishedAtMs or 0) - (job and job.startedAtMs or finishedAtMs or 0)),
@@ -93,18 +113,20 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         eraCacheHits = job and job.eraCacheHits or 0,
         eligibilityCacheHits = job and job.eligibilityCacheHits or 0,
         weaponYields = job and job.weaponYields or 0,
-        weaponSlowYieldPhase = job and ((job.weaponWork and job.weaponWork.slowestYieldPhase) or job.anchorWeaponSlowYieldPhase) or nil,
-        weaponSlowYieldMs = job and math.max(job.weaponWork and job.weaponWork.maxResumeMs or 0, job.anchorWeaponSlowYieldMs or 0) or 0,
+        weaponSlowYieldPhase = weaponYieldPhase,
+        weaponSlowYieldMs = weaponYieldMs,
         selectedArmor = job and job.selectedArmor or 0,
         anchorStats = job and job.anchorStats or nil,
         anchorFallbackReason = job and job.anchorFallbackReason or nil,
+        supportStats = job and job.supportStats or nil,
+        supportFallbackReason = job and job.supportFallbackReason or nil,
         cacheDiagnostics = P.BuildGenerationCachePerformance
             and P.BuildGenerationCachePerformance(job and job.cacheCountersStarted) or nil,
         phaseStats = job and job.phaseStats or {},
         slowestPhase = slowestKey,
         slowestPhaseMs = slowestMax,
-        largestInstrumentedCallPhase = slowestKey,
-        largestInstrumentedCallMs = slowestMax,
+        largestInstrumentedCallPhase = largestKey,
+        largestInstrumentedCallMs = largestMax,
     }
 end
 
@@ -116,8 +138,15 @@ function Wardrobe.RecordGenerationPostPhase(performance, phaseKey, elapsedMs)
     local slowestKey, slowestMax = ResolveSlowestPhase(performance.phaseStats)
     performance.slowestPhase = slowestKey
     performance.slowestPhaseMs = slowestMax
-    performance.largestInstrumentedCallPhase = slowestKey
-    performance.largestInstrumentedCallMs = slowestMax
+    local weaponYieldMs = tonumber(performance.weaponSlowYieldMs) or 0
+    local weaponYieldPhase = performance.weaponSlowYieldPhase
+    if weaponYieldPhase and (weaponYieldMs > slowestMax or (slowestKey == "anchorWeaponExpansion" and weaponYieldMs >= slowestMax * 0.75)) then
+        performance.largestInstrumentedCallPhase = weaponYieldPhase
+        performance.largestInstrumentedCallMs = weaponYieldMs
+    else
+        performance.largestInstrumentedCallPhase = slowestKey
+        performance.largestInstrumentedCallMs = slowestMax
+    end
     if performance.startedAtMs then
         performance.elapsedMs = math.max(tonumber(performance.elapsedMs) or 0, P.GenerationNowMilliseconds() - performance.startedAtMs)
     end

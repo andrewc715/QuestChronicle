@@ -1,15 +1,12 @@
 local QC = QuestChronicle
 local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
-
 local function NowMilliseconds()
     return P.GenerationNowMilliseconds and P.GenerationNowMilliseconds() or 0
 end
-
 local function RecordPhase(job, phaseKey, startedAt)
     if P.RecordGenerationPhase then P.RecordGenerationPhase(job, phaseKey, NowMilliseconds() - startedAt) end
 end
-
 local function CopyDraftState(state)
     local draft = {}
     for key, value in pairs(state or {}) do if type(value) ~= "table" then draft[key] = value end end
@@ -22,12 +19,10 @@ local function CopyDraftState(state)
     draft.lastWeaponRoute = state and state.lastWeaponRoute
     return draft
 end
-
 local function CreatePoolWork(job, slotKey)
     local definition = P.slotByKey[slotKey]
     if not definition then return { slotKey = slotKey, done = true, pool = {}, reason = "unknown slot" } end
     if job.draft.hidden[slotKey] then return { slotKey = slotKey, done = true, pool = {}, hidden = true } end
-
     local sources
     local requiredMissing = false
     local missingReason
@@ -58,14 +53,12 @@ local function CreatePoolWork(job, slotKey)
         done = false,
     }
 end
-
 local function ContinuePoolCandidate(job, work)
     local candidate = work.candidateWork
     if not candidate then
         local source = work.sources[work.sourceIndex]
         candidate = { source = source }
         work.candidateWork = candidate
-
         local validationStarted = NowMilliseconds()
         candidate.valid = Wardrobe.ValidateSource(source, work.slotKey) == true
         RecordPhase(job, "validation", validationStarted)
@@ -77,7 +70,6 @@ local function ContinuePoolCandidate(job, work)
             if fixedCandidate then fixedCandidate.locked = true P.AddAnchorPoolCandidate(work, fixedCandidate) end
             return true
         end
-
         if job.styleEngine and job.styleEngine.GetSourcePreEraEligibility then
             local eligibilityStarted = NowMilliseconds()
             local eligible
@@ -90,7 +82,6 @@ local function ContinuePoolCandidate(job, work)
             if not eligible then return true end
             candidate.prechecked = true
         end
-
         if job.styleEngine then
             local eraStarted = NowMilliseconds()
             if job.styleEngine.CreateSourceEraEvidenceWork then
@@ -102,7 +93,6 @@ local function ContinuePoolCandidate(job, work)
             RecordPhase(job, "eraEvidence", eraStarted)
         end
     end
-
     if candidate.eraWork and not candidate.eraWork.done then
         local eraStarted = NowMilliseconds()
         local done, evidence, processed = job.styleEngine.StepSourceEraEvidenceWork(candidate.eraWork, P.GENERATION_ERA_CANDIDATES_PER_OPERATION)
@@ -111,7 +101,6 @@ local function ContinuePoolCandidate(job, work)
         if not done then return false end
         candidate.eraEvidence = evidence
     end
-
     if job.styleEngine then
         local eligibilityStarted = NowMilliseconds()
         local eligible
@@ -123,7 +112,6 @@ local function ContinuePoolCandidate(job, work)
         RecordPhase(job, "eligibility", eligibilityStarted)
         if not eligible then return true end
     end
-
     local scoringStarted = NowMilliseconds()
     local anchorCandidate = P.BuildAnchorCandidate(candidate.source, work.definition, job.styleMode, job.styleContext)
     RecordPhase(job, "anchorCandidateScoring", scoringStarted)
@@ -133,7 +121,6 @@ local function ContinuePoolCandidate(job, work)
     end
     return true
 end
-
 local function StepPoolWork(job, work)
     if work.done then return true end
     if work.sourceIndex > #work.sources then
@@ -153,7 +140,6 @@ local function StepPoolWork(job, work)
     end
     return false
 end
-
 local function ApplyArmorNodeToDraft(draft, node, reroll)
     local generated = 0
     for _, slotKey in ipairs(P.ANCHOR_SLOT_ORDER) do
@@ -167,7 +153,6 @@ local function ApplyArmorNodeToDraft(draft, node, reroll)
     end
     return generated
 end
-
 local function BuildNodeStyleContext(job, draft, node)
     local context = P.CreateStyleGenerationContext(draft, job.styleEngine, job.styleEngine.GetCurrentContext(), nil, true)
     if job.styleEngine.AddSourceToGenerationContext then
@@ -177,7 +162,6 @@ local function BuildNodeStyleContext(job, draft, node)
     end
     return context
 end
-
 local function BeginWeaponExpansion(job, work, node)
     local draft = CopyDraftState(job.draft)
     ApplyArmorNodeToDraft(draft, node, job.reroll)
@@ -190,19 +174,19 @@ local function BeginWeaponExpansion(job, work, node)
         weaponWork = weaponWork,
     }
 end
-
 local function FinishWeaponExpansion(job, work, expansion, ok, value, notice)
     if not ok then
         work.lastWeaponFailure = value
         return
     end
+    local scoreStarted = NowMilliseconds()
     local finalist = P.ScoreWeaponBundleForAnchor(expansion.node, expansion.draft, job.styleMode, expansion.styleContext)
+    RecordPhase(job, "weaponBundleCohesion", scoreStarted)
     if finalist then
         finalist.weaponNotice = notice
         work.finalists[#work.finalists + 1] = finalist
     end
 end
-
 local function StepWeaponExpansions(job, work)
     local limit = math.min(P.ANCHOR_WEAPON_EXPANSION_LIMIT, #(work.beam or {}))
     if work.weaponNodeIndex > limit then return true end
@@ -233,7 +217,6 @@ local function StepWeaponExpansions(job, work)
     work.weaponExpansion = nil
     return work.weaponNodeIndex > limit
 end
-
 local function RebuildSelectedStyleContext(job, selected)
     local context = P.CreateStyleGenerationContext(job.draft, job.styleEngine, job.styleEngine.GetCurrentContext(), nil, true)
     if job.styleEngine.AddSourceToGenerationContext then
@@ -250,17 +233,14 @@ local function RebuildSelectedStyleContext(job, selected)
     if job.styleEngine.PrepareGenerationEligibilityContext then job.styleEngine.PrepareGenerationEligibilityContext(context) end
     job.styleContext = context
 end
-
 local function CandidateName(candidate)
     local source = candidate and candidate.source
     return source and (source.styleName or source.name or source.sourceID) or "Unknown"
 end
-
 local function BuildSelectedDiagnostics(selected, selectionDetails)
     local candidates = {}
     for slotKey, candidate in pairs(selected.armorNode.sourceBySlot or {}) do candidates[slotKey] = candidate end
     for _, candidate in ipairs(selected.weaponCandidates or {}) do candidates[candidate.slotKey] = candidate end
-
     local all = {}
     for _, candidate in ipairs(selected.armorNode.sources or {}) do all[#all + 1] = candidate end
     for _, candidate in ipairs(selected.weaponCandidates or {}) do all[#all + 1] = candidate end
@@ -301,7 +281,6 @@ local function BuildSelectedDiagnostics(selected, selectionDetails)
         },
     }
 end
-
 local function CommitSelectedSkeleton(job, work)
     local previousSignature = job.draft.lastAnchorSkeletonSignature
     local noveltyContext = job.currentAnchorNovelty
@@ -315,7 +294,6 @@ local function CommitSelectedSkeleton(job, work)
         work.fallbackReason = work.lastWeaponFailure or "fewer than two legal anchor components"
         return false
     end
-
     job.selectedArmor = job.selectedArmor + ApplyArmorNodeToDraft(job.draft, selected.armorNode, job.reroll)
     for _, slotKey in ipairs(P.MAIN_WEAPON_SLOT_KEYS) do
         if slotKey == selected.mainSlotKey then
@@ -334,7 +312,6 @@ local function CommitSelectedSkeleton(job, work)
     job.weaponCount = selected.weaponCount
     job.weaponNotice = selected.weaponNotice
     RebuildSelectedStyleContext(job, selected)
-
     local pairSnapshot = P.GetAnchorPairCacheSnapshot()
     local selectedDiagnostics = BuildSelectedDiagnostics(selected, selectionDetails)
     job.anchorStats = {
@@ -397,7 +374,6 @@ local function CommitSelectedSkeleton(job, work)
     job.anchorDiagnostics = P.lastAnchorSkeletonDiagnostics
     return true
 end
-
 function P.CreateAnchorSkeletonWork(job)
     return {
         stage = "POOLS",
@@ -413,12 +389,10 @@ function P.CreateAnchorSkeletonWork(job)
         pairCacheStarted = P.GetAnchorPairCacheSnapshot(),
     }
 end
-
 function P.StepAnchorSkeletonJob(job, stepStarted)
     local work = job.anchorWork
     if not work then work = P.CreateAnchorSkeletonWork(job) job.anchorWork = work end
     local operations = 0
-
     while operations < P.GENERATION_OPERATION_SAFETY_CAP do
         if work.stage == "POOLS" then
             if work.poolSlotIndex > #P.ANCHOR_SLOT_ORDER then
@@ -461,19 +435,18 @@ function P.StepAnchorSkeletonJob(job, stepStarted)
             if not committed then return "FALLBACK", work.fallbackReason end
             return "READY"
         end
-
         operations = operations + 1
         if NowMilliseconds() - stepStarted >= P.GENERATION_TIME_BUDGET_MS then return "RUNNING" end
     end
     return "RUNNING"
 end
-
 function P.AdvanceAnchorGenerationPhase(job, stepStarted)
     local status, reason = P.StepAnchorSkeletonJob(job, stepStarted)
     if status == "READY" then
-        job.phase = "ARMOR"
+        job.phase = P.StepSupportGenerationJob and "SUPPORT" or "ARMOR"
         job.armorOrder = P.SUPPORTING_ARMOR_GENERATION_ORDER
         job.armorIndex, job.armorWork = 1, nil
+        job.supportWork = nil
         job.weaponsPrepared = true
     elseif status == "FALLBACK" then
         job.anchorFallbackReason = reason or "anchor search produced no complete skeleton"

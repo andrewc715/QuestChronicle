@@ -7,14 +7,18 @@ local function YieldWeapon(phaseKey)
 end
 function P.ValidateGeneratedWeaponSource(source, slotKey, equippedItem, context)
     local definition = P.slotByKey[slotKey]
-    local cacheKey = table.concat({ tostring(slotKey), tostring(source and source.sourceID), tostring(equippedItem) }, ":")
-    local cached = context.validation[cacheKey]
+    local route = context and context.activeRoute
+    local routeKey = route and route.id or "NO_ROUTE"
+    local cacheKey = table.concat({ tostring(slotKey), tostring(source and source.sourceID), tostring(equippedItem), tostring(routeKey) }, ":")
+    local cached = context.validation[cacheKey] or (P.weaponValidationSessionCache and P.weaponValidationSessionCache[cacheKey])
     if cached then
         return cached.valid, cached.reason
     end
 
     local function Finish(valid, reason)
         context.validation[cacheKey] = { valid = valid, reason = reason }
+        P.weaponValidationSessionCache = P.weaponValidationSessionCache or {}
+        P.weaponValidationSessionCache[cacheKey] = context.validation[cacheKey]
         return valid, reason
     end
 
@@ -77,7 +81,11 @@ function P.ValidateGeneratedWeaponSource(source, slotKey, equippedItem, context)
     -- slot-option exception, do not let legacy appearanceIsUsable or
     -- isAnySourceValidForPlayer fields overrule the exact API Blizzard uses to
     -- populate its own weapon-category picker.
-    local appearanceInfo = P.SafeCall(C_TransmogCollection.GetAppearanceInfoBySource, source.sourceID)
+    local appearanceInfo = P.GetCachedWeaponSourceInfo and P.GetCachedWeaponSourceInfo(source.sourceID) or nil
+    if not appearanceInfo then
+        appearanceInfo = P.SafeCall(C_TransmogCollection.GetAppearanceInfoBySource, source.sourceID)
+        if P.StoreWeaponSourceInfo then P.StoreWeaponSourceInfo(source.sourceID, appearanceInfo) end
+    end
     YieldWeapon("weaponSourceInfo")
     if appearanceInfo then
         if appearanceInfo.appearanceIsCollected == false then

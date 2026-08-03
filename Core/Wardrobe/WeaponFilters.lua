@@ -399,6 +399,49 @@ function Wardrobe.GetFilteredSlotSources(slotKey)
     return filtered
 end
 
+
+P.weaponGenerationAppearanceIndex = P.weaponGenerationAppearanceIndex or {}
+P.weaponSourceInfoCache = P.weaponSourceInfoCache or {}
+P.weaponSourceInfoOrder = P.weaponSourceInfoOrder or {}
+P.WEAPON_SOURCE_INFO_CACHE_LIMIT = 8192
+P.weaponValidationSessionCache = P.weaponValidationSessionCache or {}
+
+function P.ClearWeaponGenerationMetadataCaches()
+    P.weaponGenerationAppearanceIndex = {}
+    P.weaponSourceInfoCache = {}
+    P.weaponSourceInfoOrder = {}
+    P.weaponValidationSessionCache = {}
+end
+
+function P.StoreWeaponGenerationAppearanceIndex(definition, categoryID, appearances)
+    if not definition or not categoryID then return nil end
+    local key = tostring(definition.slotName) .. ":" .. tostring(categoryID)
+    local indexed = {}
+    for _, appearance in ipairs(appearances or {}) do if appearance.visualID then indexed[appearance.visualID] = appearance end end
+    P.weaponGenerationAppearanceIndex[key] = indexed
+    return indexed
+end
+
+function P.StoreWeaponSourceInfo(sourceID, info)
+    if not sourceID or type(info) ~= "table" or info.sourceIsCollected ~= true then return info end
+    local key = tonumber(sourceID) or sourceID
+    if not P.weaponSourceInfoCache[key] then P.weaponSourceInfoOrder[#P.weaponSourceInfoOrder + 1] = key end
+    P.weaponSourceInfoCache[key] = {
+        sourceIsCollected = info.sourceIsCollected, appearanceIsCollected = info.appearanceIsCollected,
+        appearanceIsUsable = info.appearanceIsUsable, canDisplayOnPlayer = info.canDisplayOnPlayer,
+        isAnySourceValidForPlayer = info.isAnySourceValidForPlayer,
+    }
+    while #P.weaponSourceInfoOrder > P.WEAPON_SOURCE_INFO_CACHE_LIMIT do
+        local removed = table.remove(P.weaponSourceInfoOrder, 1)
+        P.weaponSourceInfoCache[removed] = nil
+    end
+    return info
+end
+
+function P.GetCachedWeaponSourceInfo(sourceID)
+    return sourceID and P.weaponSourceInfoCache[tonumber(sourceID) or sourceID] or nil
+end
+
 function P.CreateWeaponGenerationContext()
     -- GetWeaponAppearanceCapabilities queries Blizzard's live slot-and-option
     -- APIs directly. Forcing UpdateUsableAppearances here performs a global,
@@ -432,17 +475,12 @@ function P.GetGenerationAppearance(source, definition, context)
         return nil
     end
     local key = tostring(definition.slotName) .. ":" .. tostring(categoryID)
-    local indexed = context.appearancesByCategory[key]
+    local indexed = context.appearancesByCategory[key] or P.weaponGenerationAppearanceIndex[key]
     if not indexed then
-        indexed = {}
         local location = P.GetGenerationLocation(definition, context)
         local appearances = P.GetCategoryAppearancesRobust(categoryID, location)
-        for _, appearance in ipairs(appearances or {}) do
-            if appearance.visualID then
-                indexed[appearance.visualID] = appearance
-            end
-        end
-        context.appearancesByCategory[key] = indexed
+        indexed = P.StoreWeaponGenerationAppearanceIndex(definition, categoryID, appearances)
     end
+    context.appearancesByCategory[key] = indexed
     return indexed[source.visualID]
 end

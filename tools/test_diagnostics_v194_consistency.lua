@@ -1,5 +1,5 @@
 QuestChronicle = {
-    version = "1.9.0.4",
+    version = "1.9.0.7",
     Wardrobe = { _Private = {} },
     ZoneStyle = {}, _Core = {},
 }
@@ -37,6 +37,7 @@ W.RerollSlot = function() return true, "ok" end
 
 dofile("Core/Diagnostics/Foundation.lua")
 dofile("Core/Diagnostics/History.lua")
+dofile("Core/Diagnostics/Comparison.lua")
 dofile("Core/Diagnostics/SnapshotBuilder.lua")
 dofile("Core/Diagnostics/ReportFormatter.lua")
 local D = QC.Diagnostics
@@ -98,4 +99,4 @@ local old = {
 local oldText = D.FormatCopyReport(old, false, false)
 assert(oldText:find("Novelty data: Not recorded by this version", 1, true), "v1.9.0.3 reports should remain readable without invented novelty data")
 
-print("PASS v1.9.0.4 diagnostics: immutable scores, physical hand labels, timing terminology, and legacy reports verified")
+print("PASS v1.9.0.7 diagnostics: immutable scores, physical hand labels, timing terminology, and legacy reports verified")

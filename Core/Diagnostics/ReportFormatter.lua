@@ -16,7 +16,8 @@ local RESULT_LABELS = {
 local PHASE_ORDER = {
     "setup", "validation", "eraEvidence", "eligibility", "coherence", "scoring",
     "anchorCandidateScoring", "anchorBeamSearch", "anchorWeaponExpansion", "anchorSelection",
-    "slotSetup", "slotFinalization", "progressUpdate", "weaponRouting", "stateCommit",
+    "supportProfile", "supportLockedCommitments", "supportValidation", "supportEraEvidence", "supportEligibility",
+    "supportCandidateScoring", "supportBeamExpansion", "supportSelection", "slotSetup", "slotFinalization", "progressUpdate", "weaponRouting", "stateCommit",
     "previewApply", "uiRefresh", "completionNotify", "rerollSlot",
 }
 local PHASE_LABELS = {
@@ -24,9 +25,19 @@ local PHASE_LABELS = {
     eligibility = "Eligibility", coherence = "Outfit coherence", scoring = "Candidate scoring",
     anchorCandidateScoring = "Anchor candidate scoring", anchorBeamSearch = "Anchor beam search",
     anchorWeaponExpansion = "Anchor weapon expansion", anchorSelection = "Anchor selection",
+    supportProfile = "Support profile", supportLockedCommitments = "Locked support commitments",
+    supportValidation = "Support validation", supportEraEvidence = "Support era evidence",
+    supportEligibility = "Support eligibility", supportCandidateScoring = "Support candidate scoring",
+    supportBeamExpansion = "Support beam expansion", supportSelection = "Support selection",
     slotSetup = "Slot setup", slotFinalization = "Slot finalization", progressUpdate = "Progress update",
     weaponRouting = "Weapon routing", stateCommit = "State commit", previewApply = "Preview application",
     uiRefresh = "UI refresh", completionNotify = "Completion callback", rerollSlot = "Reroll slot",
+    weaponContext = "Weapon context", weaponCapabilities = "Weapon capabilities", weaponRoute = "Weapon route",
+    weaponCandidateBuild = "Weapon candidate build", weaponCandidateValidate = "Weapon candidate validation",
+    weaponValidation = "Weapon source validation", weaponPermission = "Weapon permission",
+    weaponAppearance = "Weapon appearance index", weaponSourceInfo = "Weapon source metadata",
+    weaponLinkedValidate = "Linked-weapon validation", weaponRouteFilter = "Weapon route filtering",
+    weaponCompanionRoute = "Weapon companion route", weaponBundleCohesion = "Weapon bundle cohesion",
 }
 local MODE_LABELS = {
     ZONE_NATIVE = "Zone Native", TRAVELER = "Traveler",
@@ -126,7 +137,7 @@ local function AddOverview(lines, report, rich)
     Add(lines, string.format("Prepared: %s frames • %.1f sec", N(performance.steps), (tonumber(performance.elapsedMs) or 0) / 1000))
     Add(lines, string.format("Longest worker slice: %.1f ms", tonumber(performance.longestWorkerSliceMs) or tonumber(performance.maxStepMs) or 0))
     Add(lines, string.format("Largest instrumented call: %s %.1f ms", PHASE_LABELS[performance.largestInstrumentedCallPhase or performance.slowestPhase] or tostring(performance.largestInstrumentedCallPhase or performance.slowestPhase or "Unknown"), tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0))
-    Add(lines, "Fallback: " .. tostring(report.skeleton and report.skeleton.fallbackReason or "None"))
+    Add(lines, "Fallback: " .. tostring((report.skeleton and report.skeleton.fallbackReason) or report.supportFallbackReason or "None"))
 end
 
 local function AddSkeleton(lines, report, rawIDs, rich)
@@ -139,6 +150,7 @@ local function AddSkeleton(lines, report, rawIDs, rich)
         Add(lines, "Compared: " .. (#(skeleton.comparedComponents or {}) > 0 and table.concat(skeleton.comparedComponents, ", ") or "Not applicable"))
         Add(lines, "Changed: " .. (#(skeleton.changedComponents or {}) > 0 and table.concat(skeleton.changedComponents, ", ") or "None"))
         Add(lines, "Repeated: " .. (#(skeleton.repeatedComponents or {}) > 0 and table.concat(skeleton.repeatedComponents, ", ") or "None"))
+        Add(lines, "Excluded: " .. (#(skeleton.excludedComponents or {}) > 0 and table.concat(skeleton.excludedComponents, ", ") or "None"))
         Add(lines, string.format("Selection score: %.2f base %+0.2f repeat penalty = %.2f adjusted", tonumber(skeleton.baseSkeletonScore or skeleton.score) or 0, tonumber(skeleton.repeatPenalty) or 0, tonumber(skeleton.adjustedSelectionScore or skeleton.score) or 0))
         if skeleton.exactRepeatAccepted then Add(lines, "Exact repeat accepted: " .. tostring(skeleton.exactRepeatReason or "No suitable alternative remained.")) end
     elseif report.version == "1.9.0.3" then
@@ -221,6 +233,8 @@ local function AddCache(lines, report, verbose, rich)
     local perf, cache = report.performance or {}, report.cache or {}
     Add(lines, string.format("Candidates: %s • era-source checks: %s • selected armor: %s", N(perf.candidates), N(perf.eraCandidates), N(perf.selectedArmor)))
     Add(lines, string.format("Cache hits: %s era • %s eligibility • %s weapon yields", N(perf.eraCacheHits), N(perf.eligibilityCacheHits), N(perf.weaponYields)))
+    local history = D.GetHistoryCounters and D.GetHistoryCounters() or nil
+    if history then Add(lines, string.format("Reports: %s recorded • %s duplicates ignored • %s malformed discarded", N(history.reportsRecorded), N(history.duplicateInsertionsIgnored), N(history.malformedReportsDiscarded))) end
     if next(cache) then
         Add(lines, string.format("Persistent: %s evidence • %s prechecks • %s eligibility", N(cache.persistentEvidence), N(cache.persistentPrechecks), N(cache.persistentEligibility)))
         Add(lines, string.format("Loaded: %s evidence • %s prechecks • %s eligibility • %s migrated", N(cache.loadedEvidence), N(cache.loadedPrechecks), N(cache.loadedEligibility), N(cache.migratedEvidence)))
@@ -243,9 +257,11 @@ local function AddComparison(lines, report, rich)
     AddHeading(lines, "Compared with Previous Completed Run", rich)
     Add(lines, "Changed: " .. (#comparison.changed > 0 and table.concat(comparison.changed, ", ") or "None"))
     Add(lines, "Unchanged: " .. (#comparison.unchanged > 0 and table.concat(comparison.unchanged, ", ") or "None"))
+    Add(lines, "Excluded: " .. (#(comparison.excluded or {}) > 0 and table.concat(comparison.excluded, ", ") or "None"))
     if comparison.previousScore ~= nil or comparison.score ~= nil then Add(lines, string.format("Base skeleton score: %.1f → %.1f", tonumber(comparison.previousScore) or 0, tonumber(comparison.score) or 0)) end
     if comparison.previousAdjustedScore ~= nil or comparison.adjustedScore ~= nil then Add(lines, string.format("Adjusted selection score: %.1f → %.1f", tonumber(comparison.previousAdjustedScore) or tonumber(comparison.previousScore) or 0, tonumber(comparison.adjustedScore) or tonumber(comparison.score) or 0)) end
     if comparison.previousCohesion ~= nil or comparison.cohesion ~= nil then Add(lines, string.format("Cohesion: %.3f → %.3f", tonumber(comparison.previousCohesion) or 0, tonumber(comparison.cohesion) or 0)) end
+    if P.AddSupportComparisonLines then P.AddSupportComparisonLines(lines, comparison) end
 end
 
 local function AddWarnings(lines, report, rich)
@@ -262,6 +278,7 @@ local function Format(report, options)
     local lines = {}
     AddOverview(lines, report, options.rich)
     AddSkeleton(lines, report, options.rawIDs, options.rich)
+    if P.AddSupportSection then P.AddSupportSection(lines, report, options.rawIDs, options.rich) end
     AddBeam(lines, report, options.verbose, options.rich)
     AddScore(lines, report, options.rich)
     AddPerformance(lines, report, options.rich)

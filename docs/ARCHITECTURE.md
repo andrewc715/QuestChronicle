@@ -309,3 +309,15 @@ The beam and legal weapon-route pipeline remain unchanged. After complete legal 
 `AnchorSkeletonWorker.lua` records the base score, repeat penalty, adjusted score, compared anchors, changed anchors, repeated anchors, and exact-repeat exception in the immutable diagnostic source. No mutable candidate or beam tables cross the diagnostics boundary.
 
 Generation telemetry distinguishes the complete cooperative worker slice from the largest individually instrumented call inside that slice. Weapon expansion returns control immediately when a weapon operation consumes the time budget.
+
+## Phase B stabilization (v1.9.0.5)
+
+Diagnostic reports reserve a stable report identity and capture their completed parent before generation begins. Hidden, locked, and unavailable anchors are explicit comparison states, and repeated-foundation warnings follow immutable report ancestry rather than searching mutable history after the fact.
+
+Wardrobe scans prewarm weapon-category appearance indexes and compact collected-source metadata. Anchor weapon generation reuses those indexes and validation outcomes across armor finalists, avoiding repeated synchronous collection queries while preserving the existing route and selection semantics. Cooperative resume diagnostics retain the exact slow weapon subphase.
+
+## Phase C contextual support pipeline (v1.9.0.7)
+
+After Phase B commits Chest, Legs, Shoulders, and the legal weapon bundle, the generator derives an immutable Traveler descriptor profile. SupportProfile aggregates palette, material, finish, visual weight, motif, provenance, confidence, tolerance, and anchor relationship diagnostics. SupportBudget creates a slot-aware cumulative mismatch ledger. SupportScoring evaluates profile fit, local neighbor cohesion, bridge improvements, visual impact, repeat pressure, and outlier risk. SupportBeam expands bounded 32-candidate pools through a 24-node cooperative beam and selects from at most six final configurations. SupportWorker applies the winning configuration without changing the Phase B skeleton. SupportReroll provides contextual single-slot replacements and rebuilds support context after anchor or weapon rerolls.
+
+The Debug workbench stores only selected support decisions and aggregate counters. Candidate arrays remain transient. Existing schema, Courier, wardrobe cache, generation cache, and diagnostic format versions remain unchanged.

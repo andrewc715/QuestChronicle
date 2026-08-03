@@ -116,6 +116,9 @@ local function BuildGenerationMessage(job, generatedName, weaponCount, weaponNot
     elseif job.anchorFallbackReason then
         message = message .. " Anchor search used the legacy fallback: " .. tostring(job.anchorFallbackReason) .. "."
     end
+    if job.supportStats then
+        message = message .. string.format(" Contextual support cohesion %.3f used %.2f of %.2f mismatch points.", job.supportStats.wholeOutfitCohesion or 0, (job.supportStats.lockedCommitment or 0) + (job.supportStats.generatedSpend or 0), job.supportStats.startingBudget or 0)
+    elseif job.supportFallbackReason then message = message .. " Contextual support used the legacy fallback: " .. tostring(job.supportFallbackReason) .. "." end
     if weaponNotice then message = message .. " " .. weaponNotice end
     if styleEngine then
         message = message .. " Promotional rewards were excluded, and native-set or shared-motif matches were favored."
@@ -166,7 +169,6 @@ local function FinalizeArmorSlot(job, work)
         P.SetSelectedSource(job.draft, work.slotKey, nil)
     end
 end
-
 local function BeginArmorSlot(job, slotKey)
     local definition = P.slotByKey[slotKey]
     if not definition or job.draft.locks[slotKey] then return nil end
@@ -182,7 +184,6 @@ local function BeginArmorSlot(job, slotKey)
         candidateWork = nil,
     }
 end
-
 local function AddCandidateToPool(job, work, source, coherenceScore, coherent, coherenceReason)
     if job.styleEngine and job.styleEngine.ChooseWeightedSource then
         local scoringStarted = NowMilliseconds()
@@ -209,24 +210,20 @@ local function AddCandidateToPool(job, work, source, coherenceScore, coherent, c
         table.insert(work.pool, source)
     end
 end
-
 local function ContinueArmorCandidate(job, work)
     local candidate = work.candidateWork
     if not candidate then
         local source = work.sources[work.sourceIndex]
         candidate = { source = source }
         work.candidateWork = candidate
-
         local validationStarted = NowMilliseconds()
         candidate.valid = Wardrobe.ValidateSource(source, work.slotKey) == true
         RecordPhase(job, "validation", validationStarted)
         if not candidate.valid then return true end
-
         if not job.styleEngine or not job.styleEngine.ChooseWeightedSource then
             AddCandidateToPool(job, work, source)
             return true
         end
-
         if job.styleEngine.GetSourcePreEraEligibility then
             local eligibilityStarted = NowMilliseconds()
             local eligible
@@ -239,7 +236,6 @@ local function ContinueArmorCandidate(job, work)
             if not eligible then return true end
             candidate.prechecked = true
         end
-
         local eraStarted = NowMilliseconds()
         if job.styleEngine.CreateSourceEraEvidenceWork then
             candidate.eraWork = job.styleEngine.CreateSourceEraEvidenceWork(source)
@@ -249,7 +245,6 @@ local function ContinueArmorCandidate(job, work)
         end
         RecordPhase(job, "eraEvidence", eraStarted)
     end
-
     if candidate.eraWork and not candidate.eraWork.done then
         local eraStarted = NowMilliseconds()
         local done, evidence, processed = job.styleEngine.StepSourceEraEvidenceWork(
@@ -261,7 +256,6 @@ local function ContinueArmorCandidate(job, work)
         if not done then return false end
         candidate.eraEvidence = evidence
     end
-
     local eligibilityStarted = NowMilliseconds()
     local eligible
     if job.styleEngine.GetSourceEligibilityCached then
@@ -283,16 +277,13 @@ local function ContinueArmorCandidate(job, work)
     end
     RecordPhase(job, "eligibility", eligibilityStarted)
     if not eligible then return true end
-
     local coherenceStarted = NowMilliseconds()
     local coherenceScore, coherent, coherenceReason = job.styleEngine.GetSourceCoherence(candidate.source, job.styleContext)
     RecordPhase(job, "coherence", coherenceStarted)
     if not coherent then return true end
-
     AddCandidateToPool(job, work, candidate.source, coherenceScore, coherent, coherenceReason)
     return true
 end
-
 local function ProcessArmor(job, stepStarted)
     local operations = 0
     local armorOrder = job.armorOrder or P.ARMOR_GENERATION_ORDER
@@ -304,7 +295,6 @@ local function ProcessArmor(job, stepStarted)
             RecordPhase(job, "slotSetup", setupStarted)
             if not job.armorWork then job.armorIndex = job.armorIndex + 1 end
         end
-
         local work = job.armorWork
         if work then
             while work.sourceIndex <= #work.sources do
@@ -318,7 +308,6 @@ local function ProcessArmor(job, stepStarted)
                 if operations >= P.GENERATION_OPERATION_SAFETY_CAP then return false end
                 if NowMilliseconds() - stepStarted >= P.GENERATION_TIME_BUDGET_MS then return false end
             end
-
             local finalizationStarted = NowMilliseconds()
             FinalizeArmorSlot(job, work)
             RecordPhase(job, "slotFinalization", finalizationStarted)
@@ -328,31 +317,34 @@ local function ProcessArmor(job, stepStarted)
             job.armorWork = nil
             job.armorIndex = job.armorIndex + 1
         end
-
         if operations >= P.GENERATION_OPERATION_SAFETY_CAP then return false end
         if NowMilliseconds() - stepStarted >= P.GENERATION_TIME_BUDGET_MS then return false end
     end
     return true
 end
-
 function P.StepGenerationJob(token)
     local job = P.generationJob
     if not job or job.token ~= token then return end
     job.steps = job.steps + 1
     local stepStarted = NowMilliseconds()
-
     if GenerationStateSignature(job.liveState) ~= job.startSignature then
         FinishJob(job, false, "Outfit generation was cancelled because the workbench changed while Quest Chronicle was preparing the outfit.")
         return
     end
-
     if job.phase == "ANCHORS" then
         P.AdvanceAnchorGenerationPhase(job, stepStarted)
         job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
         if not ScheduleNextStep(token) then FinishJob(job, false, "Quest Chronicle could not schedule the cooperative outfit generator. Try /reload.") end
         return
     end
-
+    if job.phase == "SUPPORT" then
+        local status, reason = P.StepSupportGenerationJob(job, stepStarted)
+        if status == "READY" then job.phase = "COMMIT"
+        elseif status == "FALLBACK" then job.supportFallbackReason = reason job.phase = "ARMOR" job.armorOrder = P.SUPPORTING_ARMOR_GENERATION_ORDER job.armorIndex, job.armorWork = 1, nil end
+        job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
+        if not ScheduleNextStep(token) then FinishJob(job, false, "Quest Chronicle could not schedule the cooperative outfit generator. Try /reload.") end
+        return
+    end
     if job.phase == "ARMOR" then
         if ProcessArmor(job, stepStarted) then job.phase = job.weaponsPrepared and "COMMIT" or "WEAPONS" end
         job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
@@ -361,7 +353,6 @@ function P.StepGenerationJob(token)
         end
         return
     end
-
     if job.phase == "WEAPONS" then
         if not job.weaponWork and P.CreateWeaponGenerationWork then
             job.weaponWork = P.CreateWeaponGenerationWork(job.draft, job.reroll, job.styleMode, job.styleContext)
@@ -397,7 +388,6 @@ function P.StepGenerationJob(token)
         end
         return
     end
-
     if job.phase == "COMMIT" then
         local performance = CommitDraft(job, job.weaponCount, job.weaponNotice)
         if performance then
@@ -405,15 +395,12 @@ function P.StepGenerationJob(token)
         end
     end
 end
-
 function Wardrobe.IsGenerating()
     return P.generationJob ~= nil
 end
-
 function Wardrobe.GetLastGenerationPerformance()
     return P.lastGenerationPerformance
 end
-
 function Wardrobe.CancelGeneration(reason)
     local job = P.generationJob
     if not job then return false end
@@ -421,17 +408,15 @@ function Wardrobe.CancelGeneration(reason)
     FinishJob(job, false, reason or "Outfit generation was cancelled.")
     return true
 end
-
 function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
     if Wardrobe.IsGenerating() then return false, "Quest Chronicle is already generating an outfit." end
     if Wardrobe.IsScanning() then return false, "Wait for the wardrobe scan to finish before generating an outfit." end
-
     local cache = P.EnsureCache()
     if cache.scanState ~= "COMPLETE" and cache.scanState ~= "COMPLETE_WITH_WARNINGS" then
         return false, "Scan the wardrobe collection before generating an outfit."
     end
-
     if not C_Timer or type(C_Timer.After) ~= "function" then
+        local diagnosticIdentity = QC.Diagnostics and QC.Diagnostics.BeginGenerationAttempt and QC.Diagnostics.BeginGenerationAttempt(reroll and "REROLL_UNLOCKED" or "GENERATE_OUTFIT") or nil
         local startedAt = NowMilliseconds()
         local ok, message = Wardrobe.GenerateOutfit(reroll, requestedStyleMode)
         local elapsed = math.max(0, NowMilliseconds() - startedAt)
@@ -442,10 +427,9 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
         }
         P.lastGenerationPerformance = performance
         Notify("WARDROBE_GENERATION_COMPLETE", ok == true, message, performance)
-        if QC.Diagnostics and QC.Diagnostics.RecordImmediateAttempt then QC.Diagnostics.RecordImmediateAttempt({ action = reroll and "REROLL_UNLOCKED" or "GENERATE_OUTFIT", reroll = reroll == true, liveState = P.EnsurePreviewState(), draft = P.EnsurePreviewState(), styleMode = requestedStyleMode }, ok == true, message, performance) end
+        if QC.Diagnostics and QC.Diagnostics.RecordImmediateAttempt then QC.Diagnostics.RecordImmediateAttempt({ action = reroll and "REROLL_UNLOCKED" or "GENERATE_OUTFIT", reroll = reroll == true, liveState = P.EnsurePreviewState(), draft = P.EnsurePreviewState(), styleMode = requestedStyleMode, diagnosticIdentity = diagnosticIdentity }, ok == true, message, performance) end
         return ok, message
     end
-
     local startedAtMs = NowMilliseconds()
     local setupStarted = startedAtMs
     local liveState = P.EnsurePreviewState()
@@ -458,10 +442,10 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
         draft.styleMode = styleMode
         styleContext = P.CreateStyleGenerationContext(draft, styleEngine, styleEngine.GetCurrentContext(), nil, true)
     end
-
     P.generationToken = P.generationToken + 1
-    local job = {
+    local diagnosticIdentity = QC.Diagnostics and QC.Diagnostics.BeginGenerationAttempt and QC.Diagnostics.BeginGenerationAttempt(reroll and "REROLL_UNLOCKED" or "GENERATE_OUTFIT") or nil; local job = {
         token = P.generationToken,
+        diagnosticIdentity = diagnosticIdentity,
         action = reroll and "REROLL_UNLOCKED" or "GENERATE_OUTFIT",
         reroll = reroll == true,
         liveState = liveState,
@@ -473,7 +457,7 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
         startSignature = GenerationStateSignature(liveState),
         phase = P.AdvanceAnchorGenerationPhase and "ANCHORS" or "ARMOR", armorIndex = 1, armorOrder = nil,
         anchorWork = nil, anchorStats = nil, anchorFallbackReason = nil, weaponsPrepared = false,
-        armorWork = nil,
+        supportWork = nil, supportStats = nil, supportFallbackReason = nil, armorWork = nil,
         selectedArmor = 0,
         candidatesProcessed = 0,
         eraCandidatesProcessed = 0,

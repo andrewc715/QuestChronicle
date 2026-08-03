@@ -10,6 +10,7 @@ function P.IsSourceCollected(sourceID, source)
     end
     if C_TransmogCollection and C_TransmogCollection.GetAppearanceInfoBySource then
         local info = P.SafeCall(C_TransmogCollection.GetAppearanceInfoBySource, sourceID)
+        if P.StoreWeaponSourceInfo then P.StoreWeaponSourceInfo(sourceID, info) end
         if info and info.sourceIsCollected == true then
             return true
         end

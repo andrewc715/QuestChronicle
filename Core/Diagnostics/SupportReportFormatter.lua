@@ -1,0 +1,68 @@
+local QC = QuestChronicle
+local D = QC.Diagnostics
+local P = D._Private
+
+local function F(value, decimals)
+    return string.format("%." .. tostring(decimals or 2) .. "f", tonumber(value) or 0)
+end
+
+local function Add(lines, text)
+    lines[#lines + 1] = text or ""
+end
+
+local function Heading(lines, title, rich)
+    if #lines > 0 then Add(lines, "") end
+    Add(lines, rich and ("|cffd9b36c" .. title .. "|r") or ("== " .. title .. " =="))
+end
+
+local function SourceText(decision, rawIDs)
+    local text = tostring(decision.name or "None")
+    if decision.locked then text = text .. " [Locked]" end
+    if rawIDs then
+        local ids = {}
+        if decision.visualID then ids[#ids + 1] = "visual " .. tostring(decision.visualID) end
+        if decision.sourceID then ids[#ids + 1] = "source " .. tostring(decision.sourceID) end
+        if decision.itemID then ids[#ids + 1] = "item " .. tostring(decision.itemID) end
+        if #ids > 0 then text = text .. " {" .. table.concat(ids, ", ") .. "}" end
+    end
+    return text
+end
+
+function P.AddSupportSection(lines, report, rawIDs, rich)
+    Heading(lines, "Contextual Support", rich)
+    local support = report.support
+    if not support then Add(lines, "Contextual support data: Not recorded by this version") return end
+    local profile = support.profile or {}
+    local centers = profile.centers or {}
+    Add(lines, string.format("Profile: %d active anchors • cohesion %s", tonumber(profile.activeAnchorCount) or 0, F(profile.meanAnchorCohesion, 3)))
+    local anchorLabels = {}
+    for _, anchor in ipairs(profile.activeAnchors or {}) do anchorLabels[#anchorLabels + 1] = tostring(anchor.label or anchor.slotKey) end
+    if #anchorLabels > 0 then Add(lines, "Active anchors: " .. table.concat(anchorLabels, ", ")) end
+    Add(lines, string.format("Centers: palette %s • material %s • finish %s • motif %s • weight %s", tostring(centers.palette or "unknown"), tostring(centers.material or "unknown"), tostring(centers.finish or "unknown"), tostring(centers.motif or "unknown"), F(centers.visualWeight, 2)))
+    if profile.weakestRelationship then Add(lines, string.format("Weakest anchor relationship: %s ↔ %s (%s)", tostring(profile.weakestRelationship.left), tostring(profile.weakestRelationship.right), F(profile.weakestRelationship.score, 3))) end
+    local tolerance, confidence = profile.tolerance or {}, profile.confidence or {}
+    Add(lines, string.format("Tolerance: palette %s • material %s • finish %s • weight %s • motif %s • provenance %s", F(tolerance.palette, 3), F(tolerance.material, 3), F(tolerance.finish, 3), F(tolerance.visualWeight, 3), F(tolerance.motif, 3), F(tolerance.provenance, 3)))
+    Add(lines, string.format("Confidence: palette %s • material %s • finish %s • weight %s • motif %s • provenance %s", F(confidence.palette, 3), F(confidence.material, 3), F(confidence.finish, 3), F(confidence.visualWeight, 3), F(confidence.motifs, 3), F(confidence.provenance, 3)))
+    Add(lines, string.format("Budget: %s start • %s locked • %s generated • %s borrowed • %s overrun • %s remaining", F(support.startingBudget, 2), F(support.lockedCommitment, 2), F(support.generatedSpend, 2), F(support.borrowed, 2), F(support.overrun, 2), F(support.remainingBudget, 2)))
+    Add(lines, string.format("Configuration: rank %d/%d • score %s • whole-outfit cohesion %s • accents %d • outliers %d • fallbacks %d • empty %d", support.chosenRank or 0, support.shortlistSize or 0, F(support.configurationScore, 1), F(support.wholeOutfitCohesion, 3), support.controlledAccents or 0, support.outliers or 0, support.fallbackSlots or 0, support.emptySlots or 0))
+    Add(lines, string.format("Support beam: %d deduplicated • %d budget rejects", support.deduplicated or 0, support.budgetRejections or 0))
+    for _, slotKey in ipairs(QC.Wardrobe and QC.Wardrobe._Private and QC.Wardrobe._Private.SUPPORT_SLOT_ORDER or {}) do
+        if support.poolSizes and support.poolSizes[slotKey] then Add(lines, string.format("  %s: %d prepared • %d expanded • %d retained", slotKey, support.poolSizes[slotKey] or 0, support.expansions and support.expansions[slotKey] or 0, support.retained and support.retained[slotKey] or 0)) end
+    end
+    for _, decision in ipairs(support.decisions or {}) do
+        Add(lines, string.format("%s: %s", tostring(decision.slotLabel or decision.slotKey), SourceText(decision, rawIDs)))
+        Add(lines, string.format("  Role: %s • profile %s • neighbor %s • bridge %s • mismatch %s • %s • %s • repeat %s%s", tostring(decision.role or "Support"), F(decision.profileFit, 3), F(decision.neighborCohesion, 3), F(decision.bridgeBonus, 2), F(decision.mismatchSpent, 2), tostring(decision.budgetState or "WITHIN"), tostring(decision.outlierState or "NORMAL"), F(decision.repeatPenalty, 2), decision.fallback and " • fallback" or ""))
+        if decision.bridgeTarget then Add(lines, string.format("  Bridge: %s • %s → %s", tostring(decision.bridgeTarget), F(decision.bridgeBefore, 3), F(decision.bridgeAfter, 3))) end
+    end
+    if #(support.excluded or {}) > 0 then Add(lines, "Excluded: " .. table.concat(support.excluded, ", ")) else Add(lines, "Excluded: None") end
+end
+
+function P.AddSupportComparisonLines(lines, comparison)
+    if not comparison or not comparison.supportChanged then return end
+    Add(lines, "Support changed: " .. (#comparison.supportChanged > 0 and table.concat(comparison.supportChanged, ", ") or "None"))
+    Add(lines, "Support unchanged: " .. (#comparison.supportUnchanged > 0 and table.concat(comparison.supportUnchanged, ", ") or "None"))
+    Add(lines, "Support excluded: " .. (#comparison.supportExcluded > 0 and table.concat(comparison.supportExcluded, ", ") or "None"))
+    Add(lines, string.format("Support mismatch: %.2f → %.2f", tonumber(comparison.previousMismatch) or 0, tonumber(comparison.mismatch) or 0))
+    Add(lines, string.format("Whole-outfit cohesion: %.3f → %.3f", tonumber(comparison.previousWholeOutfitCohesion) or 0, tonumber(comparison.wholeOutfitCohesion) or 0))
+    Add(lines, string.format("Support outliers: %d → %d", tonumber(comparison.previousOutliers) or 0, tonumber(comparison.outliers) or 0))
+end

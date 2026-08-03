@@ -318,6 +318,7 @@ function Wardrobe.InvalidateWeaponAppearanceRoutes()
     P.weaponRouteCacheKey = nil
     P.weaponRouteCacheExpiresAt = 0
     if P.InvalidateWeaponCandidateIndex then P.InvalidateWeaponCandidateIndex() end
+    P.weaponValidationSessionCache = {}
 end
 
 function P.GetWeaponOptionCandidatesForOutfitSlot(outfitSlot)

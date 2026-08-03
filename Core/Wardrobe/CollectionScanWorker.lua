@@ -37,6 +37,7 @@ local function BeginCategory(worker)
 
     local expected = tonumber(P.SafeCall(C_TransmogCollection.GetCategoryCollectedCount, categoryID)) or 0
     local appearances, retrievalMode = P.GetCategoryAppearancesRobust(categoryID, worker.transmogLocation)
+    if worker.definition.weaponRole and P.StoreWeaponGenerationAppearanceIndex then P.StoreWeaponGenerationAppearanceIndex(worker.definition, categoryID, appearances) end
     worker.currentCategory = {
         categoryID = categoryID,
         expectedCollected = expected,

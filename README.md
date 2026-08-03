@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0.4
+# Quest Chronicle v1.9.0.7
 
-> **Phase B Diversity Calibration:** repeated Generate Outfit actions now prefer meaningfully new unlocked anchor skeletons while preserving the existing quality window, legality, locks, and weighted variety.
+> **Phase C Contextual Support:** the committed Phase B skeleton now derives an outfit profile, mismatch budget, bridge relationships, and bounded support beam for every remaining visible armor slot.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.4 uses the v1.9.0.3 Debug Workbench to make repeated Generate Outfit actions seek a meaningfully different anchor foundation without sacrificing legality or the existing quality floor.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.7 preserves the live-validated v1.9.0.5 anchor and weapon pipeline while filling Waist, Hands, Feet, Head, Back, Wrists, Shirt, and Tabard as one contextual support configuration.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -94,7 +94,8 @@ Each selected report includes:
 - every timed phase with maximum, total, and call counts;
 - persistent-cache, metadata dependency, and invalidation diagnostics;
 - warnings for performance overruns, fallback, and repeated Chest/Shoulder foundations;
-- comparison with the previous completed run.
+- comparison with the previous completed run;
+- Phase C profile centers, tolerances, mismatch accounting, support-beam statistics, bridge effects, outlier states, and whole-outfit cohesion.
 
 Use **Copy Report** to open a read-only multiline box with the selected report highlighted for `Ctrl+C`. **Clear History** removes only diagnostic snapshots. It never changes Chronicle events, wardrobe caches, concepts, selections, or Custom Sets.
 
@@ -190,7 +191,11 @@ QuestChronicle\
 │   ├── Diagnostics\
 │   │   ├── Foundation.lua
 │   │   ├── History.lua
+│   │   ├── Comparison.lua
+│   │   ├── SupportComparison.lua
+│   │   ├── SupportSnapshot.lua
 │   │   ├── SnapshotBuilder.lua
+│   │   ├── SupportReportFormatter.lua
 │   │   └── ReportFormatter.lua
 │   ├── Wardrobe\
 │   │   ├── Foundation.lua
@@ -214,6 +219,12 @@ QuestChronicle\
 │   │   ├── GenerationPerformance.lua
 │   │   ├── AnchorSkeletonWorker.lua
 │   │   ├── GenerationWorker.lua
+│   │   ├── SupportProfile.lua
+│   │   ├── SupportBudget.lua
+│   │   ├── SupportScoring.lua
+│   │   ├── SupportBeam.lua
+│   │   ├── SupportWorker.lua
+│   │   ├── SupportReroll.lua
 │   │   ├── CustomSetBuild.lua
 │   │   ├── CustomSetSyncAndManifest.lua
 │   │   ├── AppearanceMetadata.lua
@@ -332,6 +343,16 @@ The skeleton scorer activates the calibrated Traveler palette, material, finish,
 Locks and hidden slots remain authoritative. Locked anchors become fixed beam components, Shoulders can now be deliberately hidden, hidden anchors are omitted without penalty, and an unavailable or impossible locked source sends the job through the preserved legacy generator. The final preview still changes only after an atomic commit.
 
 `/qc skeleton debug` prints the latest Chest, Legs, Shoulders, weapon bundle, beam statistics, chosen rank, score, cohesion, and fallback reason. The compact Generation Performance tooltip reports the headline timing and chosen skeleton. The Debug tab preserves the complete beam, score, performance, cache, and warning ledger for the last ten attempts.
+
+### Phase C contextual support slots
+
+After Phase B commits the anchor skeleton, Quest Chronicle derives an immutable profile from its palette, material, finish, visual weight, motif, provenance, confidence, and relationship spread. Waist, Hands, Feet, Head, Back, Wrists, Shirt, and Tabard are then expanded through a bounded cooperative support beam instead of being chosen as isolated slot lotteries.
+
+Each active support slot has a role. Waist bridges Chest and Legs, Hands connect Chest to the weapon bundle, Feet continue the lower silhouette, Head and Back extend the outfit identity, and lower-prominence slots repair continuity. A cumulative mismatch ledger allows controlled accents while reserving enough budget for later slots. Locked support pieces remain sovereign and consume a recorded commitment; hidden or unavailable slots consume no budget.
+
+Generate Outfit softly discourages repeated unlocked support visuals. Reroll Unlocked hard-excludes them where alternatives exist. Rerolling one support slot keeps every other slot fixed and chooses a contextual replacement, while rerolling an anchor rebuilds support around the new foundation without disturbing locked support pieces.
+
+The Debug report records the profile, tolerance, confidence, starting budget, locked and generated spend, borrowing, overrun, remaining budget, support-beam counts, every selected support piece, its bridge target, mismatch cost, outlier state, fallback status, and final whole-outfit cohesion.
 
 ### Weapon Appearance Rules
 
