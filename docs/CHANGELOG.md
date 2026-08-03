@@ -1,5 +1,79 @@
 # Changelog
 
+## 1.9.0.11 - 2026-08-03
+
+### Performance
+
+- Added shared elapsed-time slice budgeting and adaptive batch sizing for cooperative support rerolls and foreground generation.
+- Split support-reroll diagnostic construction into bounded resumable stages instead of one large diagnostic-foundation call.
+- Made generation eligibility resumable through its evidence, provenance, metadata, and marker checks.
+- Added session-reusable weapon candidate buckets with cooperative cold construction, warm reuse, and subtype-local repair.
+
+### Diagnostics
+
+- Added weapon-index state, use classification, bucket counts, examined-source counts, yields, builds, repairs, reuse, and invalidation reasons.
+- Renamed weapon appearance indexing telemetry to distinguish candidate lookup from cooperative index construction.
+
+### Preserved
+
+- Preserved deterministic v1.9.0.10 anchor, weapon, contextual-support, and support-reroll selections and scores.
+- Preserved SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, and diagnostic format 1.
+
+## 1.9.0.10 - 2026-08-03
+
+### Performance
+
+- Reduced support-reroll startup to a compact primitive launch manifest.
+- Moved parent lookup, state copying, profile reuse, fixed-context materialization, and diagnostic foundation work into cooperative worker phases.
+- Added revision and target-identity validation before materialization, selection, and atomic commit.
+
+### Fixed
+
+- Corrected Head and Back role labels so hidden or unavailable Shoulders are never presented as active relationship endpoints.
+- Replaced ambiguous pre-worker timing with explicit synchronous-launch and cooperative-worker timing domains.
+
+### Preserved
+
+- Preserved healthy v1.9.0.9 contextual reroll selections and all full-generation behavior.
+- Preserved SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, and diagnostic format 1.
+
+## 1.9.0.9 - 2026-08-03
+
+### Fixed
+
+- Established one canonical active-anchor mask for all Phase C generation and support-reroll paths.
+- Prevented hidden and unavailable anchors from returning to inherited profiles through stored appearance identities.
+- Reused immutable anchor-derived profiles across support-only rerolls and repaired legacy or malformed profile snapshots explicitly.
+- Reconciled removed-target and replacement mismatch costs on one profile basis before committing a reroll.
+- Separated pre-worker preparation from cooperative worker and presentation timing in Debug reports.
+- Compacted persisted profile inputs so maximum-detail Phase C diagnostic snapshots remain below 20 KB.
+
+### Preserved
+
+- Preserved correct v1.9.0.8 Generate Outfit, Reroll Unlocked, anchor, weapon, full contextual-support, and contextual one-slot reroll selections.
+- Preserved SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, and diagnostic format 1.
+
+## 1.9.0.8 - 2026-08-03
+
+### Fixed
+
+- Replaced synchronous contextual support-slot rerolls with a bounded cooperative worker.
+- Capped target-slot preparation at 32 candidates and the final reroll shortlist at six.
+- Preserved immutable Phase B anchor diagnostics across support-only actions through explicit anchor-source ancestry.
+- Prevented support rerolls from advancing or resetting repeated-anchor warnings.
+- Distinguished user locks from support pieces held fixed by one-slot rerolls.
+- Corrected Debug wording so only positive relationship changes are called bridge improvements.
+
+### Performance
+
+- Split support rerolls into independently timed state capture, profile, ledger, fixed-context, validation, evidence, eligibility, scoring, budget, selection, commit, preview, and UI phases.
+- Removed the monolithic 54 ms `Reroll slot` execution path.
+
+### Preserved
+
+- Preserved v1.9.0.7 Generate Outfit, Reroll Unlocked, Phase B anchor, weapon-route, full Phase C support, and outfit-name selection parity.
+- Preserved SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, and diagnostic format 1.
+
 ## 1.9.0.7 - 2026-08-03
 
 ### Added

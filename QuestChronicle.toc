@@ -2,7 +2,7 @@
 ## Title: Quest Chronicle
 ## Notes: Records quest lifecycle, objective progress, completions, and roleplay notes, with a native-styled Chronicle window.
 ## Author: OpenAI & Andrew
-## Version: 1.9.0.7
+## Version: 1.9.0.11
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## AddonCompartmentFunc: QuestChronicle_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: QuestChronicle_OnAddonCompartmentEnter
@@ -13,6 +13,8 @@ Core\Chronicle\Foundation.lua
 Core\Chronicle\QuestLifecycle.lua
 Core\Chronicle\Commands.lua
 Core\Chronicle\PublicAPI.lua
+Core\Workers\SliceBudget.lua
+Core\Workers\AdaptiveBatch.lua
 UI\Shared.lua
 Core\Wardrobe\Foundation.lua
 Core\Wardrobe\GenerationCacheStore.lua
@@ -47,17 +49,27 @@ Core\ZoneStyle\EraEvidence.lua
 Core\Wardrobe\PendingEvidenceResolver.lua
 Core\ZoneStyle\ProgressionRestrictions.lua
 Core\ZoneStyle\Scoring.lua
+Core\ZoneStyle\EligibilityWork.lua
 Core\ZoneStyle\GenerationEligibility.lua
 Core\ZoneStyle\Traveler\StyleLexicon.lua
 Core\ZoneStyle\Traveler\Descriptors.lua
 Core\ZoneStyle\Traveler\Cohesion.lua
+Core\Wardrobe\SupportProfileIdentity.lua
 Core\Wardrobe\SupportProfile.lua
 Core\Wardrobe\SupportBudget.lua
+Core\Wardrobe\SupportRoleResolver.lua
 Core\Wardrobe\SupportScoring.lua
 Core\Wardrobe\SupportBeam.lua
 Core\Wardrobe\SupportWorker.lua
+Core\Wardrobe\SupportRerollLaunch.lua
+Core\Wardrobe\SupportRerollFoundation.lua
+Core\Wardrobe\SupportRerollScheduling.lua
+Core\Wardrobe\SupportRerollScoring.lua
+Core\Wardrobe\SupportRerollWorker.lua
+Core\Wardrobe\SupportRerollLegacy.lua
 Core\Wardrobe\SupportReroll.lua
 Core\Diagnostics\Foundation.lua
+Core\Diagnostics\AnchorAncestry.lua
 Core\Diagnostics\History.lua
 Core\Diagnostics\Comparison.lua
 Core\Diagnostics\SupportComparison.lua

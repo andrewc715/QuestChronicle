@@ -1,6 +1,7 @@
 local QC = QuestChronicle
 local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
+local Workers = QC._Core and QC._Core.Workers
 P.GENERATION_TIME_BUDGET_MS = 2.5
 P.GENERATION_OPERATION_SAFETY_CAP = 2000
 P.GENERATION_ERA_CANDIDATES_PER_OPERATION = 1
@@ -9,6 +10,14 @@ P.generationJob = nil
 P.lastGenerationPerformance = nil
 local function NowMilliseconds()
     return P.GenerationNowMilliseconds and P.GenerationNowMilliseconds() or 0
+end
+local function BeginWorkerSlice()
+    if Workers and Workers.BeginSlice then return Workers.BeginSlice(P.GENERATION_TIME_BUDGET_MS, 7.5) end
+    return { startedAtMs = NowMilliseconds(), preferredMs = P.GENERATION_TIME_BUDGET_MS }
+end
+local function WorkerShouldYield(slice, reserveMs)
+    if Workers and Workers.ShouldYield then return Workers.ShouldYield(slice, reserveMs) end
+    return NowMilliseconds() - (slice.startedAtMs or 0) >= (slice.preferredMs or P.GENERATION_TIME_BUDGET_MS)
 end
 local function RecordPhase(job, phaseKey, startedAt)
     if P.RecordGenerationPhase then
@@ -135,9 +144,12 @@ local function CommitDraft(job, weaponCount, weaponNotice)
     job.liveState.selectionVisuals = job.draft.selectionVisuals
     job.liveState.lastWeaponRoute = job.draft.lastWeaponRoute
     job.liveState.lastAnchorSkeletonSignature = job.draft.lastAnchorSkeletonSignature
+    job.liveState.activeAnchorMask = P.CopySupportProfileValue and P.CopySupportProfileValue(job.activeAnchorMask) or job.activeAnchorMask
+    job.liveState.contextualSupportProfile = P.ExportContextualSupportProfile and P.ExportContextualSupportProfile(job.supportStats and job.supportStats.profile) or nil
     job.liveState.generatedName = generatedName
     job.liveState.styleMode = job.styleMode
     job.liveState.selectedConceptID = nil
+    if P.TouchPreviewRevision then P.TouchPreviewRevision(job.liveState) end
     RecordPhase(job, "stateCommit", commitStarted)
     return FinishJob(job, true, BuildGenerationMessage(job, generatedName, weaponCount, weaponNotice))
 end
@@ -284,7 +296,7 @@ local function ContinueArmorCandidate(job, work)
     AddCandidateToPool(job, work, candidate.source, coherenceScore, coherent, coherenceReason)
     return true
 end
-local function ProcessArmor(job, stepStarted)
+local function ProcessArmor(job, stepStarted, slice)
     local operations = 0
     local armorOrder = job.armorOrder or P.ARMOR_GENERATION_ORDER
     while job.armorIndex <= #armorOrder do
@@ -306,7 +318,7 @@ local function ProcessArmor(job, stepStarted)
                     job.candidatesProcessed = job.candidatesProcessed + 1
                 end
                 if operations >= P.GENERATION_OPERATION_SAFETY_CAP then return false end
-                if NowMilliseconds() - stepStarted >= P.GENERATION_TIME_BUDGET_MS then return false end
+                if WorkerShouldYield(slice, 0.15) then return false end
             end
             local finalizationStarted = NowMilliseconds()
             FinalizeArmorSlot(job, work)
@@ -318,7 +330,7 @@ local function ProcessArmor(job, stepStarted)
             job.armorIndex = job.armorIndex + 1
         end
         if operations >= P.GENERATION_OPERATION_SAFETY_CAP then return false end
-        if NowMilliseconds() - stepStarted >= P.GENERATION_TIME_BUDGET_MS then return false end
+        if WorkerShouldYield(slice, 0.15) then return false end
     end
     return true
 end
@@ -327,6 +339,8 @@ function P.StepGenerationJob(token)
     if not job or job.token ~= token then return end
     job.steps = job.steps + 1
     local stepStarted = NowMilliseconds()
+    local slice = BeginWorkerSlice()
+    job.currentSlice = slice
     if GenerationStateSignature(job.liveState) ~= job.startSignature then
         FinishJob(job, false, "Outfit generation was cancelled because the workbench changed while Quest Chronicle was preparing the outfit.")
         return
@@ -346,7 +360,7 @@ function P.StepGenerationJob(token)
         return
     end
     if job.phase == "ARMOR" then
-        if ProcessArmor(job, stepStarted) then job.phase = job.weaponsPrepared and "COMMIT" or "WEAPONS" end
+        if ProcessArmor(job, stepStarted, slice) then job.phase = job.weaponsPrepared and "COMMIT" or "WEAPONS" end
         job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
         if not ScheduleNextStep(token) then
             FinishJob(job, false, "Quest Chronicle could not schedule the cooperative outfit generator. Try /reload.")
@@ -380,7 +394,7 @@ function P.StepGenerationJob(token)
                 break
             end
             job.weaponYields = job.weaponYields + 1
-            if NowMilliseconds() - stepStarted >= P.GENERATION_TIME_BUDGET_MS then break end
+            if WorkerShouldYield(slice, 0.15) then break end
         end
         job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
         if not ScheduleNextStep(token) then
@@ -396,12 +410,13 @@ function P.StepGenerationJob(token)
     end
 end
 function Wardrobe.IsGenerating()
-    return P.generationJob ~= nil
+    return P.generationJob ~= nil or P.supportRerollJob ~= nil
 end
 function Wardrobe.GetLastGenerationPerformance()
     return P.lastGenerationPerformance
 end
 function Wardrobe.CancelGeneration(reason)
+    if P.supportRerollJob and P.CancelSupportReroll then return P.CancelSupportReroll(reason) end
     local job = P.generationJob
     if not job then return false end
     P.generationToken = P.generationToken + 1

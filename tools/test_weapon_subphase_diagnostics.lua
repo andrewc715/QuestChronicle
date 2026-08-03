@@ -12,5 +12,5 @@ local job = {
 local performance = P.BuildGenerationPerformance(job, 30)
 assert(performance.largestInstrumentedCallPhase == "weaponAppearance", "weapon subphase must replace the opaque outer phase")
 assert(performance.largestInstrumentedCallMs == 19.5, "weapon subphase duration must remain exact")
-assert(P.GENERATION_PHASE_LABELS.weaponAppearance == "Weapon appearance index", "subphase label must be human-readable")
+assert(P.GENERATION_PHASE_LABELS.weaponAppearance == "Weapon appearance lookup", "subphase label must be human-readable")
 print("PASS weapon subphase diagnostics: slow anchor weapon resumes identify their exact inner phase")

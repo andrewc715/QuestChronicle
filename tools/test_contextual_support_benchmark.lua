@@ -24,7 +24,7 @@ T.SLOT_VISIBILITY_WEIGHTS={CHEST=1,LEGS=.8,SHOULDER=1,ONE_HAND=.9,WAIST=.5,HANDS
 function T.GetPairCohesion(left,right) local a=left.palette.steel or 0;local b=right.palette.steel or 0;local s=1-math.abs(a-b);return s,{palette=s,material=s,finish=s,visualWeight=s,motif=s,provenance=.78} end
 local style={GetSourceCoherence=function() return .85,true end,ScoreSource=function(source) return source.descriptor.palette.steel*25,{} end,GetSourcePreEraEligibility=function() return true end,GetSourcePreEraEligibilityCached=function() return true end,CreateSourceEraEvidenceWork=function() return {done=true,result={state="KNOWN"}} end,GetSourceEligibility=function() return true end,GetSourceEligibilityCached=function() return true end,AddSourceToGenerationContext=function() end}
 math.randomseed(1907)
-for _,f in ipairs({"SupportProfile.lua","SupportBudget.lua","SupportScoring.lua","SupportBeam.lua","SupportWorker.lua"}) do dofile("Core/Wardrobe/"..f) end
+for _,f in ipairs({"SupportProfileIdentity.lua","SupportProfile.lua","SupportBudget.lua","SupportScoring.lua","SupportBeam.lua","SupportWorker.lua"}) do dofile("Core/Wardrobe/"..f) end
 local state={selections={CHEST=1,LEGS=2,SHOULDER=3,ONE_HAND=4},selectionVisuals={},hidden={},locks={}}
 local job={draft=state,liveState=state,styleEngine=style,styleMode="TRAVELER",styleContext={},reroll=false,selectedArmor=3,candidatesProcessed=0,eraCandidatesProcessed=0,phaseStats={}}
 local status,frames,maxSlice="RUNNING",0,0

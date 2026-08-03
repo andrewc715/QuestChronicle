@@ -429,6 +429,7 @@ function Wardrobe.SaveConcept(name)
     concept.generatedName = state.generatedName
     concept.generatedAt = state.generatedAt
     state.selectedConceptID = concept.id
+    if P.TouchPreviewRevision then P.TouchPreviewRevision(state) end
     if QC.Notify then
         QC.Notify("WARDROBE_CONCEPTS_CHANGED", concept)
     end

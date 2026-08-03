@@ -1,13 +1,17 @@
-# Quest Chronicle v1.9.0.7
+# Quest Chronicle v1.9.0.11
 
-## Phase C: Contextual Support Slots
+## Final Phase C Performance Closure
 
-Quest Chronicle now derives an immutable outfit profile from the Phase B anchor skeleton and fills Waist, Hands, Feet, Head, Back, Wrists, Shirt, and Tabard as one contextual support configuration.
+Quest Chronicle now applies one elapsed-time budget across cooperative generation work, decomposes support-reroll diagnostics into resumable stages, and reuses a session weapon-source index instead of repeatedly rebuilding subtype buckets.
 
-- Adds anchor-derived palette, material, finish, visual-weight, motif, and provenance profiles.
-- Adds a cumulative mismatch budget with slot allowances, borrowing limits, future-slot reserves, and locked-piece commitments.
-- Adds bridge scoring for Chest-to-Legs, Chest-to-weapons, silhouette, and neighboring-slot relationships.
-- Adds bounded support pools, a cooperative support beam, visual-family deduplication, outlier controls, and slot-local fallbacks.
-- Makes support-slot rerolls contextual and rebuilds contextual support after anchor or weapon rerolls.
-- Extends Debug reports with profile centers, budget accounting, support decisions, bridge effects, outlier states, and whole-outfit cohesion.
-- Preserves v1.9.0.5 Phase B anchor selection, novelty behavior, weapon routes, schema 2, Courier format 1, and wardrobe cache format 7.
+- Adds shared slice-budget and adaptive-batch helpers for support rerolls and full foreground generation.
+- Yields before phase transitions when the remaining frame allowance is too small and immediately after expensive operations.
+- Replaces the monolithic support-reroll diagnostic foundation with incremental identity, anchor, state, style-context, support-summary, and cache-summary stages.
+- Makes source eligibility resumable through precheck, era, provenance, curated-source, drop-source, tracked-source, metadata, and marker stages.
+- Dynamically sizes reroll candidate and scoring batches from observed operation cost and remaining slice time.
+- Adds weapon candidate index format 1 as a session acceleration layer with cold-build, partial-warm, warm, and incremental-repair diagnostics.
+- Repairs only an invalidated weapon subtype bucket when possible and coalesces reuse through the existing weapon-generation coroutine.
+- Preserves v1.9.0.10 anchor, weapon, support, contextual-reroll, profile, mismatch, and outfit-name selections for identical seeds and state.
+- Keeps SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, and diagnostic format 1 unchanged.
+
+The package is automated-validated and requires Retail validation before replacing v1.9.0.5 as the live baseline.

@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0.7
+# Quest Chronicle v1.9.0.11
 
-> **Phase C Contextual Support:** the committed Phase B skeleton now derives an outfit profile, mismatch budget, bridge relationships, and bounded support beam for every remaining visible armor slot.
+> **Phase C Performance Closure:** contextual support rerolls and foreground outfit generation now share elapsed-time slice guards, adaptive batches, resumable eligibility work, and reusable weapon-source buckets.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.7 preserves the live-validated v1.9.0.5 anchor and weapon pipeline while filling Waist, Hands, Feet, Head, Back, Wrists, Shirt, and Tabard as one contextual support configuration.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.11 closes the remaining Phase C performance paths by decomposing diagnostic capture, enforcing frame-budget-aware yields, and cooperatively building or repairing the weapon candidate index without changing selection semantics.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -96,6 +96,9 @@ Each selected report includes:
 - warnings for performance overruns, fallback, and repeated Chest/Shoulder foundations;
 - comparison with the previous completed run;
 - Phase C profile centers, tolerances, mismatch accounting, support-beam statistics, bridge effects, outlier states, and whole-outfit cohesion.
+- support-reroll ancestry, context-fixed slots, target budget replacement, and detailed cooperative reroll phases.
+- canonical active-anchor masks, immutable profile identity and source, profile-repair state, exact budget reconciliation, and separate pre-worker/cooperative timing domains.
+- decomposed support-reroll snapshot phases, adaptive worker scheduling, and weapon-index cold/warm/repair diagnostics.
 
 Use **Copy Report** to open a read-only multiline box with the selected report highlighted for `Ctrl+C`. **Clear History** removes only diagnostic snapshots. It never changes Chronicle events, wardrobe caches, concepts, selections, or Custom Sets.
 

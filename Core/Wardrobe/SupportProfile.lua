@@ -31,22 +31,16 @@ local function Dominant(values)
     return key, best or 0
 end
 
-local function SourceFor(state, slotKey)
-    local sourceID = state and state.selections and state.selections[slotKey]
-    return sourceID and P.GetSourceByID(slotKey, sourceID) or nil
-end
-
-local function MainWeaponSlot(state)
-    for _, slotKey in ipairs(P.MAIN_WEAPON_SLOT_KEYS or {}) do
-        if state and state.selections and state.selections[slotKey] then return slotKey end
-    end
-end
-
 local function AddEntry(entries, source, slotKey, weight, label)
     if not source or weight <= 0 then return end
     local definition = P.slotByKey[slotKey]
     local descriptor = QC.ZoneStyle and QC.ZoneStyle.GetTravelerDescriptor and QC.ZoneStyle.GetTravelerDescriptor(source, definition)
-    if descriptor then entries[#entries + 1] = { source = source, slotKey = slotKey, label = label or slotKey, weight = weight, descriptor = descriptor } end
+    if descriptor then
+        entries[#entries + 1] = {
+            source = source, sourceID = source.sourceID, visualID = source.visualID,
+            slotKey = slotKey, label = label or slotKey, weight = weight, descriptor = descriptor,
+        }
+    end
 end
 
 local function Redistribute(entries)
@@ -56,14 +50,18 @@ local function Redistribute(entries)
     for _, entry in ipairs(entries) do entry.weight = entry.weight / total end
 end
 
-local function BuildEntries(state)
+local function BuildEntries(state, mask)
     local entries, logicalCount = {}, 0
-    if not (state.hidden and state.hidden.CHEST) and SourceFor(state, "CHEST") then AddEntry(entries, SourceFor(state, "CHEST"), "CHEST", P.SUPPORT_PROFILE_WEIGHTS.CHEST, "Chest") logicalCount = logicalCount + 1 end
-    if not (state.hidden and state.hidden.LEGS) and SourceFor(state, "LEGS") then AddEntry(entries, SourceFor(state, "LEGS"), "LEGS", P.SUPPORT_PROFILE_WEIGHTS.LEGS, "Legs") logicalCount = logicalCount + 1 end
-    if not (state.hidden and state.hidden.SHOULDER) and SourceFor(state, "SHOULDER") then AddEntry(entries, SourceFor(state, "SHOULDER"), "SHOULDER", P.SUPPORT_PROFILE_WEIGHTS.SHOULDER, "Shoulders") logicalCount = logicalCount + 1 end
-    local mainSlot = MainWeaponSlot(state)
-    local mainSource = mainSlot and SourceFor(state, mainSlot)
-    local offSource = SourceFor(state, "OFF_HAND")
+    for _, slotKey in ipairs({ "CHEST", "LEGS", "SHOULDER" }) do
+        if P.IsAnchorActive(mask, slotKey) then
+            local source = P.GetActiveAnchorSource(mask, state, slotKey)
+            if source then
+                AddEntry(entries, source, slotKey, P.SUPPORT_PROFILE_WEIGHTS[slotKey], slotKey == "SHOULDER" and "Shoulders" or (slotKey == "CHEST" and "Chest" or "Legs"))
+                logicalCount = logicalCount + 1
+            end
+        end
+    end
+    local mainSource, mainSlot, offSource = P.GetActiveAnchorSource(mask, state, "WEAPON")
     if mainSource or offSource then logicalCount = logicalCount + 1 end
     if mainSource and offSource and tostring(mainSource.visualID or mainSource.sourceID) ~= tostring(offSource.visualID or offSource.sourceID) then
         AddEntry(entries, mainSource, mainSlot, P.SUPPORT_PROFILE_WEIGHTS.WEAPON * 0.5, "Main Hand")
@@ -124,12 +122,20 @@ local function RelationshipSummary(entries)
     return mean, strongest, weakest, componentTotals, tolerance
 end
 
-function P.BuildContextualSupportProfile(state)
-    local entries, mainSlot, logicalCount = BuildEntries(state or {})
+function P.BuildContextualSupportProfile(state, options)
+    options = options or {}
+    local mask = options.activeAnchorMask or P.BuildActiveAnchorMask(state or {}, options.anchorSnapshot)
+    local entries, mainSlot, logicalCount = BuildEntries(state or {}, mask)
     local descriptor = BuildDescriptor(entries)
     local mean, strongest, weakest, components, tolerance = RelationshipSummary(entries)
+    local sourceReportID = options.profileSourceReportID
+    local profileID = options.profileID or P.CreateContextualSupportProfileID(sourceReportID, mask)
     return {
-        version = 1,
+        version = 2,
+        profileID = profileID,
+        profileSourceReportID = sourceReportID,
+        activeAnchorMask = mask,
+        activeAnchorMaskSignature = P.ActiveAnchorMaskSignature(mask),
         entries = entries,
         descriptor = descriptor,
         mainWeaponSlot = mainSlot,

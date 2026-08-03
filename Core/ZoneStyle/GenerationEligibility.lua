@@ -143,23 +143,30 @@ local function EligibilityKey(source, modeKey, context, evidence)
     }, "|")
 end
 
-function ZoneStyle.GetSourceEligibilityCached(source, modeKey, context, evidence, prechecked)
-    if not source then return false, "pending", "No appearance source was provided.", false end
+local function CompletedEligibilityWork(source, key, eligible, kind, reason, fromCache)
+    return {
+        source = source,
+        key = key,
+        done = true,
+        eligible = eligible == true,
+        kind = kind,
+        reason = reason,
+        fromCache = fromCache == true,
+    }
+end
+
+function ZoneStyle.CreateCachedSourceEligibilityWork(source, modeKey, context, evidence, prechecked)
+    if not source then return CompletedEligibilityWork(source, nil, false, "pending", "No appearance source was provided.", false) end
     context = ResolveContext(context)
     if not prechecked then
         local preEligible, preKind, preReason = ZoneStyle.GetSourcePreEraEligibilityCached(source, context)
-        if not preEligible then return false, preKind, preReason, true end
+        if not preEligible then return CompletedEligibilityWork(source, nil, false, preKind, preReason, true) end
     end
-    if evidence == nil and ZoneStyle.GetSourceEraEvidence then
-        evidence = ZoneStyle.GetSourceEraEvidence(source)
-    end
+    if evidence == nil and ZoneStyle.GetSourceEraEvidence then evidence = ZoneStyle.GetSourceEraEvidence(source) end
     local key = EligibilityKey(source, modeKey, context, evidence)
     if source.generationEligibilityKey == key and source.generationEligibilityEligible ~= nil then
         CountCacheHit()
-        return source.generationEligibilityEligible == true,
-            source.generationEligibilityKind,
-            source.generationEligibilityReason,
-            true
+        return CompletedEligibilityWork(source, key, source.generationEligibilityEligible, source.generationEligibilityKind, source.generationEligibilityReason, true)
     end
     local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
     local persistent = wardrobePrivate and wardrobePrivate.GetPersistentGenerationEligibility
@@ -170,15 +177,49 @@ function ZoneStyle.GetSourceEligibilityCached(source, modeKey, context, evidence
         source.generationEligibilityKind = persistent.kind
         source.generationEligibilityReason = persistent.reason
         CountCacheHit()
-        return persistent.eligible == true, persistent.kind, persistent.reason, true
+        return CompletedEligibilityWork(source, key, persistent.eligible, persistent.kind, persistent.reason, true)
     end
-    local eligible, kind, reason = ZoneStyle.GetSourceEligibility(source, modeKey, context, evidence, true)
-    source.generationEligibilityKey = key
-    source.generationEligibilityEligible = eligible == true
+    local raw = ZoneStyle.CreateSourceEligibilityWork
+        and ZoneStyle.CreateSourceEligibilityWork(source, modeKey, context, evidence, true) or nil
+    return {
+        source = source,
+        key = key,
+        modeKey = modeKey,
+        context = context,
+        evidence = evidence,
+        raw = raw,
+        legacy = raw == nil,
+        done = false,
+        fromCache = false,
+    }
+end
+
+function ZoneStyle.StepCachedSourceEligibilityWork(work, markerBatch)
+    if not work then return true, false, "pending", "No cached eligibility work was provided.", false end
+    if work.done then return true, work.eligible, work.kind, work.reason, work.fromCache end
+    local done, eligible, kind, reason
+    if work.legacy then
+        eligible, kind, reason = ZoneStyle.GetSourceEligibility(work.source, work.modeKey, work.context, work.evidence, true)
+        done = true
+    else
+        done, eligible, kind, reason = ZoneStyle.StepSourceEligibilityWork(work.raw, markerBatch)
+    end
+    if not done then return false end
+    work.done, work.eligible, work.kind, work.reason = true, eligible == true, kind, reason
+    local source = work.source
+    source.generationEligibilityKey = work.key
+    source.generationEligibilityEligible = work.eligible
     source.generationEligibilityKind = kind
     source.generationEligibilityReason = reason
+    local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
     if wardrobePrivate and wardrobePrivate.StorePersistentGenerationEligibility then
-        wardrobePrivate.StorePersistentGenerationEligibility(source, key, eligible, kind, reason)
+        wardrobePrivate.StorePersistentGenerationEligibility(source, work.key, work.eligible, kind, reason)
     end
-    return eligible == true, kind, reason, false
+    return true, work.eligible, kind, reason, false
+end
+
+function ZoneStyle.GetSourceEligibilityCached(source, modeKey, context, evidence, prechecked)
+    local work = ZoneStyle.CreateCachedSourceEligibilityWork(source, modeKey, context, evidence, prechecked)
+    while not work.done do ZoneStyle.StepCachedSourceEligibilityWork(work, 1000000) end
+    return work.eligible, work.kind, work.reason, work.fromCache
 end

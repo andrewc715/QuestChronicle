@@ -67,6 +67,11 @@ local function FindCandidate(anchorDiagnostics, slotKey)
 end
 
 local function BuildSkeleton(state, job)
+    if job and job.reuseAnchorSnapshot and type(job.inheritedAnchorSnapshot) == "table" then
+        local inherited = CopyTable(job.inheritedAnchorSnapshot)
+        inherited.reusedFromParent = true
+        return inherited
+    end
     local sourceDiagnostics = job and job.anchorDiagnostics
     local stats = job and job.anchorStats
     local skeleton = {
@@ -114,6 +119,7 @@ local function BuildSkeleton(state, job)
 end
 
 local function BuildBeam(job)
+    if job and job.reuseAnchorSnapshot and type(job.inheritedBeamSnapshot) == "table" then return CopyTable(job.inheritedBeamSnapshot) end
     local stats = job and job.anchorStats or {}
     local work = job and job.anchorWork or {}
     return {
@@ -163,7 +169,8 @@ local function BuildContext(job)
     }
 end
 
-local function ResolveResult(success, message, fallbackReason)
+local function ResolveResult(success, message, fallbackReason, resultOverride)
+    if resultOverride then return tostring(resultOverride) end
     if success and fallbackReason then return "FALLBACK" end
     if success then return "COMPLETED" end
     local lower = string.lower(tostring(message or ""))
@@ -179,18 +186,25 @@ local function BuildGenerationSeed(job, success, message)
     local identity = job and job.diagnosticIdentity
     if not identity and D.BeginGenerationAttempt then identity = D.BeginGenerationAttempt(action) end
     identity = identity or {}
+    local performedAnchorSelection = identity.performedAnchorSelection == true
+    if job and job.performedAnchorSelection ~= nil then performedAnchorSelection = job.performedAnchorSelection == true end
     return {
         formatVersion = D.FORMAT_VERSION,
         id = identity.reportID, sequence = identity.sequence, startedAt = identity.startedAt,
         lineageID = identity.lineageID, generationToken = identity.generationToken,
         parentCompletedReportID = identity.parentCompletedReportID,
+        performedAnchorSelection = performedAnchorSelection,
+        previousAnchorSourceReportID = identity.anchorSourceReportID,
+        anchorSourceReportID = performedAnchorSelection and identity.reportID
+            or (job and job.anchorSourceReportID) or identity.anchorSourceReportID,
+        anchorPhase = job and job.reuseAnchorSnapshot and "REUSED" or "SELECTED",
         timestamp = timestamp,
         timestampText = type(date) == "function" and date("%Y-%m-%d %H:%M:%S", timestamp) or tostring(timestamp),
         version = QC.version,
         action = action,
         actionSlotKey = job and job.actionSlotKey or nil,
         mode = job and job.styleMode or state.styleMode,
-        result = ResolveResult(success, message, job and (job.anchorFallbackReason or job.supportFallbackReason)),
+        result = ResolveResult(success, message, job and (job.anchorFallbackReason or job.supportFallbackReason), job and job.resultOverride),
         success = success == true,
         message = tostring(message or ""),
         character = BuildCharacter(),
@@ -223,8 +237,14 @@ local function PerformanceSnapshot(performance)
         slowestPhaseMs = tonumber(performance.slowestPhaseMs) or 0,
         largestInstrumentedCallPhase = performance.largestInstrumentedCallPhase or performance.slowestPhase,
         largestInstrumentedCallMs = tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0,
+        supportRerollTiming = performance.supportRerollTiming == true,
+        synchronousLaunchPreparationMs = tonumber(performance.synchronousLaunchPreparationMs or performance.preWorkerPreparationMs) or 0,
+        preWorkerPreparationMs = tonumber(performance.synchronousLaunchPreparationMs or performance.preWorkerPreparationMs) or 0,
+        largestCooperativeCallPhase = performance.largestCooperativeCallPhase,
+        largestCooperativeCallMs = tonumber(performance.largestCooperativeCallMs) or 0,
         weaponSlowYieldPhase = performance.weaponSlowYieldPhase,
         weaponSlowYieldMs = tonumber(performance.weaponSlowYieldMs) or 0,
+        weaponIndex = CopyTable(performance.weaponIndex),
         phaseStats = CopyTable(performance.phaseStats),
     }
     return result
@@ -288,16 +308,26 @@ function D.InstallRerollSlotWrapper()
     if DP.rerollSlotWrapped or not Wardrobe or type(Wardrobe.RerollSlot) ~= "function" then return false end
     local original = Wardrobe.RerollSlot
     Wardrobe.RerollSlot = function(slotKey)
-        local identity = D.BeginGenerationAttempt and D.BeginGenerationAttempt("REROLL_SLOT") or nil
+        if WP and WP.IsSupportSlotKey and WP.IsSupportSlotKey(slotKey) then return original(slotKey) end
+        local identity = D.BeginGenerationAttempt and D.BeginGenerationAttempt("REROLL_SLOT", slotKey) or nil
         local started = DP.NowMilliseconds()
-        local ok, message = original(slotKey)
+        local ok, message, asynchronous = original(slotKey)
+        if asynchronous then return ok, message, asynchronous end
         local elapsed = math.max(0, DP.NowMilliseconds() - started)
         local state = WP and WP.EnsurePreviewState and WP.EnsurePreviewState() or nil
         local mode = state and state.styleMode or nil
-        local job = { action = "REROLL_SLOT", actionSlotKey = slotKey, liveState = state, draft = state, styleMode = mode, diagnosticIdentity = identity }
-        local performance = { elapsedMs = elapsed, steps = 1, maxStepMs = elapsed, longestWorkerSliceMs = elapsed, slowestPhase = "rerollSlot", slowestPhaseMs = elapsed, phaseStats = { rerollSlot = { calls = 1, totalMs = elapsed, maxMs = elapsed } }, cacheDiagnostics = WP and WP.BuildGenerationCachePerformance and WP.BuildGenerationCachePerformance(nil) or nil }
+        local job = {
+            action = "REROLL_SLOT", actionSlotKey = slotKey, liveState = state, draft = state,
+            styleMode = mode, diagnosticIdentity = identity, performedAnchorSelection = true,
+        }
+        local performance = {
+            elapsedMs = elapsed, steps = 1, maxStepMs = elapsed, longestWorkerSliceMs = elapsed,
+            slowestPhase = "rerollSlot", slowestPhaseMs = elapsed,
+            phaseStats = { rerollSlot = { calls = 1, totalMs = elapsed, maxMs = elapsed } },
+            cacheDiagnostics = WP and WP.BuildGenerationCachePerformance and WP.BuildGenerationCachePerformance(nil) or nil,
+        }
         D.RecordImmediateAttempt(job, ok == true, message, performance)
-        return ok, message
+        return ok, message, false
     end
     DP.rerollSlotWrapped = true
     return true

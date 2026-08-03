@@ -368,6 +368,7 @@ function Wardrobe.ClearAllSelections()
     state.selectedConceptID = nil
     state.generatedName = nil
     state.generatedAt = nil
+    if P.TouchPreviewRevision then P.TouchPreviewRevision(state) end
     if QC.Notify then
         QC.Notify("WARDROBE_SELECTIONS_CLEARED")
     end

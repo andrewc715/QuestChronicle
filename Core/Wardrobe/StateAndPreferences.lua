@@ -180,6 +180,8 @@ function Wardrobe.SetSlotLocked(slotKey, locked)
     end
     local state = P.EnsurePreviewState()
     state.locks[slotKey] = locked == true or nil
+    if P.TouchPreviewRevision then P.TouchPreviewRevision(state) end
+    if P.RefreshCanonicalAnchorMask then P.RefreshCanonicalAnchorMask(state, slotKey) end
     state.selectedConceptID = nil
     if QC.Notify then
         QC.Notify("WARDROBE_WORKBENCH_CHANGED", slotKey)
@@ -197,6 +199,8 @@ function Wardrobe.SetSlotHidden(slotKey, hidden)
     end
     local state = P.EnsurePreviewState()
     state.hidden[slotKey] = hidden == true or nil
+    if P.TouchPreviewRevision then P.TouchPreviewRevision(state) end
+    if P.RefreshCanonicalAnchorMask then P.RefreshCanonicalAnchorMask(state, slotKey) end
     state.selectedConceptID = nil
     if QC.Notify then
         QC.Notify("WARDROBE_WORKBENCH_CHANGED", slotKey)
@@ -263,6 +267,7 @@ function P.SetSelectedSource(state, slotKey, source)
     state.selectionVisuals = state.selectionVisuals or {}
     state.selections[slotKey] = source and source.sourceID or nil
     state.selectionVisuals[slotKey] = source and source.visualID or nil
+    if P.TouchPreviewRevision then P.TouchPreviewRevision(state) end
 end
 
 function P.SnapshotSelectionVisuals(selections, previousVisuals)
@@ -324,6 +329,7 @@ function P.RecoverAppearanceReferences(cache)
     local selections, visuals, previewRecovered, previewMissing = P.RebindSelectionMap(state.selections, state.selectionVisuals, false)
     state.selections = selections
     state.selectionVisuals = visuals
+    if P.TouchPreviewRevision then P.TouchPreviewRevision(state) end
 
     local concepts = P.EnsureConceptStore()
     local conceptRecovered, conceptMissing = 0, 0

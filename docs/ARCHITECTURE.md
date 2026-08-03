@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0.2 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0.11 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -45,6 +45,17 @@ These tables are runtime implementation details. Other subsystems should use pub
 `Core/Diagnostics/ReportFormatter.lua` renders the same snapshot as rich in-game text or a plain copy report. Raw IDs and verbose zero-count diagnostics are presentation options and do not mutate stored reports. `UI/DebugHistory.lua`, `UI/DebugReport.lua`, and `UI/DebugTab.lua` provide the two-column workbench. A new report refreshes the tab only when it is visible and never changes the active main-window tab.
 
 Generation integration is deliberately read-only. `GenerationWorker.lua` queues a snapshot after its existing completion pipeline, and the Reroll Slot wrapper preserves the original return values. Anchor score reasons and selected pair diagnostics are copied only after the winner has already been chosen, preserving v1.9.0.2 selection behavior.
+
+
+## Phase C support reroll stabilization
+
+`Core/Wardrobe/SupportRerollFoundation.lua`, `SupportRerollScoring.lua`, and `SupportRerollWorker.lua` implement the bounded one-slot contextual reroll path. The worker copies the visible outfit into a private draft, inherits the committed anchor profile, reconstructs the mismatch ledger from user-locked and context-fixed support pieces, prepares no more than 32 target candidates, retains no more than six finalists, and atomically commits only the requested slot. `SupportRerollLegacy.lua` retains the established synchronous helper only for the anchor-slot rebuild path so full-generation and anchor-reroll selection remain unchanged.
+
+`Core/Wardrobe/SupportProfileIdentity.lua` remains the canonical profile-integrity boundary. It creates the canonical logical mask for Chest, Legs, Shoulders, and the weapon bundle; explicit Hidden or Unavailable state always overrides a stored appearance identity. Completed anchor actions persist a compact immutable profile snapshot and stable profile ID. Support-only rerolls validate and reuse that snapshot rather than deriving a fresh profile from mutable preview tables. A mask mismatch triggers one explicit repair before scoring, and an unreconcilable profile fails without modifying the preview.
+
+`Core/Wardrobe/SupportRerollLaunch.lua` creates a compact primitive launch manifest and revision guard. Parent lookup, profile/state reuse, fixed-context construction, and diagnostic foundation work then run inside cooperative phases in `SupportRerollWorker.lua`. `SupportRoleResolver.lua` derives Head and Back labels and endpoints from the canonical active-anchor mask. Timing is divided into synchronous launch, cooperative worker, and commit/presentation domains. Full-generation timing retains its established diagnostics.
+
+`Core/Diagnostics/AnchorAncestry.lua` distinguishes the immediately previous completed report from the report that last performed Phase B anchor selection. Support-only actions inherit the latter's immutable skeleton and beam snapshots and cannot advance repeated-anchor warnings. Detailed reroll phases are recorded through the existing generation-performance ledger, while cancellation, failure, or no-alternative outcomes preserve the visible preview.
 
 ## Wardrobe
 
@@ -321,3 +332,13 @@ Wardrobe scans prewarm weapon-category appearance indexes and compact collected-
 After Phase B commits Chest, Legs, Shoulders, and the legal weapon bundle, the generator derives an immutable Traveler descriptor profile. SupportProfile aggregates palette, material, finish, visual weight, motif, provenance, confidence, tolerance, and anchor relationship diagnostics. SupportBudget creates a slot-aware cumulative mismatch ledger. SupportScoring evaluates profile fit, local neighbor cohesion, bridge improvements, visual impact, repeat pressure, and outlier risk. SupportBeam expands bounded 32-candidate pools through a 24-node cooperative beam and selects from at most six final configurations. SupportWorker applies the winning configuration without changing the Phase B skeleton. SupportReroll provides contextual single-slot replacements and rebuilds support context after anchor or weapon rerolls.
 
 The Debug workbench stores only selected support decisions and aggregate counters. Candidate arrays remain transient. Existing schema, Courier, wardrobe cache, generation cache, and diagnostic format versions remain unchanged.
+
+## Shared cooperative scheduling and weapon indexing (v1.9.0.11)
+
+`Core/Workers/SliceBudget.lua` provides one elapsed-time guard for foreground generation workers. A slice records its start time, preferred budget, soft ceiling, and the most recent instrumented call. Workers check the guard before batches, after operations, and before phase transitions. An operation at or above the expensive-call threshold forces a yield before another phase begins.
+
+`Core/Workers/AdaptiveBatch.lua` maintains a rolling operation-cost estimate and selects a bounded batch size from 1, 2, 4, 8, or 16. Support rerolls use the shared policy through `SupportRerollScheduling.lua`, while `GenerationWorker.lua` uses the shared elapsed guard for armor and weapon progress. Continuation indices are stored on the transient job so yielding never repeats or skips completed candidates.
+
+The support-reroll worker no longer builds one diagnostic foundation. It materializes identity, anchor ancestry, draft state, style context, selected-support summaries, and cache counters as separate resumable phases. Candidate eligibility is also resumable: `EligibilityWork.lua` advances through precheck, era, provenance, curated-source, drop-source, tracked-source, metadata, and marker stages. `GenerationEligibility.lua` wraps that work with the existing transient and persistent cache semantics.
+
+`WeaponCandidateIndex.lua` adds weapon index format 1 as a session acceleration layer. The index is keyed by its format, the completed wardrobe scan identity, visual count, and character key. Each weapon subtype bucket is built cooperatively through the existing weapon coroutine, reused on warm calls, and repaired independently when an affected subtype is invalidated. The index does not replace wardrobe cache format 7 and does not become authoritative for weapon eligibility or ordering. Existing route generation remains the source of truth.

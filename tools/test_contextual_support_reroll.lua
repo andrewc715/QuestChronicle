@@ -36,19 +36,34 @@ function Z.GetSourceEligibilityCached() return true end
 function P.CreateStyleGenerationContext() return {} end
 function P.RefreshGeneratedOutfitName(state) state.generatedName="Contextual Test"; return state.generatedName end
 QC.Notify=function() end
+local timerQueue={}
+C_Timer={After=function(_,callback) timerQueue[#timerQueue+1]=callback end}
+local function DrainTimers()
+    local guard=0
+    while #timerQueue>0 do
+        guard=guard+1; assert(guard<10000,"support reroll timer timeout")
+        local callback=table.remove(timerQueue,1); callback()
+    end
+end
+P.GENERATION_TIME_BUDGET_MS=2.5; P.GENERATION_OPERATION_SAFETY_CAP=2000; P.GENERATION_ERA_CANDIDATES_PER_OPERATION=1
+local now=0; function P.GenerationNowMilliseconds() now=now+.02 return now end
+function P.RecordGenerationPhase(job,key,elapsed) job.phaseStats=job.phaseStats or {}; local x=job.phaseStats[key] or {calls=0,totalMs=0,maxMs=0}; job.phaseStats[key]=x; x.calls=x.calls+1; x.totalMs=x.totalMs+elapsed; x.maxMs=math.max(x.maxMs,elapsed) end
 local state={selections={CHEST=chestA.sourceID,LEGS=legs.sourceID,SHOULDER=shoulder.sourceID,ONE_HAND=weapon.sourceID},selectionVisuals={},hidden={},locks={},styleMode="TRAVELER"}
 for _,slot in ipairs(supportSlots) do state.selections[slot]=currentBySlot[slot].sourceID end
 P.EnsurePreviewState=function() return state end
 local originalAnchorCalls=0
 W.RerollSlot=function(slotKey) originalAnchorCalls=originalAnchorCalls+1; if slotKey=="CHEST" then P.SetSelectedSource(state,"CHEST",chestB) end; return true,"anchor rerolled" end
 math.randomseed(1907)
-for _,f in ipairs({"SupportProfile.lua","SupportBudget.lua","SupportScoring.lua","SupportBeam.lua","SupportWorker.lua","SupportReroll.lua"}) do dofile("Core/Wardrobe/"..f) end
+for _,f in ipairs({"SupportProfileIdentity.lua","SupportProfile.lua","SupportBudget.lua","SupportRoleResolver.lua","SupportScoring.lua","SupportBeam.lua","SupportWorker.lua","SupportRerollLaunch.lua","SupportRerollFoundation.lua", "SupportRerollScheduling.lua","SupportRerollScoring.lua","SupportRerollWorker.lua","SupportRerollLegacy.lua","SupportReroll.lua"}) do dofile("Core/Wardrobe/"..f) end
 local before={}; for slot,id in pairs(state.selections) do before[slot]=id end
-local ok,message=W.RerollSlot("WAIST")
-assert(ok and message:find("contextually",1,true),"support reroll should succeed contextually")
+local ok,message,asynchronous=W.RerollSlot("WAIST")
+assert(ok and asynchronous and message:find("contextually",1,true),"support reroll should start cooperatively")
+assert(state.selections.WAIST==before.WAIST,"support reroll must not commit before worker completion")
+DrainTimers()
 assert(state.selections.WAIST~=before.WAIST,"support reroll must hard-exclude the current visual")
 for slot,id in pairs(before) do if slot~="WAIST" then assert(state.selections[slot]==id,"support reroll changed unrelated slot "..slot) end end
 assert(P.lastSupportDiagnostics and P.lastSupportDiagnostics.chosenRank>=1 and P.lastSupportDiagnostics.shortlistSize>=1,"reroll diagnostics need truthful rank")
+local rerollStats=P.lastSupportDiagnostics
 state.locks.BACK=true; local lockedBack=state.selections.BACK
 ok,message=W.RerollSlot("CHEST")
 assert(ok and originalAnchorCalls==1,"anchor reroll must call the original route")
@@ -57,4 +72,6 @@ assert(state.selections.BACK==lockedBack,"locked support must survive anchor-con
 state.locks.WAIST=true
 ok,message=W.RerollSlot("WAIST")
 assert(not ok and message:find("Unlock",1,true),"locked support reroll must fail safely")
-print(string.format("PASS contextual support reroll: isolated support replacement, anchor rebuild, locked preservation, rank %d/%d",P.lastSupportDiagnostics.chosenRank,P.lastSupportDiagnostics.shortlistSize))
+assert(rerollStats.poolSizes.WAIST<=32,"support reroll pool must remain capped at 32")
+assert(rerollStats.shortlistSize<=6,"support reroll shortlist must remain capped at 6")
+print(string.format("PASS contextual support reroll: cooperative isolated replacement, anchor rebuild, locked preservation, rank %d/%d",rerollStats.chosenRank,rerollStats.shortlistSize))

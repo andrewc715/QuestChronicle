@@ -66,15 +66,16 @@ local function Foundation(report)
 end
 
 local function AddFoundationWarning(report)
+    if P.ReportPerformsAnchorSelection and not P.ReportPerformsAnchorSelection(report) then return end
     local signature = Foundation(report)
     if not signature then return end
-    local consecutive, ids, parentID = 1, { report.id }, report.parentCompletedReportID
+    local consecutive, ids, parentID = 1, { report.id }, report.previousAnchorSourceReportID
     while parentID do
         local previous = D.GetReportByID(parentID)
-        if not previous or Foundation(previous) ~= signature then break end
+        if not previous or (P.ReportPerformsAnchorSelection and not P.ReportPerformsAnchorSelection(previous)) or Foundation(previous) ~= signature then break end
         consecutive = consecutive + 1
         ids[#ids + 1] = previous.id
-        parentID = previous.parentCompletedReportID
+        parentID = previous.previousAnchorSourceReportID
     end
     if consecutive >= 3 then
         AddWarning(report, "REPEATED_FOUNDATION", "WARNING", string.format("The same unlocked Chest and Shoulders appeared in %d consecutive completed skeletons.", consecutive), ids)
@@ -84,15 +85,33 @@ end
 function P.AttachWarningsAndComparison(report)
     local performance = report.performance or {}
     local workerSlice = tonumber(performance.longestWorkerSliceMs) or tonumber(performance.maxStepMs) or 0
-    local callMs = tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0
-    local callPhase = tostring(performance.largestInstrumentedCallPhase or performance.slowestPhase or "an unknown phase")
-    if workerSlice > 16 then
-        AddWarning(report, "SEVERE_WORKER_SLICE", "SEVERE", string.format("Quest Chronicle reached a %.1f ms worker slice; the largest instrumented call was %s at %.1f ms.", workerSlice, callPhase, callMs))
-    elseif workerSlice > 8 then
-        AddWarning(report, "WORKER_SLICE", "WARNING", string.format("Quest Chronicle reached a %.1f ms worker slice; the largest instrumented call was %s at %.1f ms.", workerSlice, callPhase, callMs))
+    local supportRerollTiming = performance.supportRerollTiming == true
+    local callMs = supportRerollTiming and (tonumber(performance.largestCooperativeCallMs) or 0)
+        or (tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0)
+    local callPhase = tostring(supportRerollTiming and performance.largestCooperativeCallPhase
+        or performance.largestInstrumentedCallPhase or performance.slowestPhase or "an unknown phase")
+    if supportRerollTiming then
+        if workerSlice > 16 then
+            AddWarning(report, "SEVERE_WORKER_SLICE", "SEVERE", string.format("Quest Chronicle reached a %.1f ms cooperative worker slice; the largest cooperative call was %s at %.1f ms.", workerSlice, callPhase, callMs))
+        elseif workerSlice > 8 then
+            AddWarning(report, "WORKER_SLICE", "WARNING", string.format("Quest Chronicle reached a %.1f ms cooperative worker slice; the largest cooperative call was %s at %.1f ms.", workerSlice, callPhase, callMs))
+        end
+        if callMs > 16 then AddWarning(report, "SEVERE_INSTRUMENTED_CALL", "SEVERE", string.format("%s contained a %.1f ms cooperative call.", callPhase, callMs))
+        elseif callMs > 8 then AddWarning(report, "INSTRUMENTED_CALL", "WARNING", string.format("%s contained a %.1f ms cooperative call.", callPhase, callMs)) end
+    else
+        if workerSlice > 16 then
+            AddWarning(report, "SEVERE_WORKER_SLICE", "SEVERE", string.format("Quest Chronicle reached a %.1f ms worker slice; the largest instrumented call was %s at %.1f ms.", workerSlice, callPhase, callMs))
+        elseif workerSlice > 8 then
+            AddWarning(report, "WORKER_SLICE", "WARNING", string.format("Quest Chronicle reached a %.1f ms worker slice; the largest instrumented call was %s at %.1f ms.", workerSlice, callPhase, callMs))
+        end
+        if callMs > 16 then AddWarning(report, "SEVERE_INSTRUMENTED_CALL", "SEVERE", string.format("%s contained a %.1f ms instrumented call.", callPhase, callMs))
+        elseif callMs > 8 then AddWarning(report, "INSTRUMENTED_CALL", "WARNING", string.format("%s contained a %.1f ms instrumented call.", callPhase, callMs)) end
     end
-    if callMs > 16 then AddWarning(report, "SEVERE_INSTRUMENTED_CALL", "SEVERE", string.format("%s contained a %.1f ms instrumented call.", callPhase, callMs))
-    elseif callMs > 8 then AddWarning(report, "INSTRUMENTED_CALL", "WARNING", string.format("%s contained a %.1f ms instrumented call.", callPhase, callMs)) end
+    if supportRerollTiming then
+        local launch = tonumber(performance.synchronousLaunchPreparationMs or performance.preWorkerPreparationMs) or 0
+        if launch > 12 then AddWarning(report, "SYNC_LAUNCH_OVERRUN", "SEVERE", string.format("Synchronous support-reroll launch preparation reached %.1f ms.", launch))
+        elseif launch >= 8 then AddWarning(report, "SYNC_LAUNCH_OVERRUN", "WARNING", string.format("Synchronous support-reroll launch preparation reached %.1f ms.", launch)) end
+    end
     local skeleton = report.skeleton or {}
     if skeleton.fallbackReason then AddWarning(report, "LEGACY_FALLBACK", "WARNING", "Anchor search used the legacy generator: " .. tostring(skeleton.fallbackReason)) end
     if report.supportFallbackReason then AddWarning(report, "SUPPORT_LEGACY_FALLBACK", "WARNING", "Contextual support used the legacy selector: " .. tostring(report.supportFallbackReason)) end
@@ -103,7 +122,9 @@ function P.AttachWarningsAndComparison(report)
     end
     local repeated = {}
     for _, label in ipairs(skeleton.repeatedComponents or {}) do repeated[label] = true end
-    if repeated.Chest and repeated.Shoulders then AddWarning(report, "REPEATED_CHEST_AND_SHOULDERS", "INFO", "Unlocked Chest and Shoulders were retained after novelty scoring.") end
+    if (not P.ReportPerformsAnchorSelection or P.ReportPerformsAnchorSelection(report)) and repeated.Chest and repeated.Shoulders then
+        AddWarning(report, "REPEATED_CHEST_AND_SHOULDERS", "INFO", "Unlocked Chest and Shoulders were retained after novelty scoring.")
+    end
 
     local previous = report.parentCompletedReportID and D.GetReportByID(report.parentCompletedReportID) or nil
     if previous then
@@ -115,5 +136,7 @@ function P.AttachWarningsAndComparison(report)
     if support and (tonumber(support.outliers) or 0) > 0 then AddWarning(report, "SUPPORT_OUTLIER", "WARNING", string.format("Contextual support retained %d visual outlier%s.", support.outliers, support.outliers == 1 and "" or "s")) end
     if support and (tonumber(support.fallbackSlots) or 0) > 0 then AddWarning(report, "SUPPORT_FALLBACK", "INFO", string.format("Contextual support used %d slot-local fallback%s.", support.fallbackSlots, support.fallbackSlots == 1 and "" or "s")) end
     if support and (tonumber(support.emptySlots) or 0) > 0 then AddWarning(report, "SUPPORT_EMPTY_SLOT", "INFO", string.format("Contextual support left %d active slot%s empty because no legal appearance was available.", support.emptySlots, support.emptySlots == 1 and "" or "s")) end
+    if support and support.profileRepaired then AddWarning(report, "PROFILE_REPAIRED", "INFO", "Quest Chronicle repaired an inherited contextual profile before scoring this support reroll: " .. tostring(support.profileRepairReason or "profile mismatch")) end
+    if support and support.budgetReconciled == false then AddWarning(report, "BUDGET_RECONCILIATION_FAILED", "SEVERE", "The contextual mismatch ledger did not reconcile on one profile basis.") end
     AddFoundationWarning(report)
 end

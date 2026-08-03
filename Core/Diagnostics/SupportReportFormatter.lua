@@ -10,14 +10,53 @@ local function Add(lines, text)
     lines[#lines + 1] = text or ""
 end
 
+local function RoundedCents(value)
+    value = (tonumber(value) or 0) * 100
+    if value >= 0 then return math.floor(value + 0.5) end
+    return math.ceil(value - 0.5)
+end
+
+local function BudgetEquation(support)
+    local before = RoundedCents(support.budgetBefore)
+    local removed = RoundedCents(support.previousTargetCost)
+    local replacement = RoundedCents(support.replacementCost)
+    local adjustment = RoundedCents(support.profileAdjustment)
+    local after = RoundedCents(support.budgetAfter)
+    local rounding = after - (before - removed + replacement + adjustment)
+    local parts = {
+        string.format("%.2f before", before / 100),
+        string.format("- %.2f removed", removed / 100),
+        string.format("+ %.2f replacement", replacement / 100),
+        string.format("%+.2f profile adjustment", adjustment / 100),
+    }
+    if rounding ~= 0 then parts[#parts + 1] = string.format("%+.2f display rounding", rounding / 100) end
+    parts[#parts + 1] = string.format("= %.2f after", after / 100)
+    return table.concat(parts, " • ")
+end
+
 local function Heading(lines, title, rich)
     if #lines > 0 then Add(lines, "") end
     Add(lines, rich and ("|cffd9b36c" .. title .. "|r") or ("== " .. title .. " =="))
 end
 
+
+local function AnchorMaskText(mask)
+    local labels = { CHEST = "Chest", LEGS = "Legs", SHOULDER = "Shoulders", WEAPON = "Weapon bundle" }
+    local parts = {}
+    for _, key in ipairs({ "CHEST", "LEGS", "SHOULDER", "WEAPON" }) do
+        local entry = mask and mask[key] or {}
+        local state = tostring(entry.state or "UNAVAILABLE")
+        state = state:sub(1, 1) .. state:sub(2):lower()
+        parts[#parts + 1] = tostring(labels[key]) .. " " .. state
+    end
+    return table.concat(parts, " • ")
+end
+
 local function SourceText(decision, rawIDs)
     local text = tostring(decision.name or "None")
-    if decision.locked then text = text .. " [Locked]" end
+    if decision.locked then text = text .. " [Locked]"
+    elseif decision.contextFixed then text = text .. " [Context Fixed]"
+    elseif decision.targetRerolled then text = text .. " [Rerolled]" end
     if rawIDs then
         local ids = {}
         if decision.visualID then ids[#ids + 1] = "visual " .. tostring(decision.visualID) end
@@ -32,9 +71,23 @@ function P.AddSupportSection(lines, report, rawIDs, rich)
     Heading(lines, "Contextual Support", rich)
     local support = report.support
     if not support then Add(lines, "Contextual support data: Not recorded by this version") return end
+    if support.targetSlotKey then
+        local definition = QC.Wardrobe and QC.Wardrobe.GetSlotDefinition and QC.Wardrobe.GetSlotDefinition(support.targetSlotKey)
+        local targetLabel = definition and definition.label or support.targetSlotKey
+        Add(lines, "Target slot: " .. tostring(targetLabel))
+        Add(lines, "Previous appearance: " .. tostring(support.previousTargetName or "None"))
+        Add(lines, string.format("Profile phase: %s%s", support.profileRepaired and "Repaired" or (support.profileReused and "Reused" or "Derived"), support.profileMigrated and " • legacy profile migrated" or ""))
+        Add(lines, "Profile ID: " .. tostring(support.profileID or (support.profile and support.profile.profileID) or "Unknown"))
+        Add(lines, "Profile source report: " .. tostring(support.profileSourceReportID or (support.profile and support.profile.profileSourceReportID) or "Unknown"))
+        Add(lines, "Target budget: " .. BudgetEquation(support))
+        Add(lines, "Budget reconciliation: " .. (support.budgetReconciled == false and "Failed" or "Pass"))
+        if support.profileRepaired then Add(lines, "Profile repair: " .. tostring(support.profileRepairReason or "Inherited profile did not match the canonical anchor state")) end
+        Add(lines, string.format("Fixed contextual slots: %d%s", tonumber(support.fixedContextCount) or 0, support.noAlternative and " • no legal alternative" or ""))
+    end
     local profile = support.profile or {}
     local centers = profile.centers or {}
     Add(lines, string.format("Profile: %d active anchors • cohesion %s", tonumber(profile.activeAnchorCount) or 0, F(profile.meanAnchorCohesion, 3)))
+    if profile.activeAnchorMask then Add(lines, "Active-anchor mask: " .. AnchorMaskText(profile.activeAnchorMask)) end
     local anchorLabels = {}
     for _, anchor in ipairs(profile.activeAnchors or {}) do anchorLabels[#anchorLabels + 1] = tostring(anchor.label or anchor.slotKey) end
     if #anchorLabels > 0 then Add(lines, "Active anchors: " .. table.concat(anchorLabels, ", ")) end
@@ -51,8 +104,15 @@ function P.AddSupportSection(lines, report, rawIDs, rich)
     end
     for _, decision in ipairs(support.decisions or {}) do
         Add(lines, string.format("%s: %s", tostring(decision.slotLabel or decision.slotKey), SourceText(decision, rawIDs)))
-        Add(lines, string.format("  Role: %s • profile %s • neighbor %s • bridge %s • mismatch %s • %s • %s • repeat %s%s", tostring(decision.role or "Support"), F(decision.profileFit, 3), F(decision.neighborCohesion, 3), F(decision.bridgeBonus, 2), F(decision.mismatchSpent, 2), tostring(decision.budgetState or "WITHIN"), tostring(decision.outlierState or "NORMAL"), F(decision.repeatPenalty, 2), decision.fallback and " • fallback" or ""))
-        if decision.bridgeTarget then Add(lines, string.format("  Bridge: %s • %s → %s", tostring(decision.bridgeTarget), F(decision.bridgeBefore, 3), F(decision.bridgeAfter, 3))) end
+        Add(lines, string.format("  Role: %s • profile %s • neighbor %s • bridge bonus %s • mismatch %s • %s • %s • repeat %s%s", tostring(decision.role or "Support"), F(decision.profileFit, 3), F(decision.neighborCohesion, 3), F(decision.bridgeBonus, 2), F(decision.mismatchSpent, 2), tostring(decision.budgetState or "WITHIN"), tostring(decision.outlierState or "NORMAL"), F(decision.repeatPenalty, 2), decision.fallback and " • fallback" or ""))
+        if decision.bridgeTarget then
+            local improved = decision.bridgeImprovement == true or ((tonumber(decision.bridgeAfter) or 0) - (tonumber(decision.bridgeBefore) or 0)) > 0.005
+            if improved then
+                Add(lines, string.format("  Bridge improvement: %s • %s → %s • bonus +%s", tostring(decision.bridgeTarget), F(decision.bridgeBefore, 3), F(decision.bridgeAfter, 3), F(decision.bridgeBonus, 2)))
+            else
+                Add(lines, string.format("  Relationship: %s • %s → %s • bridge bonus None", tostring(decision.bridgeTarget), F(decision.bridgeBefore, 3), F(decision.bridgeAfter, 3)))
+            end
+        end
     end
     if #(support.excluded or {}) > 0 then Add(lines, "Excluded: " .. table.concat(support.excluded, ", ")) else Add(lines, "Excluded: None") end
 end

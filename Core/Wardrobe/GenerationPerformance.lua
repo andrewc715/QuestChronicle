@@ -26,10 +26,29 @@ P.GENERATION_PHASE_LABELS = {
     supportEligibility = "Support eligibility", supportCandidateScoring = "Support candidate scoring",
     supportBeamExpansion = "Support beam expansion", supportSelection = "Support selection",
     rerollSlot = "Reroll slot",
+    rerollLaunchManifest = "Reroll launch manifest", rerollStateCapture = "Reroll state capture (legacy)",
+    rerollAnchorSnapshotReuse = "Reroll anchor snapshot reuse",
+    rerollStateMaterialization = "Reroll state materialization",
+    rerollDiagnosticIdentity = "Reroll diagnostic identity",
+    rerollAnchorSummary = "Reroll anchor summary",
+    rerollStyleContextInit = "Reroll style-context initialization",
+    rerollStyleContextSeed = "Reroll style-context seed",
+    rerollEligibilityContext = "Reroll eligibility context",
+    rerollSupportSummaryFoundation = "Reroll support summary foundation",
+    rerollCacheSummaryFoundation = "Reroll cache summary foundation",
+    rerollProfileReuse = "Reroll profile reuse",
+    rerollFixedContextCommitments = "Reroll fixed-context commitments", rerollLedgerReconstruction = "Reroll ledger reconstruction",
+    rerollCandidatePreparation = "Reroll candidate preparation", rerollSourceValidation = "Reroll source validation",
+    rerollEraEvidence = "Reroll era evidence", rerollEligibility = "Reroll eligibility",
+    rerollCandidateScoring = "Reroll candidate scoring", rerollNeighborScoring = "Reroll neighbor scoring",
+    rerollBridgeScoring = "Reroll bridge scoring", rerollBudgetEvaluation = "Reroll budget evaluation",
+    rerollShortlistSelection = "Reroll shortlist selection", rerollStateCommit = "Reroll state commit",
     weaponContext = "Weapon context", weaponCapabilities = "Weapon capabilities", weaponRoute = "Weapon route",
     weaponCandidateBuild = "Weapon candidate build", weaponCandidateValidate = "Weapon candidate validation",
     weaponValidation = "Weapon source validation", weaponPermission = "Weapon permission",
-    weaponAppearance = "Weapon appearance index", weaponSourceInfo = "Weapon source metadata",
+    weaponAppearance = "Weapon appearance lookup", weaponSourceInfo = "Weapon source metadata",
+    weaponIndexBuild = "Weapon index build", weaponIndexRepair = "Weapon index repair",
+    weaponIndexLookup = "Weapon index lookup",
     weaponLinkedValidate = "Linked-weapon validation", weaponRouteFilter = "Weapon route filtering",
     weaponCompanionRoute = "Weapon companion route", weaponBundleCohesion = "Weapon bundle cohesion",
 }
@@ -54,6 +73,19 @@ P.GENERATION_PHASE_SHORT_LABELS = {
     supportEligibility = "Support eligibility", supportCandidateScoring = "Support candidate scoring",
     supportBeamExpansion = "Support beam expansion", supportSelection = "Support selection",
     rerollSlot = "Reroll slot",
+    rerollLaunchManifest = "Reroll launch", rerollStateCapture = "Reroll capture (legacy)",
+    rerollAnchorSnapshotReuse = "Reroll anchor snapshot", rerollStateMaterialization = "Reroll state",
+    rerollDiagnosticIdentity = "Reroll diagnostic identity", rerollAnchorSummary = "Reroll anchor summary",
+    rerollStyleContextInit = "Reroll context init", rerollStyleContextSeed = "Reroll context seed",
+    rerollEligibilityContext = "Reroll eligibility context",
+    rerollSupportSummaryFoundation = "Reroll support summary", rerollCacheSummaryFoundation = "Reroll cache summary",
+    rerollProfileReuse = "Reroll profile",
+    rerollFixedContextCommitments = "Reroll fixed context", rerollLedgerReconstruction = "Reroll ledger",
+    rerollCandidatePreparation = "Reroll candidates", rerollSourceValidation = "Reroll validation",
+    rerollEraEvidence = "Reroll era", rerollEligibility = "Reroll eligibility",
+    rerollCandidateScoring = "Reroll scoring", rerollNeighborScoring = "Reroll neighbors",
+    rerollBridgeScoring = "Reroll bridge", rerollBudgetEvaluation = "Reroll budget",
+    rerollShortlistSelection = "Reroll shortlist", rerollStateCommit = "Reroll commit",
 }
 
 function P.GenerationNowMilliseconds()
@@ -83,15 +115,32 @@ function P.RecordGenerationPhase(target, phaseKey, elapsedMs)
     phase.maxMs = math.max(phase.maxMs, elapsedMs)
 end
 
-local function ResolveSlowestPhase(phaseStats)
+local function ResolveSlowestPhase(phaseStats, allowed)
     local slowestKey, slowestMax = nil, 0
     for phaseKey, phase in pairs(phaseStats or {}) do
-        local phaseMax = tonumber(phase and phase.maxMs) or 0
-        if phaseMax > slowestMax then
-            slowestKey, slowestMax = phaseKey, phaseMax
-        end
+        local accepted = not allowed or allowed(phaseKey)
+        local phaseMax = accepted and (tonumber(phase and phase.maxMs) or 0) or 0
+        if phaseMax > slowestMax then slowestKey, slowestMax = phaseKey, phaseMax end
     end
     return slowestKey, slowestMax
+end
+
+local function IsCooperativeRerollPhase(phaseKey)
+    return phaseKey ~= "rerollLaunchManifest" and phaseKey ~= "rerollStateCapture"
+        and phaseKey ~= "previewApply" and phaseKey ~= "uiRefresh" and phaseKey ~= "completionNotify"
+end
+
+local function ApplyTimingDomains(performance)
+    if not performance or not performance.supportRerollTiming then return end
+    local phases = performance.phaseStats or {}
+    local launch = phases.rerollLaunchManifest or phases.rerollStateCapture
+    local launchMs = tonumber(launch and launch.maxMs) or tonumber(performance.synchronousLaunchPreparationMs)
+        or tonumber(performance.preWorkerPreparationMs) or 0
+    performance.synchronousLaunchPreparationMs = launchMs
+    performance.preWorkerPreparationMs = launchMs
+    local key, value = ResolveSlowestPhase(performance.phaseStats, IsCooperativeRerollPhase)
+    performance.largestCooperativeCallPhase = key
+    performance.largestCooperativeCallMs = value
 end
 
 function P.BuildGenerationPerformance(job, finishedAtMs)
@@ -102,7 +151,7 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
     if weaponYieldPhase and (weaponYieldMs > largestMax or (slowestKey == "anchorWeaponExpansion" and weaponYieldMs >= largestMax * 0.75)) then
         largestKey, largestMax = weaponYieldPhase, weaponYieldMs
     end
-    return {
+    local result = {
         startedAtMs = job and job.startedAtMs or finishedAtMs,
         elapsedMs = math.max(0, (finishedAtMs or 0) - (job and job.startedAtMs or finishedAtMs or 0)),
         steps = job and job.steps or 0,
@@ -120,6 +169,7 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         anchorFallbackReason = job and job.anchorFallbackReason or nil,
         supportStats = job and job.supportStats or nil,
         supportFallbackReason = job and job.supportFallbackReason or nil,
+        weaponIndex = P.GetWeaponCandidateIndexDiagnostics and P.GetWeaponCandidateIndexDiagnostics() or nil,
         cacheDiagnostics = P.BuildGenerationCachePerformance
             and P.BuildGenerationCachePerformance(job and job.cacheCountersStarted) or nil,
         phaseStats = job and job.phaseStats or {},
@@ -127,14 +177,21 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         slowestPhaseMs = slowestMax,
         largestInstrumentedCallPhase = largestKey,
         largestInstrumentedCallMs = largestMax,
+        supportRerollTiming = job and job.supportReroll == true or false,
+        synchronousLaunchPreparationMs = job and (job.synchronousLaunchPreparationMs or job.preWorkerPreparationMs) or 0,
+        preWorkerPreparationMs = job and (job.synchronousLaunchPreparationMs or job.preWorkerPreparationMs) or 0,
     }
+    ApplyTimingDomains(result)
+    return result
 end
 
 function Wardrobe.RecordGenerationPostPhase(performance, phaseKey, elapsedMs)
     if not performance then return end
     P.RecordGenerationPhase(performance, phaseKey, elapsedMs)
-    performance.maxStepMs = math.max(tonumber(performance.maxStepMs) or 0, tonumber(elapsedMs) or 0)
-    performance.longestWorkerSliceMs = performance.maxStepMs
+    if not performance.supportRerollTiming then
+        performance.maxStepMs = math.max(tonumber(performance.maxStepMs) or 0, tonumber(elapsedMs) or 0)
+        performance.longestWorkerSliceMs = performance.maxStepMs
+    end
     local slowestKey, slowestMax = ResolveSlowestPhase(performance.phaseStats)
     performance.slowestPhase = slowestKey
     performance.slowestPhaseMs = slowestMax
@@ -147,6 +204,7 @@ function Wardrobe.RecordGenerationPostPhase(performance, phaseKey, elapsedMs)
         performance.largestInstrumentedCallPhase = slowestKey
         performance.largestInstrumentedCallMs = slowestMax
     end
+    ApplyTimingDomains(performance)
     if performance.startedAtMs then
         performance.elapsedMs = math.max(tonumber(performance.elapsedMs) or 0, P.GenerationNowMilliseconds() - performance.startedAtMs)
     end
@@ -161,14 +219,19 @@ function Wardrobe.FormatGenerationPerformance(performance)
         or P.GENERATION_PHASE_LABELS[performance.slowestPhase]
         or tostring(performance.slowestPhase or "Unknown")
     local slowestMs = tonumber(performance.slowestPhaseMs) or 0
+    if performance.supportRerollTiming then
+        local cooperativeLabel = P.GENERATION_PHASE_SHORT_LABELS[performance.largestCooperativeCallPhase]
+            or P.GENERATION_PHASE_LABELS[performance.largestCooperativeCallPhase]
+            or tostring(performance.largestCooperativeCallPhase or "Unknown")
+        return string.format(
+            "Prepared in %d frame%s • %.1f sec • synchronous launch %.1f ms • cooperative slice %.1f ms • largest cooperative call %s %.1f ms",
+            steps, steps == 1 and "" or "s", elapsedSeconds, tonumber(performance.synchronousLaunchPreparationMs) or 0,
+            maxStep, cooperativeLabel, tonumber(performance.largestCooperativeCallMs) or 0
+        )
+    end
     return string.format(
         "Prepared in %d frame%s • %.1f sec • worker slice %.1f ms • largest call %s %.1f ms",
-        steps,
-        steps == 1 and "" or "s",
-        elapsedSeconds,
-        maxStep,
-        slowestLabel,
-        slowestMs
+        steps, steps == 1 and "" or "s", elapsedSeconds, maxStep, slowestLabel, slowestMs
     )
 end
 

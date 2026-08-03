@@ -177,7 +177,12 @@ function P.StepSupportGenerationJob(job, stepStarted)
     while operations < P.GENERATION_OPERATION_SAFETY_CAP do
         if work.stage == "PROFILE" then
             local started = NowMilliseconds()
-            work.profile = P.BuildContextualSupportProfile(job.draft)
+            work.activeAnchorMask = P.BuildActiveAnchorMask(job.draft)
+            work.profile = P.BuildContextualSupportProfile(job.draft, {
+                activeAnchorMask = work.activeAnchorMask,
+                profileSourceReportID = job.diagnosticIdentity and job.diagnosticIdentity.reportID,
+            })
+            job.activeAnchorMask = work.activeAnchorMask
             RecordPhase(job, "supportProfile", started)
             work.stage = "LOCKED"
         elseif work.stage == "LOCKED" then

@@ -33,7 +33,7 @@ Every report includes:
     sequence = 1,
     timestamp = 0,
     timestampText = "YYYY-MM-DD HH:MM:SS",
-    version = "1.9.0.7",
+    version = "1.9.0.8",
     action = "GENERATE_OUTFIT",
     result = "COMPLETED",
     success = true,
@@ -56,6 +56,7 @@ COMPLETED
 FALLBACK
 CANCELLED
 FAILED
+NO_ALTERNATIVE
 ```
 
 ## Character and context
@@ -193,3 +194,116 @@ support = {
 Each decision stores the selected slot and stable appearance identity plus role, profile fit, neighbor cohesion, bridge target and improvement, mismatch cost, budget state, outlier state, repeat penalty, lock state, fallback state, and recorded score. Candidate pools, beam nodes, source tables, and mutable budget objects are never persisted.
 
 Support comparisons add changed, unchanged, and excluded support slots plus immutable mismatch, whole-outfit cohesion, and outlier-count movement. A contextual-support legacy fallback may store `supportFallbackReason` on the report without changing the diagnostic format version.
+
+## v1.9.0.8 support-reroll ancestry and fields
+
+Diagnostic format 1 adds optional dual ancestry fields:
+
+```lua
+{
+    parentCompletedReportID = "QCDBG-...",
+    anchorSourceReportID = "QCDBG-...",
+    previousAnchorSourceReportID = "QCDBG-...",
+    performedAnchorSelection = false,
+    anchorPhase = "REUSED",
+}
+```
+
+`parentCompletedReportID` identifies the immediately previous completed visible outfit. `anchorSourceReportID` identifies the most recent report that actually completed Phase B anchor selection. A support-only reroll deep-copies the anchor source's skeleton and beam snapshots so rank, base score, adjusted score, cohesion, and score ledger remain immutable. Support-only actions cannot become anchor sources or advance repeated-foundation warning sequences.
+
+The optional support-reroll snapshot fields include target slot, previous target identity and cost, replacement cost, budget before and after, fixed-context count, and no-alternative state. Support decisions may mark `contextFixed`, `targetRerolled`, or `noAlternative`. Relationship diagnostics use `Bridge improvement` only when the recorded delta exceeds `0.005`; otherwise the relationship is reported without a bridge claim.
+
+## v1.9.0.9 canonical profile identity and timing fields
+
+Diagnostic format 1 adds optional immutable Phase C profile fields without changing the format number:
+
+```lua
+support = {
+    profileID = "QCPROFILE-...",
+    profileSourceReportID = "QCDBG-...",
+    profileReused = true,
+    profileRepaired = false,
+    profileMigrated = false,
+    profileRepairReason = nil,
+    profileBasisConsistent = true,
+    profileAdjustment = 0,
+    expectedBudgetAfter = 1.23,
+    budgetReconciled = true,
+    profile = {
+        version = 2,
+        activeAnchorMask = {
+            CHEST = { state = "ACTIVE", ... },
+            LEGS = { state = "LOCKED", ... },
+            SHOULDER = { state = "HIDDEN", ... },
+            WEAPON = { state = "ACTIVE", ... },
+        },
+        activeAnchorMaskSignature = "...",
+        descriptor = { ... },
+        entries = { ... },
+    },
+}
+```
+
+The active-anchor mask is authoritative. `HIDDEN` and `UNAVAILABLE` anchors contribute zero profile weight even when their appearance identity remains available in the preview. Support-only rerolls reuse a version-2 profile whose mask signature matches the current anchor snapshot. Legacy or malformed snapshots are rebuilt once and record their repair or migration state.
+
+Persisted profile entries retain only slot, label, weight, and source/visual identity. The aggregate immutable descriptor, tolerance, confidence, relationship ledger, and canonical mask contain the scoring basis; redundant per-entry descriptor copies are omitted to keep maximum-detail reports below the 20 KB persistence limit.
+
+Support-reroll mismatch snapshots additionally store full-precision `budgetBefore`, `previousTargetCost`, `replacementCost`, `profileAdjustment`, `expectedBudgetAfter`, and `budgetAfter`. A healthy inherited profile has a zero adjustment, and the worker verifies reconciliation before atomically committing the target appearance.
+
+Performance snapshots may add:
+
+```lua
+performance = {
+    supportRerollTiming = true,
+    preWorkerPreparationMs = 6.4,
+    longestWorkerSliceMs = 2.9,
+    largestCooperativeCallPhase = "rerollCandidatePreparation",
+    largestCooperativeCallMs = 0.7,
+}
+```
+
+The Overview labels pre-worker preparation, longest cooperative worker slice, and largest cooperative call separately. Commit and UI presentation phases remain visible in the detailed phase table but do not masquerade as cooperative worker work.
+
+
+## v1.9.0.10 launch and role fields
+
+Support-only reroll performance snapshots add `synchronousLaunchPreparationMs` while retaining `preWorkerPreparationMs` as a compatibility alias. New phases include `rerollLaunchManifest`, `rerollAnchorSnapshotReuse`, `rerollStateMaterialization`, and `rerollDiagnosticFoundation`. The legacy `rerollStateCapture` phase is rendered only for older reports.
+
+Support decisions store role text resolved from the immutable active-anchor mask. Hidden or unavailable Shoulders therefore produce Chest-only Head and Back roles and relationship endpoints.
+
+## v1.9.0.11 scheduling and weapon-index fields
+
+Diagnostic format 1 remains unchanged. Performance snapshots may add compact weapon-index telemetry:
+
+```lua
+performance = {
+    weaponIndex = {
+        format = 1,
+        state = "PARTIAL",
+        use = "COLD_BUILD" | "PARTIAL_WARM" | "WARM" | "INCREMENTAL_REPAIR" | "NONE",
+        buckets = 3,
+        examined = 240,
+        yields = 30,
+        builds = 3,
+        repairs = 1,
+        reused = 4,
+        invalidationReason = nil,
+    },
+}
+```
+
+Support-reroll performance phase tables may contain the decomposed keys:
+
+```text
+rerollDiagnosticIdentity
+rerollAnchorSummary
+rerollAnchorSnapshotReuse
+rerollStateMaterialization
+rerollStyleContextInit
+rerollStyleContextSeed
+rerollEligibilityContext
+rerollSupportSummaryFoundation
+rerollCacheSummaryFoundation
+```
+
+The historical `rerollDiagnosticFoundation` phase remains renderable for older reports but is not emitted by v1.9.0.11. Weapon diagnostics distinguish `weaponAppearance` lookup from `weaponIndexBuild`, `weaponIndexRepair`, and `weaponIndexLookup` work. The index snapshot stores only aggregate counters and readiness state; subtype source arrays are transient and never persisted inside diagnostic history.

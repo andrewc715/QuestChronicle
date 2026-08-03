@@ -12,13 +12,21 @@ local RESULT_LABELS = {
     FALLBACK = "Fallback",
     CANCELLED = "Cancelled",
     FAILED = "Failed",
+    NO_ALTERNATIVE = "No Alternative",
 }
 local PHASE_ORDER = {
     "setup", "validation", "eraEvidence", "eligibility", "coherence", "scoring",
     "anchorCandidateScoring", "anchorBeamSearch", "anchorWeaponExpansion", "anchorSelection",
     "supportProfile", "supportLockedCommitments", "supportValidation", "supportEraEvidence", "supportEligibility",
     "supportCandidateScoring", "supportBeamExpansion", "supportSelection", "slotSetup", "slotFinalization", "progressUpdate", "weaponRouting", "stateCommit",
-    "previewApply", "uiRefresh", "completionNotify", "rerollSlot",
+    "previewApply", "uiRefresh", "completionNotify", "rerollLaunchManifest", "rerollStateCapture",
+    "rerollAnchorSnapshotReuse", "rerollStateMaterialization", "rerollDiagnosticIdentity", "rerollAnchorSummary",
+    "rerollStyleContextInit", "rerollStyleContextSeed", "rerollEligibilityContext",
+    "rerollSupportSummaryFoundation", "rerollCacheSummaryFoundation", "rerollProfileReuse",
+    "rerollFixedContextCommitments", "rerollLedgerReconstruction", "rerollCandidatePreparation",
+    "rerollSourceValidation", "rerollEraEvidence", "rerollEligibility", "rerollCandidateScoring",
+    "rerollNeighborScoring", "rerollBridgeScoring", "rerollBudgetEvaluation", "rerollShortlistSelection",
+    "rerollStateCommit", "rerollSlot",
 }
 local PHASE_LABELS = {
     setup = "Setup", validation = "Source validation", eraEvidence = "Era evidence",
@@ -32,10 +40,24 @@ local PHASE_LABELS = {
     slotSetup = "Slot setup", slotFinalization = "Slot finalization", progressUpdate = "Progress update",
     weaponRouting = "Weapon routing", stateCommit = "State commit", previewApply = "Preview application",
     uiRefresh = "UI refresh", completionNotify = "Completion callback", rerollSlot = "Reroll slot",
+    rerollLaunchManifest = "Reroll launch manifest", rerollStateCapture = "Reroll state capture (legacy)",
+    rerollAnchorSnapshotReuse = "Reroll anchor snapshot reuse", rerollStateMaterialization = "Reroll state materialization",
+    rerollDiagnosticIdentity = "Reroll diagnostic identity", rerollAnchorSummary = "Reroll anchor summary",
+    rerollStyleContextInit = "Reroll style-context initialization", rerollStyleContextSeed = "Reroll style-context seed",
+    rerollEligibilityContext = "Reroll eligibility context",
+    rerollSupportSummaryFoundation = "Reroll support summary foundation", rerollCacheSummaryFoundation = "Reroll cache summary foundation",
+    rerollProfileReuse = "Reroll profile reuse",
+    rerollFixedContextCommitments = "Reroll fixed-context commitments", rerollLedgerReconstruction = "Reroll ledger reconstruction",
+    rerollCandidatePreparation = "Reroll candidate preparation", rerollSourceValidation = "Reroll source validation",
+    rerollEraEvidence = "Reroll era evidence", rerollEligibility = "Reroll eligibility",
+    rerollCandidateScoring = "Reroll candidate scoring", rerollNeighborScoring = "Reroll neighbor scoring",
+    rerollBridgeScoring = "Reroll bridge scoring", rerollBudgetEvaluation = "Reroll budget evaluation",
+    rerollShortlistSelection = "Reroll shortlist selection", rerollStateCommit = "Reroll state commit",
     weaponContext = "Weapon context", weaponCapabilities = "Weapon capabilities", weaponRoute = "Weapon route",
     weaponCandidateBuild = "Weapon candidate build", weaponCandidateValidate = "Weapon candidate validation",
     weaponValidation = "Weapon source validation", weaponPermission = "Weapon permission",
-    weaponAppearance = "Weapon appearance index", weaponSourceInfo = "Weapon source metadata",
+    weaponAppearance = "Weapon appearance lookup", weaponSourceInfo = "Weapon source metadata",
+    weaponIndexBuild = "Weapon index build", weaponIndexRepair = "Weapon index repair", weaponIndexLookup = "Weapon index lookup",
     weaponLinkedValidate = "Linked-weapon validation", weaponRouteFilter = "Weapon route filtering",
     weaponCompanionRoute = "Weapon companion route", weaponBundleCohesion = "Weapon bundle cohesion",
 }
@@ -129,14 +151,28 @@ local function AddOverview(lines, report, rich)
     Add(lines, "Action: " .. action)
     Add(lines, "Mode: " .. tostring(MODE_LABELS[report.mode] or report.mode or "Unknown"))
     Add(lines, "Result: " .. tostring(RESULT_LABELS[report.result] or report.result or "Unknown"))
+    if report.anchorPhase == "REUSED" then
+        Add(lines, "Anchor phase: Reused from parent report")
+        Add(lines, "Anchor source report: " .. tostring(report.anchorSourceReportID or "Unknown"))
+    end
+    if report.support and report.support.targetSlotKey then
+        Add(lines, "Profile phase: " .. (report.support.profileRepaired and "Repaired" or (report.support.profileReused and "Reused" or "Derived")))
+        Add(lines, "Profile ID: " .. tostring(report.support.profileID or (report.support.profile and report.support.profile.profileID) or "Unknown"))
+    end
     if report.outfit and report.outfit.generatedName then Add(lines, "Outfit: " .. tostring(report.outfit.generatedName)) end
     local context = report.context or {}
     local location = context.profileLabel or context.provenanceLabel or context.zone
     if location then Add(lines, "Context: " .. tostring(location) .. (context.eraLabel and (" • through " .. tostring(context.eraLabel)) or "")) end
     local performance = report.performance or {}
     Add(lines, string.format("Prepared: %s frames • %.1f sec", N(performance.steps), (tonumber(performance.elapsedMs) or 0) / 1000))
-    Add(lines, string.format("Longest worker slice: %.1f ms", tonumber(performance.longestWorkerSliceMs) or tonumber(performance.maxStepMs) or 0))
-    Add(lines, string.format("Largest instrumented call: %s %.1f ms", PHASE_LABELS[performance.largestInstrumentedCallPhase or performance.slowestPhase] or tostring(performance.largestInstrumentedCallPhase or performance.slowestPhase or "Unknown"), tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0))
+    if performance.supportRerollTiming then
+        Add(lines, string.format("Synchronous launch preparation: %.1f ms", tonumber(performance.synchronousLaunchPreparationMs or performance.preWorkerPreparationMs) or 0))
+        Add(lines, string.format("Longest cooperative worker slice: %.1f ms", tonumber(performance.longestWorkerSliceMs) or tonumber(performance.maxStepMs) or 0))
+        Add(lines, string.format("Largest cooperative call: %s %.1f ms", PHASE_LABELS[performance.largestCooperativeCallPhase] or tostring(performance.largestCooperativeCallPhase or "Unknown"), tonumber(performance.largestCooperativeCallMs) or 0))
+    else
+        Add(lines, string.format("Longest worker slice: %.1f ms", tonumber(performance.longestWorkerSliceMs) or tonumber(performance.maxStepMs) or 0))
+        Add(lines, string.format("Largest instrumented call: %s %.1f ms", PHASE_LABELS[performance.largestInstrumentedCallPhase or performance.slowestPhase] or tostring(performance.largestInstrumentedCallPhase or performance.slowestPhase or "Unknown"), tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0))
+    end
     Add(lines, "Fallback: " .. tostring((report.skeleton and report.skeleton.fallbackReason) or report.supportFallbackReason or "None"))
 end
 
@@ -144,7 +180,11 @@ local function AddSkeleton(lines, report, rawIDs, rich)
     AddHeading(lines, "Anchor Skeleton", rich)
     local skeleton = report.skeleton or {}
     Add(lines, string.format("Chosen: rank %d/%d • score %.1f • cohesion %.3f • hard clashes %d", tonumber(skeleton.chosenRank) or 0, tonumber(skeleton.shortlistSize) or 0, tonumber(skeleton.baseSkeletonScore or skeleton.score) or 0, tonumber(skeleton.meanPairCohesion) or 0, tonumber(skeleton.hardClashes) or 0))
-    if skeleton.noveltyClass then
+    if report.anchorPhase == "REUSED" then
+        Add(lines, "Anchor phase: Reused from parent report")
+        Add(lines, "Anchor selection changed: No")
+        Add(lines, "Novelty data: Not applicable to a support-only reroll")
+    elseif skeleton.noveltyClass then
         local noveltyLabel = ({ INITIAL = "Initial Generation", MEANINGFULLY_NEW = "Meaningfully New", PARTIAL_CHANGE = "Partial Change", EXACT_REPEAT = "Exact Repeat" })[skeleton.noveltyClass] or tostring(skeleton.noveltyClass)
         Add(lines, "Novelty: " .. noveltyLabel)
         Add(lines, "Compared: " .. (#(skeleton.comparedComponents or {}) > 0 and table.concat(skeleton.comparedComponents, ", ") or "Not applicable"))
@@ -233,6 +273,11 @@ local function AddCache(lines, report, verbose, rich)
     local perf, cache = report.performance or {}, report.cache or {}
     Add(lines, string.format("Candidates: %s • era-source checks: %s • selected armor: %s", N(perf.candidates), N(perf.eraCandidates), N(perf.selectedArmor)))
     Add(lines, string.format("Cache hits: %s era • %s eligibility • %s weapon yields", N(perf.eraCacheHits), N(perf.eligibilityCacheHits), N(perf.weaponYields)))
+    local weaponIndex = perf.weaponIndex or report.weaponIndex
+    if weaponIndex then
+        Add(lines, string.format("Weapon index: %s • %s • %s buckets • %s examined • %s cooperative yields", tostring(weaponIndex.state or "Unknown"), tostring(weaponIndex.use or "None"), N(weaponIndex.buckets), N(weaponIndex.examined), N(weaponIndex.yields)))
+        if weaponIndex.invalidationReason then Add(lines, "Weapon index invalidation: " .. tostring(weaponIndex.invalidationReason)) end
+    end
     local history = D.GetHistoryCounters and D.GetHistoryCounters() or nil
     if history then Add(lines, string.format("Reports: %s recorded • %s duplicates ignored • %s malformed discarded", N(history.reportsRecorded), N(history.duplicateInsertionsIgnored), N(history.malformedReportsDiscarded))) end
     if next(cache) then

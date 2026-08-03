@@ -35,6 +35,7 @@ end
 P.SupportVisualIdentity = function(source) return tostring(source and source.visualID or "") end
 function P.GetSupportSlotAllowance(slot) return ({ WAIST=1.5, HANDS=1.25, HEAD=2, BACK=2, FEET=1.25, WRIST=.5, SHIRT=.75, TABARD=1.5 })[slot] or 0 end
 math.randomseed(1907)
+dofile("Core/Wardrobe/SupportProfileIdentity.lua")
 dofile("Core/Wardrobe/SupportProfile.lua")
 dofile("Core/Wardrobe/SupportBudget.lua")
 dofile("Core/Wardrobe/SupportScoring.lua")

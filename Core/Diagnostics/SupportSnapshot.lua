@@ -29,6 +29,11 @@ local function SourceSnapshot(decision)
         outlierState = decision and decision.outlierState,
         repeatPenalty = decision and tonumber(decision.repeatPenalty) or 0,
         locked = decision and decision.locked == true or false,
+        fixed = decision and decision.fixed == true or false,
+        contextFixed = decision and decision.contextFixed == true or false,
+        targetRerolled = decision and decision.targetRerolled == true or false,
+        noAlternative = decision and decision.noAlternative == true or false,
+        bridgeImprovement = decision and decision.bridgeImprovement == true or false,
         fallback = decision and decision.fallback == true or false,
         score = decision and tonumber(decision.score) or 0,
     }
@@ -36,22 +41,8 @@ end
 
 local function ProfileSnapshot(profile)
     if not profile then return nil end
-    local descriptor = profile.descriptor or {}
-    local entries = {}
-    for _, entry in ipairs(profile.entries or {}) do entries[#entries + 1] = { slotKey = entry.slotKey, label = entry.label, weight = entry.weight } end
-    return {
-        activeAnchors = entries,
-        activeAnchorCount = profile.activeAnchorCount,
-        meanAnchorCohesion = profile.meanAnchorCohesion,
-        strongestRelationship = Copy(profile.strongestRelationship),
-        weakestRelationship = Copy(profile.weakestRelationship),
-        centers = {
-            palette = descriptor.dominantPalette, material = descriptor.dominantMaterial,
-            finish = descriptor.dominantFinish, motif = descriptor.dominantMotif,
-            visualWeight = descriptor.visualWeight, provenance = descriptor.expansionID,
-        },
-        tolerance = Copy(profile.tolerance), confidence = Copy(profile.confidence),
-    }
+    if WP and WP.ExportContextualSupportProfile then return WP.ExportContextualSupportProfile(profile) end
+    return Copy(profile)
 end
 
 local function ExcludedSlots(state, stats)
@@ -95,5 +86,26 @@ function DP.BuildSupportSnapshot(state, job)
         emptySlots = tonumber(stats.emptySlots) or 0,
         decisions = decisions,
         excluded = ExcludedSlots(state or {}, stats),
+        targetSlotKey = stats.targetSlotKey,
+        previousTargetName = stats.previousTargetName,
+        previousTargetSourceID = stats.previousTargetSourceID,
+        previousTargetVisualID = stats.previousTargetVisualID,
+        previousTargetCost = tonumber(stats.previousTargetCost) or 0,
+        replacementCost = tonumber(stats.replacementCost) or 0,
+        budgetBefore = tonumber(stats.budgetBefore) or 0,
+        budgetAfter = tonumber(stats.budgetAfter) or 0,
+        fixedContextCount = tonumber(stats.fixedContextCount) or 0,
+        noAlternative = stats.noAlternative == true,
+        profileID = stats.profileID or (stats.profile and stats.profile.profileID),
+        profileSourceReportID = stats.profileSourceReportID or (stats.profile and stats.profile.profileSourceReportID),
+        profileReused = stats.profileReused == true,
+        profileRepaired = stats.profileRepaired == true,
+        profileMigrated = stats.profileMigrated == true,
+        profileRepairReason = stats.profileRepairReason,
+        profileBasisConsistent = stats.profileBasisConsistent ~= false,
+        fixedContextCost = tonumber(stats.fixedContextCost) or 0,
+        profileAdjustment = tonumber(stats.profileAdjustment) or 0,
+        expectedBudgetAfter = tonumber(stats.expectedBudgetAfter) or tonumber(stats.budgetAfter) or 0,
+        budgetReconciled = stats.budgetReconciled ~= false,
     }
 end

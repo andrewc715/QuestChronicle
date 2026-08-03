@@ -50,7 +50,7 @@ P.builders[#P.builders + 1] = function(C)
     C.rerollSlot:SetScript("OnClick", function()
         local slotKey = P.GetCurrentSlot()
         local ok, message = Wardrobe.RerollSlot(slotKey)
-        if ok then Wardrobe.ApplyPreview(C.model) end
+        if ok and not Wardrobe.IsGenerating() then Wardrobe.ApplyPreview(C.model) end
         C.pane:Refresh(message)
     end)
     C.lockSlot:SetScript("OnClick", function()
