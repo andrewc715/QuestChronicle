@@ -230,6 +230,7 @@ local function CacheEraResult(source, result, candidateCount)
     source.eraEvidenceMetadataRevision = tonumber(source.metadataRevision) or 0
     source.eraEvidenceCandidateCount = candidateCount
     source.eraEvidenceExpansionID = result.expansionID
+    source.eraEvidenceProvisionalExpansionID = result.provisionalExpansionID
     source.eraEvidenceMethod = result.method
     source.eraEvidenceLabel = result.label
     source.eraEvidenceSourceID = result.sourceID
@@ -239,10 +240,16 @@ local function CacheEraResult(source, result, candidateCount)
     source.eraEvidenceUnknown = result.unknown == true
     source.eraEvidencePendingItemIDs = result.pendingItemIDs
     source.eraEvidenceTrackingPending = result.trackingPending == true
+    local pendingItems = result.pendingItemIDs and #result.pendingItemIDs > 0
     source.eraEvidenceState = result.expansionID ~= nil and "RESOLVED"
-        or (result.pending and "PENDING" or "UNKNOWN")
-    source.eraEvidenceRetryAt = result.pending and (EraNow() + 30) or nil
+        or (pendingItems and "PENDING_ITEMS"
+            or (result.trackingPending and "TRACKING_ONLY"
+                or (result.pending and "PENDING_ITEMS" or "UNKNOWN")))
     local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
+    local retrySeconds = source.eraEvidenceState == "TRACKING_ONLY"
+        and (wardrobePrivate and wardrobePrivate.GENERATION_CACHE_TRACKING_RETRY_SECONDS or 1800)
+        or (wardrobePrivate and wardrobePrivate.GENERATION_CACHE_PENDING_RETRY_SECONDS or 600)
+    source.eraEvidenceRetryAt = result.pending and (EraNow() + retrySeconds) or nil
     if wardrobePrivate and wardrobePrivate.StorePersistentEraEvidence then
         wardrobePrivate.StorePersistentEraEvidence(
             source, result, candidateCount, P.ERA_EVIDENCE_VERSION
@@ -260,12 +267,17 @@ local function ReadCachedEvidence(source)
         and (tonumber(source.eraEvidenceMetadataRevision) or 0) == (tonumber(source.metadataRevision) or 0)
         and source.eraEvidenceState ~= nil
     if localValid then
-        local pendingExpired = source.eraEvidenceState == "PENDING"
-            and tonumber(source.eraEvidenceRetryAt)
+        local pendingState = source.eraEvidenceState == "PENDING"
+            or source.eraEvidenceState == "PENDING_ITEMS"
+            or source.eraEvidenceState == "TRACKING_ONLY"
+            or source.eraEvidenceState == "STALE"
+        local pendingExpired = pendingState and tonumber(source.eraEvidenceRetryAt)
             and EraNow() >= tonumber(source.eraEvidenceRetryAt)
         if not pendingExpired then
             return {
+                state = source.eraEvidenceState,
                 expansionID = source.eraEvidenceExpansionID,
+                provisionalExpansionID = source.eraEvidenceProvisionalExpansionID,
                 method = source.eraEvidenceMethod,
                 label = source.eraEvidenceLabel,
                 sourceID = source.eraEvidenceSourceID,
@@ -322,13 +334,14 @@ local function FinalizeEraWork(work)
     table.sort(pendingItemIDs)
     result.pendingItemIDs = #pendingItemIDs > 0 and pendingItemIDs or nil
     result.trackingPending = work.trackingPending == true
-    CacheEraResult(work.source, result, candidateCount)
+    if not work.suppressCache then CacheEraResult(work.source, result, candidateCount) end
     work.done = true
     work.result = result
     return result
 end
 
-function ZoneStyle.CreateSourceEraEvidenceWork(source)
+function ZoneStyle.CreateSourceEraEvidenceWork(source, options)
+    options = type(options) == "table" and options or {}
     if not source then
         return {
             source = source,
@@ -338,7 +351,7 @@ function ZoneStyle.CreateSourceEraEvidenceWork(source)
             result = { pending = true, reason = "No appearance source was provided." },
         }
     end
-    local cached = ReadCachedEvidence(source)
+    local cached = not options.forceRefresh and ReadCachedEvidence(source) or nil
     if cached then
         local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
         if wardrobePrivate and wardrobePrivate.generationJob then
@@ -361,6 +374,7 @@ function ZoneStyle.CreateSourceEraEvidenceWork(source)
         pending = false,
         pendingItemIDs = {},
         trackingPending = false,
+        suppressCache = options.suppressCache == true,
         done = false,
     }
 end

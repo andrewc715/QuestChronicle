@@ -5,6 +5,9 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 store = (ROOT / "Core/Wardrobe/GenerationCacheStore.lua").read_text(encoding="utf-8")
+access = (ROOT / "Core/Wardrobe/GenerationCacheAccess.lua").read_text(encoding="utf-8")
+dependency = (ROOT / "Core/Wardrobe/GenerationDependencyIndex.lua").read_text(encoding="utf-8")
+resolver = (ROOT / "Core/Wardrobe/PendingEvidenceResolver.lua").read_text(encoding="utf-8")
 diagnostics = (ROOT / "Core/Wardrobe/GenerationCacheDiagnostics.lua").read_text(encoding="utf-8")
 metadata = (ROOT / "Core/Wardrobe/AppearanceMetadata.lua").read_text(encoding="utf-8")
 invalidation = (ROOT / "Core/Wardrobe/GenerationCacheInvalidation.lua").read_text(encoding="utf-8")
@@ -19,11 +22,15 @@ checks = {
     "store is versioned inside SavedVariables": "GENERATION_CACHE_STORE_VERSION" in store and "cache.generationCache" in store,
     "stable source identity excludes metadataRevision": "GetStableGenerationSourceIdentity" in store and "metadataRevision" not in eligibility,
     "era evidence reads and writes persistent records": "StorePersistentEraEvidence" in era and "GetPersistentEraEvidence" in era,
-    "eligibility reads and writes persistent records": "StorePersistentGenerationPrecheck" in eligibility and "StorePersistentGenerationEligibility" in eligibility,
+    "eligibility reads and writes persistent records":
+        "StorePersistentGenerationPrecheck" in eligibility
+        and "StorePersistentGenerationEligibility" in eligibility
+        and "StorePersistentGenerationPrecheck" in access,
     "scan lifecycle preserves persistent records": "BeginPersistentGenerationCacheScan" in metadata and "FinishPersistentGenerationCacheScan" in metadata,
-    "metadata events reopen only affected evidence": "ITEM_DATA_LOADED" in metadata
+    "metadata events resolve only indexed dependencies": "ITEM_DATA_LOADED" in metadata
         and "InvalidatePersistentGenerationCacheForItemData" in invalidation
-        and "ITEM_DATA_PENDING_RESOLVED" in invalidation,
+        and "GetPendingEraDependencySources" in dependency
+        and "QueuePendingEraEvidenceReevaluation" in resolver,
     "performance exposes cache lifecycle": "BuildGenerationCachePerformance" in diagnostics
         and "GetGenerationCachePerformanceLines" in performance,
     "unknown and pending records expire safely": "UNKNOWN_TTL_EXPIRED" in store and "PENDING_RETRY_EXPIRED" in store,

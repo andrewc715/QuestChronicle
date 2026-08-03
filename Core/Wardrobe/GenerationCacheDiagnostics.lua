@@ -55,6 +55,14 @@ function Wardrobe.GetGenerationCacheDiagnostics()
         pendingEvidenceReopened = stats.pendingEvidenceReopened,
         metadataIdentityChanges = stats.metadataIdentityChanges,
         failedItemEventsIgnored = stats.failedItemEventsIgnored,
+        itemCallbacksReceived = stats.itemCallbacksReceived,
+        dependencyRecordsExamined = stats.dependencyRecordsExamined,
+        dependenciesStillPending = stats.dependenciesStillPending,
+        dependenciesSatisfied = stats.dependenciesSatisfied,
+        evidenceOutcomesUnchanged = stats.evidenceOutcomesUnchanged,
+        evidenceOutcomesChanged = stats.evidenceOutcomesChanged,
+        downstreamRecordsInvalidated = stats.downstreamRecordsInvalidated,
+        pendingRecordsCreated = stats.pendingRecordsCreated,
         retainedEvidenceAfterScan = stats.retainedEvidenceAfterScan,
         retainedPrechecksAfterScan = stats.retainedPrechecksAfterScan,
         retainedEligibilityAfterScan = stats.retainedEligibilityAfterScan,
@@ -76,6 +84,14 @@ function P.GetGenerationCacheCounterSnapshot()
         pendingEvidenceReopened = diagnostics.pendingEvidenceReopened,
         metadataIdentityChanges = diagnostics.metadataIdentityChanges,
         failedItemEventsIgnored = diagnostics.failedItemEventsIgnored,
+        itemCallbacksReceived = diagnostics.itemCallbacksReceived,
+        dependencyRecordsExamined = diagnostics.dependencyRecordsExamined,
+        dependenciesStillPending = diagnostics.dependenciesStillPending,
+        dependenciesSatisfied = diagnostics.dependenciesSatisfied,
+        evidenceOutcomesUnchanged = diagnostics.evidenceOutcomesUnchanged,
+        evidenceOutcomesChanged = diagnostics.evidenceOutcomesChanged,
+        downstreamRecordsInvalidated = diagnostics.downstreamRecordsInvalidated,
+        pendingRecordsCreated = diagnostics.pendingRecordsCreated,
     }
 end
 
@@ -92,5 +108,13 @@ function P.BuildGenerationCachePerformance(startCounters)
     diagnostics.pendingEvidenceReopenedDuringGeneration = diagnostics.pendingEvidenceReopened - (startCounters.pendingEvidenceReopened or 0)
     diagnostics.metadataIdentityChangesDuringGeneration = diagnostics.metadataIdentityChanges - (startCounters.metadataIdentityChanges or 0)
     diagnostics.failedItemEventsIgnoredDuringGeneration = diagnostics.failedItemEventsIgnored - (startCounters.failedItemEventsIgnored or 0)
+    diagnostics.itemCallbacksReceivedDuringGeneration = diagnostics.itemCallbacksReceived - (startCounters.itemCallbacksReceived or 0)
+    diagnostics.dependencyRecordsExaminedDuringGeneration = diagnostics.dependencyRecordsExamined - (startCounters.dependencyRecordsExamined or 0)
+    diagnostics.dependenciesStillPendingDuringGeneration = diagnostics.dependenciesStillPending - (startCounters.dependenciesStillPending or 0)
+    diagnostics.dependenciesSatisfiedDuringGeneration = diagnostics.dependenciesSatisfied - (startCounters.dependenciesSatisfied or 0)
+    diagnostics.evidenceOutcomesUnchangedDuringGeneration = diagnostics.evidenceOutcomesUnchanged - (startCounters.evidenceOutcomesUnchanged or 0)
+    diagnostics.evidenceOutcomesChangedDuringGeneration = diagnostics.evidenceOutcomesChanged - (startCounters.evidenceOutcomesChanged or 0)
+    diagnostics.downstreamRecordsInvalidatedDuringGeneration = diagnostics.downstreamRecordsInvalidated - (startCounters.downstreamRecordsInvalidated or 0)
+    diagnostics.pendingRecordsCreatedDuringGeneration = diagnostics.pendingRecordsCreated - (startCounters.pendingRecordsCreated or 0)
     return diagnostics
 end

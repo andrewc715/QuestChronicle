@@ -19,6 +19,8 @@ C_Item = {
 local root = (... and (...):match("^(.*)[/\\]") or "")
 local base = root ~= "" and root .. "/../" or ""
 dofile(base .. "Core/Wardrobe/GenerationCacheStore.lua")
+dofile(base .. "Core/Wardrobe/GenerationCacheAccess.lua")
+dofile(base .. "Core/Wardrobe/GenerationDependencyIndex.lua")
 dofile(base .. "Core/Wardrobe/GenerationCacheInvalidation.lua")
 dofile(base .. "Core/Wardrobe/GenerationCacheDiagnostics.lua")
 dofile(base .. "Core/Wardrobe/AppearanceMetadata.lua")
@@ -30,6 +32,9 @@ local function Source(visualID)
         eraSourceIDs = { visualID }, eraItemIDs = { visualID + 1000 },
     }
 end
+
+local queued = 0
+P.QueuePendingEraEvidenceReevaluation = function() queued = queued + 1 return true end
 
 local resolved = Source(10)
 loadedExpansion[resolved.itemID] = 2
@@ -56,9 +61,14 @@ P.StorePersistentGenerationEligibility(pending, "final", false, "pending", "load
 P.InvalidateSourceEraEvidence(pending, "ITEM_DATA_LOADED", false, pending.itemID, {
     success = true, loaded = true,
 })
-assert(P.GetPersistentEraEvidence(pending, 2) == nil, "relevant item-data load did not reopen pending era evidence")
-assert(P.GetPersistentGenerationEligibility(pending, "final") == nil, "dependent final eligibility survived reopened evidence")
-assert(P.GetPersistentGenerationPrecheck(pending, "pre"), "era-independent precheck was unnecessarily discarded")
+local pendingEvidence, pendingRecord = P.GetPersistentEraEvidence(pending, 2)
+assert(pendingEvidence and pendingRecord.state == "STALE",
+    "relevant item dependency was discarded before outcome comparison")
+assert(P.GetPersistentGenerationEligibility(pending, "final"),
+    "eligibility was invalidated before evidence outcome changed")
+assert(P.GetPersistentGenerationPrecheck(pending, "pre"),
+    "era-independent precheck was unnecessarily discarded")
+assert(queued == 1, "resolved dependency did not queue one reevaluation")
 
 local tracking = Source(30)
 loadedExpansion[tracking.itemID] = 2
@@ -109,7 +119,8 @@ P.InvalidateSourceEraEvidence(scanning, "ITEM_DATA_LOADED", true, scanning.itemI
 assert(P.GetPersistentEraEvidence(scanning, 2), "scan-time item callback discarded persistent evidence before cache transfer")
 
 local stats = P.GetGenerationCacheSessionStats()
-assert(stats.pendingEvidenceReopened == 1, "pending reopen diagnostic was not precise")
+assert(stats.pendingEvidenceReopened == 2, "pending reevaluation diagnostic was not precise")
+assert(stats.dependenciesSatisfied == 2, "dependency satisfaction diagnostic was not precise")
 assert(stats.metadataIdentityChanges == 1, "identity-change diagnostic was not precise")
 assert(stats.itemEventsIgnored >= 3, "stable item-data events were not counted as ignored")
-print("PASS item-data invalidation precision: stable events are ignored, relevant pending evidence reopens once, and genuine item identity changes invalidate item-derived evidence")
+print("PASS item-data dependency precision: stable events are ignored, pending records survive until outcome comparison, and genuine identity changes invalidate")

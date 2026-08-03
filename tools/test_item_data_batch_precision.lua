@@ -22,6 +22,8 @@ C_Item = {
 local root = (... and (...):match("^(.*)[/\\]") or "")
 local base = root ~= "" and root .. "/../" or ""
 dofile(base .. "Core/Wardrobe/GenerationCacheStore.lua")
+dofile(base .. "Core/Wardrobe/GenerationCacheAccess.lua")
+dofile(base .. "Core/Wardrobe/GenerationDependencyIndex.lua")
 dofile(base .. "Core/Wardrobe/GenerationCacheInvalidation.lua")
 dofile(base .. "Core/Wardrobe/GenerationCacheDiagnostics.lua")
 dofile(base .. "Core/Wardrobe/AppearanceMetadata.lua")
@@ -36,15 +38,21 @@ local source = {
 P.StorePersistentEraEvidence(source, {
     pending = true, reason = "item loading", pendingItemIDs = { 1010 },
 }, 1, 2)
+P.RegisterCurrentGenerationSource(source)
 P.itemMetadataWatch[1010] = setmetatable({ [source] = true }, { __mode = "k" })
+local queued = 0
+P.QueuePendingEraEvidenceReevaluation = function() queued = queued + 1 return true end
 
 Wardrobe.QueueItemMetadataUpdate(1010, true, "GET_ITEM_INFO_RECEIVED")
 Wardrobe.QueueItemMetadataUpdate(1010, true, "ITEM_DATA_LOAD_RESULT")
 assert(timerCallback, "item-data batch was not scheduled")
 timerCallback()
-assert(P.GetPersistentEraEvidence(source, 2) == nil, "loaded pending item did not reopen evidence")
+local evidence, record = P.GetPersistentEraEvidence(source, 2)
+assert(evidence and record.state == "STALE", "loaded dependency was not retained for outcome comparison")
 local stats = P.GetGenerationCacheSessionStats()
-assert(stats.pendingEvidenceReopened == 1, "duplicate item events reopened evidence more than once")
+assert(stats.pendingEvidenceReopened == 1 and queued == 1,
+    "duplicate item events queued evidence more than once")
+assert(stats.dependenciesSatisfied == 1, "resolved item dependency was not counted")
 assert(stats.itemEventsCoalesced >= 1, "duplicate item events were not coalesced")
 assert(notifications == 1, "representative metadata hydration did not produce one targeted notification")
 
@@ -52,7 +60,9 @@ Wardrobe.QueueItemMetadataUpdate(1010, true, "ITEM_DATA_LOAD_RESULT")
 assert(timerCallback, "second item-data batch was not scheduled")
 timerCallback()
 stats = P.GetGenerationCacheSessionStats()
-assert(stats.pendingEvidenceReopened == 1, "stable repeat event reopened already-cleared evidence")
-assert(stats.itemEventsIgnored >= 1, "stable repeat event was not recorded as ignored")
+assert(stats.pendingEvidenceReopened == 1 and queued == 1,
+    "stable repeat event queued already-satisfied evidence")
+assert(stats.itemCallbacksReceived == 3,
+    "stable repeat callback was not counted without reopening evidence")
 assert(notifications == 1, "stable repeat event caused an unnecessary UI notification")
-print("PASS item-data batch precision: duplicate events coalesce, pending evidence reopens once, and stable repeats are ignored without UI churn")
+print("PASS item-data batch precision: duplicate callbacks coalesce, exact dependencies queue once, and stable repeats cause no cache churn")

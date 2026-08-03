@@ -1,8 +1,11 @@
 local QC = QuestChronicle
 local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
-P.GENERATION_CACHE_STORE_VERSION = 1
+P.GENERATION_CACHE_STORE_VERSION = 2
+P.GENERATION_CACHE_DEPENDENCY_VERSION = 1
 P.GENERATION_CACHE_UNKNOWN_TTL_SECONDS = 6 * 60 * 60
+P.GENERATION_CACHE_PENDING_RETRY_SECONDS = 10 * 60
+P.GENERATION_CACHE_TRACKING_RETRY_SECONDS = 6 * 60 * 60
 P.GENERATION_CACHE_ENTRY_TTL_SECONDS = 30 * 24 * 60 * 60
 P.GENERATION_CACHE_PRECHECKS_PER_VISUAL = 3
 P.GENERATION_CACHE_ELIGIBILITY_PER_VISUAL = 4
@@ -28,6 +31,30 @@ local function CopyNumericList(values)
     end
     table.sort(copy)
     return #copy > 0 and copy or nil
+end
+P.CopyGenerationCacheNumericList = CopyNumericList
+
+local function EvidenceState(result)
+    if result and result.expansionID ~= nil then return "RESOLVED" end
+    local pendingItems = CopyNumericList(result and result.pendingItemIDs)
+    if pendingItems then return "PENDING_ITEMS" end
+    if result and result.trackingPending == true then return "TRACKING_ONLY" end
+    if result and result.pending == true then return "PENDING_ITEMS" end
+    return "UNKNOWN"
+end
+
+function P.BuildEraEvidenceOutcomeFingerprint(result)
+    result = result or {}
+    return table.concat({
+        tostring(result.expansionID or result.provisionalExpansionID or ""),
+        tostring(result.method or ""),
+        tostring(result.sourceID or ""),
+        tostring(result.itemID or ""),
+        tostring(result.pending == true),
+        tostring(result.unknown == true),
+        tostring(result.trackingPending == true),
+        tostring(result.candidateCount or 0),
+    }, "|")
 end
 local function VisualKey(sourceOrID)
     local visualID = type(sourceOrID) == "table" and sourceOrID.visualID or sourceOrID
@@ -84,6 +111,7 @@ end
 local function NewStore()
     return {
         version = P.GENERATION_CACHE_STORE_VERSION,
+        dependencyVersion = P.GENERATION_CACHE_DEPENDENCY_VERSION,
         visuals = {},
         createdAt = CacheNow(),
         updatedAt = CacheNow(),
@@ -92,11 +120,21 @@ end
 local function EnsureStoreRaw()
     local cache = P.EnsureCache()
     local store = cache.generationCache
-    if type(store) ~= "table" or store.version ~= P.GENERATION_CACHE_STORE_VERSION then
+    if type(store) ~= "table" then
         store = NewStore()
         cache.generationCache = store
+    elseif tonumber(store.version) ~= P.GENERATION_CACHE_STORE_VERSION then
+        if tonumber(store.version) == 1 and type(store.visuals) == "table" then
+            store.version = P.GENERATION_CACHE_STORE_VERSION
+            store.dependencyVersion = P.GENERATION_CACHE_DEPENDENCY_VERSION
+            store.updatedAt = CacheNow()
+        else
+            store = NewStore()
+            cache.generationCache = store
+        end
     end
     store.visuals = store.visuals or {}
+    store.dependencyVersion = P.GENERATION_CACHE_DEPENDENCY_VERSION
     return store, cache
 end
 local function CountStore(store)
@@ -125,6 +163,14 @@ local function Stats()
             pendingEvidenceReopened = 0,
             metadataIdentityChanges = 0,
             failedItemEventsIgnored = 0,
+            itemCallbacksReceived = 0,
+            dependencyRecordsExamined = 0,
+            dependenciesStillPending = 0,
+            dependenciesSatisfied = 0,
+            evidenceOutcomesUnchanged = 0,
+            evidenceOutcomesChanged = 0,
+            downstreamRecordsInvalidated = 0,
+            pendingRecordsCreated = 0,
             retainedEvidenceAfterScan = 0,
             retainedPrechecksAfterScan = 0,
             retainedEligibilityAfterScan = 0,
@@ -151,6 +197,7 @@ end
 
 local function InvalidateEvidence(store, key, bucket, reason)
     if not bucket then return end
+    if P.RemovePersistentEraDependencies then P.RemovePersistentEraDependencies(key) end
     local removed = bucket.evidence and 1 or 0
     removed = removed + CountMap(bucket.eligibility)
     bucket.evidence = nil
@@ -187,14 +234,21 @@ local function PruneStore(store)
     for key, bucket in pairs(store.visuals or {}) do
         local evidence = bucket.evidence
         if evidence then
-            local expiredPending = evidence.state == "PENDING"
+            local state = evidence.state == "PENDING" and EvidenceState(evidence) or evidence.state
+            evidence.state = state
+            local expiredPending = (state == "PENDING_ITEMS" or state == "STALE")
                 and tonumber(evidence.retryAt)
                 and now >= tonumber(evidence.retryAt)
-            local expiredUnknown = evidence.state == "UNKNOWN"
+            local expiredTracking = state == "TRACKING_ONLY"
+                and tonumber(evidence.retryAt)
+                and now >= tonumber(evidence.retryAt)
+            local expiredUnknown = state == "UNKNOWN"
                 and tonumber(evidence.expiresAt)
                 and now >= tonumber(evidence.expiresAt)
-            if expiredPending or expiredUnknown then
-                InvalidateEvidence(store, key, bucket, expiredPending and "PENDING_RETRY_EXPIRED" or "UNKNOWN_TTL_EXPIRED")
+            if expiredPending or expiredTracking or expiredUnknown then
+                local reason = expiredUnknown and "UNKNOWN_TTL_EXPIRED"
+                    or (expiredTracking and "TRACKING_RETRY_EXPIRED" or "PENDING_RETRY_EXPIRED")
+                InvalidateEvidence(store, key, bucket, reason)
                 bucket = store.visuals[key]
             end
         end
@@ -212,15 +266,18 @@ local function PutEvidenceRaw(store, source, result, candidateCount, evidenceVer
     local bucket = store.visuals[key] or {}
     store.visuals[key] = bucket
     local now = CacheNow()
-    local state = result.expansionID ~= nil and "RESOLVED" or (result.pending and "PENDING" or "UNKNOWN")
+    local state = EvidenceState(result)
+    local pendingItems = CopyNumericList(result.pendingItemIDs)
     local record = {
         evidenceVersion = tonumber(evidenceVersion) or tonumber(source.eraEvidenceVersion) or 0,
         visualID = tonumber(source.visualID),
         manifestVersion = tonumber(source.eraManifestVersion) or 0,
         manifestSignature = ManifestSignature(source),
         fingerprint = P.GetPersistentEraFingerprint(source),
+        dependencyVersion = P.GENERATION_CACHE_DEPENDENCY_VERSION,
         state = state,
         expansionID = result.expansionID,
+        provisionalExpansionID = result.provisionalExpansionID,
         method = result.method,
         label = result.label,
         sourceID = result.sourceID,
@@ -229,21 +286,30 @@ local function PutEvidenceRaw(store, source, result, candidateCount, evidenceVer
         reason = result.reason,
         pending = result.pending == true,
         unknown = result.unknown == true,
-        pendingItemIDs = CopyNumericList(result.pendingItemIDs),
+        pendingItemIDs = pendingItems,
         trackingPending = result.trackingPending == true,
-        retryAt = result.pending and (tonumber(source.eraEvidenceRetryAt) or (now + 30)) or nil,
+        outcomeFingerprint = P.BuildEraEvidenceOutcomeFingerprint(result),
+        retryAt = state == "PENDING_ITEMS" and
+            (tonumber(source.eraEvidenceRetryAt) or (now + P.GENERATION_CACHE_PENDING_RETRY_SECONDS))
+            or (state == "TRACKING_ONLY" and
+                (tonumber(source.eraEvidenceRetryAt) or (now + P.GENERATION_CACHE_TRACKING_RETRY_SECONDS))
+                or nil),
         expiresAt = state == "UNKNOWN" and (now + P.GENERATION_CACHE_UNKNOWN_TTL_SECONDS) or nil,
         updatedAt = now,
         lastUsedAt = now,
     }
     local added = bucket.evidence == nil
     bucket.evidence = record
+    if P.IndexPersistentEraDependencies then P.IndexPersistentEraDependencies(key, record) end
     bucket.updatedAt = now
     store.updatedAt = now
     if migrated then
         if added then Stats().migratedEvidence = Stats().migratedEvidence + 1 end
     elseif added then
         Stats().addedEvidence = Stats().addedEvidence + 1
+        if state == "PENDING_ITEMS" or state == "TRACKING_ONLY" then
+            Stats().pendingRecordsCreated = Stats().pendingRecordsCreated + 1
+        end
     end
     return true
 end
@@ -287,6 +353,9 @@ function P.EnsurePersistentGenerationCache()
         stats.loadedPrechecks = prechecks
         stats.loadedEligibility = eligibility
         MigrateLegacySourceFields(cache, store)
+        if P.RebuildPersistentEraDependencyIndex then
+            P.RebuildPersistentEraDependencyIndex(store)
+        end
     end
     return store
 end
@@ -322,8 +391,14 @@ function P.GetPersistentEraEvidence(source, evidenceVersion)
         return nil
     end
     local now = CacheNow()
-    if record.state == "PENDING" and tonumber(record.retryAt) and now >= tonumber(record.retryAt) then
-        InvalidateEvidence(store, key, bucket, "PENDING_RETRY_EXPIRED")
+    if record.state == "PENDING" then record.state = EvidenceState(record) end
+    local expiringPending = record.state == "PENDING_ITEMS" or record.state == "STALE"
+    local expiringTracking = record.state == "TRACKING_ONLY"
+    if (expiringPending or expiringTracking) and tonumber(record.retryAt)
+        and now >= tonumber(record.retryAt)
+    then
+        InvalidateEvidence(store, key, bucket,
+            expiringTracking and "TRACKING_RETRY_EXPIRED" or "PENDING_RETRY_EXPIRED")
         return nil
     end
     if record.state == "UNKNOWN" and tonumber(record.expiresAt) and now >= tonumber(record.expiresAt) then
@@ -333,7 +408,9 @@ function P.GetPersistentEraEvidence(source, evidenceVersion)
     record.lastUsedAt = now
     bucket.updatedAt = now
     return {
+        state = record.state,
         expansionID = record.expansionID,
+        provisionalExpansionID = record.provisionalExpansionID,
         method = record.method,
         label = record.label,
         sourceID = record.sourceID,
@@ -344,104 +421,28 @@ function P.GetPersistentEraEvidence(source, evidenceVersion)
         unknown = record.unknown == true,
         pendingItemIDs = CopyNumericList(record.pendingItemIDs),
         trackingPending = record.trackingPending == true,
+        retryAt = record.retryAt,
+        outcomeFingerprint = record.outcomeFingerprint,
         cached = true,
         persistent = true,
     }, record
 end
 
-local function TrimBucketMap(bucket, field, maxEntries, reason)
-    local values = bucket[field]
-    if CountMap(values) <= maxEntries then return end
-    PruneEntryMap(values, maxEntries, CacheNow(), reason)
-end
-
-function P.StorePersistentGenerationPrecheck(source, key, eligible, kind, reason)
-    local store, bucket = GetBucket(source, true)
-    if not bucket or not key then return end
-    bucket.prechecks = bucket.prechecks or {}
-    local added = bucket.prechecks[key] == nil
-    bucket.prechecks[key] = {
-        eligible = eligible == true,
-        kind = kind,
-        reason = reason,
-        sourceIdentity = P.GetStableGenerationSourceIdentity(source),
-        fingerprint = P.GetPersistentGenerationFingerprint(source),
-        updatedAt = CacheNow(),
-    }
-    bucket.updatedAt = CacheNow()
-    store.updatedAt = CacheNow()
-    if added then Stats().addedPrechecks = Stats().addedPrechecks + 1 end
-    TrimBucketMap(bucket, "prechecks", P.GENERATION_CACHE_PRECHECKS_PER_VISUAL, "PRECHECK_LRU")
-end
-
-function P.GetPersistentGenerationPrecheck(source, key)
-    local _, bucket = GetBucket(source, false)
-    local record = bucket and bucket.prechecks and bucket.prechecks[key]
-    if not record then return nil end
-    if record.sourceIdentity ~= P.GetStableGenerationSourceIdentity(source)
-        or record.fingerprint ~= P.GetPersistentGenerationFingerprint(source)
-    then
-        bucket.prechecks[key] = nil
-        NoteInvalidation("PRECHECK_IDENTITY_CHANGED", 1)
-        return nil
-    end
-    record.updatedAt = CacheNow()
-    return record
-end
-
-function P.StorePersistentGenerationEligibility(source, key, eligible, kind, reason)
-    local store, bucket = GetBucket(source, true)
-    if not bucket or not key then return end
-    bucket.eligibility = bucket.eligibility or {}
-    local added = bucket.eligibility[key] == nil
-    bucket.eligibility[key] = {
-        eligible = eligible == true,
-        kind = kind,
-        reason = reason,
-        sourceIdentity = P.GetStableGenerationSourceIdentity(source),
-        fingerprint = P.GetPersistentGenerationFingerprint(source),
-        updatedAt = CacheNow(),
-    }
-    bucket.updatedAt = CacheNow()
-    store.updatedAt = CacheNow()
-    if added then Stats().addedEligibility = Stats().addedEligibility + 1 end
-    TrimBucketMap(bucket, "eligibility", P.GENERATION_CACHE_ELIGIBILITY_PER_VISUAL, "ELIGIBILITY_LRU")
-end
-
-function P.GetPersistentGenerationEligibility(source, key)
-    local _, bucket = GetBucket(source, false)
-    local record = bucket and bucket.eligibility and bucket.eligibility[key]
-    if not record then return nil end
-    if record.sourceIdentity ~= P.GetStableGenerationSourceIdentity(source)
-        or record.fingerprint ~= P.GetPersistentGenerationFingerprint(source)
-    then
-        bucket.eligibility[key] = nil
-        NoteInvalidation("ELIGIBILITY_IDENTITY_CHANGED", 1)
-        return nil
-    end
-    record.updatedAt = CacheNow()
-    return record
-end
+P._GenerationCacheStoreAccess = {
+    CacheNow = CacheNow, CountMap = CountMap, CountStore = CountStore,
+    EvidenceState = EvidenceState, GetBucket = GetBucket,
+    InvalidateEvidence = InvalidateEvidence, ManifestSignature = ManifestSignature,
+    NoteInvalidation = NoteInvalidation, PruneEntryMap = PruneEntryMap,
+    Stats = Stats, VisualKey = VisualKey,
+}
 
 function P.InvalidatePersistentGenerationCache(source, reason)
     local store, bucket, key = GetBucket(source, false)
     if not bucket then return end
     local removed = (bucket.evidence and 1 or 0) + CountMap(bucket.prechecks) + CountMap(bucket.eligibility)
+    if P.RemovePersistentEraDependencies then P.RemovePersistentEraDependencies(key) end
     store.visuals[key] = nil
     NoteInvalidation(reason or "SOURCE_INVALIDATED", removed)
-end
-
-function P.GetPersistentGenerationCacheRecord(source)
-    local store, bucket, key = GetBucket(source, false)
-    return bucket and bucket.evidence or nil, bucket, store, key
-end
-
-function P.InvalidatePersistentEraEvidence(source, reason)
-    local store, bucket, key = GetBucket(source, false)
-    if not bucket or not bucket.evidence then return 0 end
-    local removed = 1 + CountMap(bucket.eligibility)
-    InvalidateEvidence(store, key, bucket, reason or "ERA_EVIDENCE_INVALIDATED")
-    return removed
 end
 
 function P.RestorePersistentGenerationFields(source, evidenceVersion)
@@ -455,6 +456,7 @@ function P.RestorePersistentGenerationFields(source, evidenceVersion)
         source.eraEvidenceMetadataRevision = tonumber(source.metadataRevision) or 0
         source.eraEvidenceCandidateCount = evidence.candidateCount
         source.eraEvidenceExpansionID = evidence.expansionID
+        source.eraEvidenceProvisionalExpansionID = evidence.provisionalExpansionID
         source.eraEvidenceMethod = evidence.method
         source.eraEvidenceLabel = evidence.label
         source.eraEvidenceSourceID = evidence.sourceID
@@ -464,8 +466,8 @@ function P.RestorePersistentGenerationFields(source, evidenceVersion)
         source.eraEvidenceUnknown = evidence.unknown == true
         source.eraEvidencePendingItemIDs = CopyNumericList(evidence.pendingItemIDs)
         source.eraEvidenceTrackingPending = evidence.trackingPending == true
-        source.eraEvidenceState = evidence.expansionID ~= nil and "RESOLVED"
-            or (evidence.pending and "PENDING" or "UNKNOWN")
+        source.eraEvidenceState = evidence.state or EvidenceState(evidence)
+        source.eraEvidenceRetryAt = evidence.retryAt
     end
     if P.NotePersistentGenerationCacheRestore then
         P.NotePersistentGenerationCacheRestore(source, evidenceRestored, false, false)

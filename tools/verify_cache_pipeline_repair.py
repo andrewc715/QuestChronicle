@@ -16,7 +16,9 @@ toc = (ROOT / "QuestChronicle.toc").read_text(encoding="utf-8")
 
 checks = {
     "unknown era outcomes cached": '"UNKNOWN"' in era and "eraEvidenceUnknown" in era,
-    "pending era outcomes cached with retry": '"PENDING"' in era and "eraEvidenceRetryAt" in era and "+ 30" in era,
+    "pending era outcomes cached with bounded retry":
+        '"PENDING_ITEMS"' in era and "eraEvidenceRetryAt" in era
+        and "GENERATION_CACHE_PENDING_RETRY_SECONDS" in era,
     "metadata revision guards era cache": "eraEvidenceMetadataRevision" in era,
     "scan captures generation caches": "CaptureAppearanceGenerationCaches" in metadata,
     "scan restores generation caches": "RestoreAppearanceGenerationCache" in metadata,

@@ -31,6 +31,7 @@ local function ClearSourceEraDependentFields(source)
     source.eraEvidenceMetadataRevision = nil
     source.eraEvidenceState = nil
     source.eraEvidenceExpansionID = nil
+    source.eraEvidenceProvisionalExpansionID = nil
     source.eraEvidenceMethod = nil
     source.eraEvidenceLabel = nil
     source.eraEvidenceSourceID = nil
@@ -50,6 +51,8 @@ local function ClearSourceEraDependentFields(source)
     source.generationEligibilityReason = nil
 end
 
+P.ClearSourceEraDependentFields = ClearSourceEraDependentFields
+
 local function ClearSourceGenerationFields(source)
     ClearSourceEraDependentFields(source)
     if not source then return end
@@ -64,7 +67,6 @@ function P.InvalidateSourceEraEvidence(source, reason, preservePersistent, itemI
     local itemDataReason = reason == "ITEM_DATA_LOADED"
         or reason == "ITEM_METADATA_IDENTITY_CHANGED"
     if itemDataReason and P.InvalidatePersistentGenerationCacheForItemData then
-        if preservePersistent then return false end
         local shouldClear = P.InvalidatePersistentGenerationCacheForItemData(
             source, reason, itemID, eventInfo
         )
@@ -91,7 +93,8 @@ end
 local generationCacheFields = {
     "eraEvidenceVersion", "eraEvidenceVisualID", "eraEvidenceManifestVersion",
     "eraEvidenceManifestSignature", "eraEvidenceMetadataRevision", "eraEvidenceState",
-    "eraEvidenceExpansionID", "eraEvidenceMethod", "eraEvidenceLabel",
+    "eraEvidenceExpansionID", "eraEvidenceProvisionalExpansionID",
+    "eraEvidenceMethod", "eraEvidenceLabel",
     "eraEvidenceSourceID", "eraEvidenceItemID", "eraEvidenceCandidateCount",
     "eraEvidenceReason", "eraEvidencePending", "eraEvidenceUnknown",
     "eraEvidencePendingItemIDs", "eraEvidenceTrackingPending", "eraEvidenceRetryAt",
@@ -286,10 +289,8 @@ end
 function P.TrackAppearanceMetadata(source, requestManifestItems)
     if not source then return false end
     P.EnsureEraSourceManifest(source, true)
+    if P.RegisterCurrentGenerationSource then P.RegisterCurrentGenerationSource(source) end
     if source.itemID then WatchItem(source.itemID, source) end
-    for _, itemID in ipairs(source.eraItemIDs or {}) do
-        WatchItem(itemID, source)
-    end
 
     local loaded, changed = P.HydrateSourceItemMetadata(source)
     if requestManifestItems ~= false then
@@ -310,6 +311,7 @@ function P.BeginAppearanceMetadataRefresh()
     -- Clear it once here instead of rebuilding and hydrating the entire old
     -- cache before the scan, then doing the same work again afterward.
     P.itemMetadataWatch = {}
+    if P.ResetCurrentGenerationSourceIndex then P.ResetCurrentGenerationSourceIndex() end
     P.eraItemRequests = {}
     P.pendingItemMetadata = {}
     P.itemMetadataBatchScheduled = false
@@ -318,12 +320,11 @@ end
 
 function P.RestoreAppearanceMetadataWatchIndex(cache)
     P.itemMetadataWatch = {}
+    if P.ResetCurrentGenerationSourceIndex then P.ResetCurrentGenerationSourceIndex() end
     for _, sources in pairs(cache and cache.bySlot or {}) do
         for _, source in ipairs(sources or {}) do
+            if P.RegisterCurrentGenerationSource then P.RegisterCurrentGenerationSource(source) end
             if source.itemID then WatchItem(source.itemID, source) end
-            for _, itemID in ipairs(source.eraItemIDs or {}) do
-                WatchItem(itemID, source)
-            end
         end
     end
     P.metadataRefreshActive = false
@@ -340,6 +341,7 @@ end
 
 function P.RebuildAppearanceMetadataIndex(cache, sortSources, notify, requestManifestItems)
     P.itemMetadataWatch = {}
+    if P.ResetCurrentGenerationSourceIndex then P.ResetCurrentGenerationSourceIndex() end
     P.eraItemRequests = {}
     local changedSourceIDs = {}
     local changedCount = 0
@@ -387,19 +389,30 @@ local function ProcessItemMetadataBatch()
         P.eraItemRequests[itemID] = nil
         changedItemIDs[itemID] = true
         local fingerprint, loaded = P.GetStableItemMetadataFingerprint(itemID)
-        for source in pairs(P.itemMetadataWatch[itemID] or {}) do
+        local function AddSourceUpdate(source, dependency)
             local update = sourceUpdates[source]
             if not update then
                 update = { items = {}, order = {} }
                 sourceUpdates[source] = update
-            elseif update.items[itemID] then
-                P.NoteGenerationItemEvent("coalesced", 1)
             end
-            if not update.items[itemID] then update.order[#update.order + 1] = itemID end
-            update.items[itemID] = {
-                success = eventInfo.success, eventName = eventInfo.eventName,
-                loaded = loaded == true, fingerprint = fingerprint,
-            }
+            local info = update.items[itemID]
+            if not info then
+                update.order[#update.order + 1] = itemID
+                info = {
+                    success = eventInfo.success, eventName = eventInfo.eventName,
+                    loaded = loaded == true, fingerprint = fingerprint,
+                }
+                update.items[itemID] = info
+            end
+            info.dependency = info.dependency == true or dependency == true
+        end
+        for source in pairs(P.itemMetadataWatch[itemID] or {}) do
+            AddSourceUpdate(source, false)
+        end
+        if P.GetPendingEraDependencySources then
+            for _, source in ipairs(P.GetPendingEraDependencySources(itemID)) do
+                AddSourceUpdate(source, true)
+            end
         end
     end
 
@@ -411,16 +424,16 @@ local function ProcessItemMetadataBatch()
             identityChanged = identity == true
         end
 
-        local reopened = identityChanged
         for _, itemID in ipairs(update.order) do
-            if reopened then
-                P.NoteGenerationItemEvent("coalesced", 1)
-            elseif not (identityChanged and tonumber(source.itemID) == itemID) then
-                reopened = P.InvalidateSourceEraEvidence(
+            local itemUpdate = update.items[itemID]
+            if itemUpdate.dependency and
+                not (identityChanged and tonumber(source.itemID) == itemID)
+            then
+                P.InvalidateSourceEraEvidence(
                     source, "ITEM_DATA_LOADED",
                     P.metadataRefreshActive == true or Wardrobe.scanning == true,
-                    itemID, update.items[itemID]
-                ) == true
+                    itemID, itemUpdate
+                )
             end
         end
 
@@ -445,6 +458,7 @@ function Wardrobe.QueueItemMetadataUpdate(itemID, success, eventName)
     itemID = tonumber(itemID)
     if not itemID or itemID <= 0 then return end
     P.eraItemRequests[itemID] = nil
+    P.NoteGenerationItemEvent("callback", 1)
     if P.pendingItemMetadata[itemID] then P.NoteGenerationItemEvent("coalesced", 1) end
     P.pendingItemMetadata[itemID] = {
         success = success,

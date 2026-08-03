@@ -24,44 +24,40 @@ dofile(base .. "Core/Wardrobe/GenerationCacheInvalidation.lua")
 dofile(base .. "Core/Wardrobe/GenerationCacheDiagnostics.lua")
 dofile(base .. "Core/Wardrobe/AppearanceMetadata.lua")
 
-local stableCount, reopenCount = 1700, 40
-local sources = {}
-for index = 1, stableCount + reopenCount do
-    local itemID = 100000 + index
+local count = 850
+for index = 1, count do
+    local itemID = 200000 + index
     local source = {
         visualID = index, sourceID = index, itemID = itemID,
         eraManifestVersion = 3, eraManifestSignature = tostring(index),
         eraSourceIDs = { index }, eraItemIDs = { itemID },
-        eraEvidenceRetryAt = 1030,
+        eraEvidenceRetryAt = 1600,
     }
-    local result
-    if index <= stableCount then
-        result = { pending = true, trackingPending = true, reason = "tracking pending" }
-    else
-        result = { pending = true, pendingItemIDs = { itemID }, reason = "item loading" }
-    end
-    sources[#sources + 1] = source
-    P.StorePersistentEraEvidence(source, result, 1, 2)
+    P.StorePersistentEraEvidence(source, {
+        pending = true, pendingItemIDs = { itemID }, trackingPending = true,
+        reason = "item and tracking pending",
+    }, 1, 2)
     P.RegisterCurrentGenerationSource(source)
-    P.itemMetadataWatch[itemID] = setmetatable({ [source] = true }, { __mode = "k" })
+    Wardrobe.QueueItemMetadataUpdate(itemID, true, "GET_ITEM_INFO_RECEIVED")
     Wardrobe.QueueItemMetadataUpdate(itemID, true, "ITEM_DATA_LOAD_RESULT")
 end
-local queued = 0
-P.QueuePendingEraEvidenceReevaluation = function() queued = queued + 1 return true end
-assert(timerCallback, "large item-data batch was not scheduled")
+assert(timerCallback, "callback storm did not schedule a batch")
 timerCallback()
 
 local evidence = select(1, P.GetPersistentGenerationCacheCounts())
 local stats = P.GetGenerationCacheSessionStats()
-assert(evidence == stableCount + reopenCount, "pending evidence was discarded before comparison")
-assert(stats.pendingEvidenceReopened == reopenCount and queued == reopenCount,
-    "relevant item-pending records did not queue exactly once")
-assert(stats.dependenciesSatisfied == reopenCount,
-    "resolved dependencies were not counted exactly")
-assert(stats.invalidated == 0, "batch invalidated records before outcomes changed")
-assert(stats.itemCallbacksReceived == stableCount + reopenCount,
-    "callback accounting did not match the batch")
+assert(evidence == count, "tracking-pending callback storm discarded evidence")
+assert(stats.itemCallbacksReceived == count * 2, "callback count did not include both events")
+assert(stats.itemEventsCoalesced == count, "duplicate item events did not coalesce")
+assert(stats.dependencyRecordsExamined == count, "exact dependency records were not isolated")
+assert(stats.dependenciesSatisfied == count, "loaded dependencies were not satisfied")
+assert(stats.evidenceOutcomesUnchanged == count,
+    "tracking-only fail-closed outcomes were not preserved")
+assert(stats.pendingEvidenceReopened == 0,
+    "tracking-only outcomes queued unnecessary evidence recomputation")
+assert(stats.invalidated == 0 and stats.downstreamRecordsInvalidated == 0,
+    "tracking-only callback storm caused cache churn")
 print(string.format(
-    "PASS dependency benchmark: %d stable callbacks bypassed, %d exact dependencies queued, %d premature invalidations",
-    stableCount, reopenCount, stats.invalidated
+    "PASS live churn benchmark: %d callback pairs became tracking-only with 0 reevaluations and 0 invalidations",
+    count
 ))

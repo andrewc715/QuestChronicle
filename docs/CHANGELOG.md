@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.9.0a10 - 2026-08-02
+
+### Performance
+
+- Added explicit resolved, item-pending, tracking-only, stale, and unknown evidence states.
+- Added a persistent reverse dependency index from missing item IDs to affected visual evidence records.
+- Resolved item dependencies cooperatively and compared normalized evidence outcomes before invalidating downstream caches.
+- Preserved prechecks and final eligibility when newly available item data does not change generation-relevant evidence.
+- Invalidated only dependent final eligibility records when an evidence outcome genuinely changes.
+- Coalesced callback storms and exposed dependency, outcome, and downstream-invalidation diagnostics.
+- Added slow weapon-resume phase reporting without changing weapon selection semantics.
+- Migrated the internal generation-cache store to version 2 without clearing existing evidence.
+- Preserved schema 2, Courier format 1, wardrobe cache format 7, and Traveler instrumentation-only behavior.
+
 ## 1.9.0a9 - 2026-08-02
 
 ### Performance

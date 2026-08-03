@@ -39,6 +39,8 @@ end
 local root = (... and (...):match("^(.*)[/\\]") or "")
 local base = root ~= "" and root .. "/../" or ""
 dofile(base .. "Core/Wardrobe/GenerationCacheStore.lua")
+dofile(base .. "Core/Wardrobe/GenerationCacheAccess.lua")
+dofile(base .. "Core/Wardrobe/GenerationDependencyIndex.lua")
 dofile(base .. "Core/ZoneStyle/GenerationEligibility.lua")
 
 local source = {

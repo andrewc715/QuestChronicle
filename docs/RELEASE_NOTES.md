@@ -1,44 +1,51 @@
-# Quest Chronicle v1.9.0a9 - Precise Item-Data Invalidation
+# Quest Chronicle v1.9.0a10 - Pending Dependency Pipeline
 
-v1.9.0a9 is a focused cache-invalidation repair built from the live-validated v1.9.0a8 persistent-cache baseline. Retail testing confirmed that v1.9.0a8 preserved thousands of era and eligibility records across `/reload`, but ordinary `ITEM_DATA_LOAD_RESULT` and `GET_ITEM_INFO_RECEIVED` traffic still invalidated roughly 1,700 records during every generation.
+v1.9.0a10 is a focused cache-churn repair built from the v1.9.0a9 diagnostic branch while retaining v1.9.0a8 as the live-validated behavioral baseline. Retail testing showed that v1.9.0a9 correctly preserved the persistent cache but still reopened roughly 814 to 848 pending evidence records and invalidated roughly 1,628 to 1,696 downstream records during each generation. Most callbacks completed item dependencies without changing the final era outcome.
 
-## Relevant pending-item tracking
+## Exact dependency lifecycle
 
-- Era evidence now records the exact item IDs that were unavailable when a visual entered the `PENDING` state.
-- Tracking-only pending evidence is distinguished from item-data pending evidence.
-- An item-data callback reopens evidence only when that exact pending item has become available.
-- Unknown evidence remains fail-closed under its existing six-hour expiry instead of being reopened by unrelated callbacks.
-- Existing v1.9.0a8 records without pending-item details remain compatible and continue to use the existing pending retry window.
+- Persistent evidence records now use explicit `RESOLVED`, `PENDING_ITEMS`, `TRACKING_ONLY`, `STALE`, and `UNKNOWN` states.
+- Item-pending records retain the exact unresolved item IDs rather than a broad pending flag.
+- A reverse dependency index maps each pending item ID to only the affected visual evidence records.
+- Resolving one dependency leaves the record pending when other item dependencies remain.
+- Item completion that leaves only content-tracking work transitions the record to `TRACKING_ONLY` without discarding reusable eligibility.
+- The generation-cache store migrates from internal version 1 to version 2 in place. No blanket purge is performed.
 
-## Stable metadata identity
+## Outcome comparison before invalidation
 
-- Adds a compact generation-relevant item fingerprint using item ID, expansion, item type, subtype, equip location, class, and subclass.
-- Presentation-only hydration such as names, links, icons, and quality no longer masquerades as a generation-identity change.
-- Item-derived era evidence is invalidated when its genuine metadata identity changes.
-- Set, tracking, encounter, and curated evidence survive unrelated representative-item metadata changes.
+- Fully satisfied item dependencies queue one cooperative evidence reevaluation.
+- The reevaluated evidence is normalized into a generation-relevant outcome fingerprint.
+- Presentation details such as names, links, icons, and quality are excluded from the fingerprint.
+- If the outcome is unchanged, the persistent record is updated in place and dependent eligibility remains valid.
+- If the outcome changes, only final eligibility records derived from that visual are invalidated; era-independent prechecks remain reusable.
+- Genuine stable metadata identity changes continue to invalidate item-derived evidence safely.
 
-## Event coalescing and targeted refresh
+## Callback coalescing and cooperative resolution
 
-- Duplicate callbacks for the same item are coalesced inside the existing metadata batch.
-- Multiple callbacks affecting one visual stop after the first relevant reopening.
-- Stable callbacks no longer clear local era, eligibility, or precheck fields.
-- UI metadata notifications are emitted only when the representative appearance row actually changed.
-- Era-independent prechecks survive item-data reopening.
+- Duplicate item callbacks are deduplicated before dependency processing.
+- The pending resolver uses the existing foreground time budget and processes era siblings incrementally.
+- Resolution pauses while collection scanning or foreground outfit generation owns the wardrobe pipeline.
+- Failed or incomplete dependencies remain bounded and fail closed instead of entering an immediate reopen loop.
 
 ## Diagnostics
 
-The Generation Performance tooltip now reports:
+The Generation Performance tooltip now distinguishes:
 
 ```text
-Item data: <stable ignored> • <pending reopened> • <identity changes> • <coalesced>
+Item callbacks received and coalesced
+Exact dependencies examined, still pending, and fully satisfied
+Evidence outcomes unchanged and changed
+Pending records created
+Downstream eligibility records invalidated
+Genuine metadata identity changes
 ```
 
-Exact invalidation reasons distinguish `ITEM_DATA_PENDING_RESOLVED` from `ITEM_METADATA_IDENTITY_CHANGED`.
+Weapon diagnostics also retain the slowest cooperative resume phase when an individual resume exceeds the responsiveness guard.
 
 ## Preserved behavior
 
-- Persistent cache format remains backward-compatible; no cache reset is required.
-- Cooperative armor generation, cooperative weapon routing, weighted selection, locks, hidden slots, linked hands, artifacts, atomic commits, and targeted UI refreshes are unchanged.
+- Armor weighting, random selection order, zone preferences, era restrictions, locks, hidden slots, linked hands, weapon routes, artifacts, and atomic commits are unchanged.
 - Traveler cohesion remains calibrated instrumentation only.
+- The targeted post-generation UI refresh remains unchanged.
 - SavedVariables schema 2, Courier format 1, and wardrobe cache format 7 remain unchanged.
-- Quest Chronicle still applies no transmog and spends no gold.
+- Quest Chronicle applies no transmog and spends no gold.

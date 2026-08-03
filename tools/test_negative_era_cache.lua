@@ -65,8 +65,8 @@ local pendingDone, pendingResult = ZoneStyle.StepSourceEraEvidenceWork(pendingWo
 assert(pendingDone and pendingResult.pending and pendingCalls == 2, "pending result did not finish")
 local pendingCached = ZoneStyle.CreateSourceEraEvidenceWork(pendingSource)
 assert(pendingCached.done and pendingCached.cached and pendingCached.result.pending, "pending result was not cached")
-now = now + 31
+now = now + 601
 local retry = ZoneStyle.CreateSourceEraEvidenceWork(pendingSource)
 assert(not retry.done, "expired pending evidence did not reopen")
 
-print("PASS negative era cache: unknown results reuse immediately, pending results retry after 30 seconds")
+print("PASS negative era cache: unknown results reuse immediately, pending results retry after the bounded dependency window")

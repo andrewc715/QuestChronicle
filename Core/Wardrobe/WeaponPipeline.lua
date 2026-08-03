@@ -4,6 +4,13 @@ local P = Wardrobe._Private
 
 P.activeWeaponCoroutine = nil
 
+local function NowMilliseconds()
+    if type(debugprofilestop) == "function" then return debugprofilestop() end
+    if type(GetTimePreciseSec) == "function" then return GetTimePreciseSec() * 1000 end
+    if type(GetTime) == "function" then return GetTime() * 1000 end
+    return 0
+end
+
 function P.MaybeYieldWeaponGeneration(phaseKey)
     if not coroutine or type(coroutine.running) ~= "function" or type(coroutine.yield) ~= "function" then return end
     local running = coroutine.running()
@@ -31,8 +38,15 @@ function P.StepWeaponGenerationWork(work)
     end
 
     P.activeWeaponCoroutine = work.thread
+    local started = NowMilliseconds()
     local resumed, first, second, third = coroutine.resume(work.thread)
+    local elapsed = math.max(0, NowMilliseconds() - started)
     P.activeWeaponCoroutine = nil
+    work.lastResumeMs = elapsed
+    if elapsed > (tonumber(work.maxResumeMs) or 0) then
+        work.maxResumeMs = elapsed
+        work.slowestYieldPhase = first
+    end
     if not resumed then
         work.done, work.ok, work.value = true, false, tostring(first)
         return true, false, work.value

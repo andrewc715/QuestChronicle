@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0a9
+# Quest Chronicle v1.9.0a10
 
-> **Precise item-data invalidation:** stable Blizzard item-data callbacks are now ignored or coalesced instead of tearing down reusable era evidence. Only a relevant pending item becoming available or a genuine item-metadata identity change reopens affected evidence.
+> **Pending-dependency repair:** exact missing-item dependencies are indexed and resolved cooperatively. When item data arrives, Quest Chronicle compares the normalized era outcome before invalidating anything, so unchanged evidence keeps its reusable eligibility records.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a9 preserves the live-validated v1.9.0a8 persistent cache while preventing ordinary item-data completion events from repeatedly invalidating thousands of reusable records.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a10 preserves the live-validated v1.9.0a8 persistent cache and the responsive v1.9.0a9 pipeline while eliminating the repeated pending-record teardown revealed by Retail diagnostics.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -163,6 +163,12 @@ QuestChronicle\
 │   │   └── PublicAPI.lua
 │   ├── Wardrobe\
 │   │   ├── Foundation.lua
+│   │   ├── GenerationCacheStore.lua
+│   │   ├── GenerationCacheAccess.lua
+│   │   ├── GenerationDependencyIndex.lua
+│   │   ├── GenerationCacheInvalidation.lua
+│   │   ├── GenerationCacheDiagnostics.lua
+│   │   ├── PendingEvidenceResolver.lua
 │   │   ├── StateAndPreferences.lua
 │   │   ├── EquipmentTopology.lua
 │   │   ├── AppearanceRoutes.lua
@@ -187,7 +193,8 @@ QuestChronicle\
 │       ├── ProgressionRestrictions.lua
 │       ├── Scoring.lua
 │       ├── GenerationEligibility.lua
-│       └── Traveler│           ├── StyleLexicon.lua
+│       └── Traveler\
+│           ├── StyleLexicon.lua
 │           ├── Descriptors.lua
 │           ├── Cohesion.lua
 │           └── Debug.lua

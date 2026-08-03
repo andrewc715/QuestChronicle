@@ -82,6 +82,8 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         eraCacheHits = job and job.eraCacheHits or 0,
         eligibilityCacheHits = job and job.eligibilityCacheHits or 0,
         weaponYields = job and job.weaponYields or 0,
+        weaponSlowYieldPhase = job and job.weaponWork and job.weaponWork.slowestYieldPhase or nil,
+        weaponSlowYieldMs = job and job.weaponWork and job.weaponWork.maxResumeMs or 0,
         selectedArmor = job and job.selectedArmor or 0,
         cacheDiagnostics = P.BuildGenerationCachePerformance
             and P.BuildGenerationCachePerformance(job and job.cacheCountersStarted) or nil,
@@ -136,6 +138,15 @@ function Wardrobe.GetGenerationPerformanceDetails(performance)
             maxMs = tonumber(phase.maxMs) or 0,
         })
     end
+    if (tonumber(performance.weaponSlowYieldMs) or 0) > 8 then
+        table.insert(details, {
+            key = "weaponYieldOverrun",
+            label = "Weapon yield: " .. tostring(performance.weaponSlowYieldPhase or "unknown"),
+            calls = 1,
+            totalMs = tonumber(performance.weaponSlowYieldMs) or 0,
+            maxMs = tonumber(performance.weaponSlowYieldMs) or 0,
+        })
+    end
     table.sort(details, function(left, right)
         if left.maxMs == right.maxMs then return left.label < right.label end
         return left.maxMs > right.maxMs
@@ -167,11 +178,23 @@ function Wardrobe.GetGenerationCachePerformanceLines(performance)
             tonumber(diagnostics.invalidatedDuringGeneration) or 0
         ),
         string.format(
-            "Item data: %d stable ignored • %d pending reopened • %d identity changes • %d coalesced",
-            tonumber(diagnostics.itemEventsIgnoredDuringGeneration) or 0,
-            tonumber(diagnostics.pendingEvidenceReopenedDuringGeneration) or 0,
-            tonumber(diagnostics.metadataIdentityChangesDuringGeneration) or 0,
-            tonumber(diagnostics.itemEventsCoalescedDuringGeneration) or 0
+            "Item callbacks: %d received • %d coalesced • %d dependencies examined",
+            tonumber(diagnostics.itemCallbacksReceivedDuringGeneration) or 0,
+            tonumber(diagnostics.itemEventsCoalescedDuringGeneration) or 0,
+            tonumber(diagnostics.dependencyRecordsExaminedDuringGeneration) or 0
+        ),
+        string.format(
+            "Dependencies: %d still pending • %d satisfied • %d outcomes unchanged • %d changed",
+            tonumber(diagnostics.dependenciesStillPendingDuringGeneration) or 0,
+            tonumber(diagnostics.dependenciesSatisfiedDuringGeneration) or 0,
+            tonumber(diagnostics.evidenceOutcomesUnchangedDuringGeneration) or 0,
+            tonumber(diagnostics.evidenceOutcomesChangedDuringGeneration) or 0
+        ),
+        string.format(
+            "Cache churn: %d pending records created • %d downstream invalidated • %d identity changes",
+            tonumber(diagnostics.pendingRecordsCreatedDuringGeneration) or 0,
+            tonumber(diagnostics.downstreamRecordsInvalidatedDuringGeneration) or 0,
+            tonumber(diagnostics.metadataIdentityChangesDuringGeneration) or 0
         ),
     }
     local reasons = {}
