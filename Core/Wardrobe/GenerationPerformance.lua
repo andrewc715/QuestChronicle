@@ -21,6 +21,7 @@ P.GENERATION_PHASE_LABELS = {
     anchorBeamSearch = "Anchor beam search",
     anchorWeaponExpansion = "Anchor weapon expansion",
     anchorSelection = "Anchor selection",
+    rerollSlot = "Reroll slot",
 }
 
 P.GENERATION_PHASE_SHORT_LABELS = {
@@ -38,6 +39,7 @@ P.GENERATION_PHASE_SHORT_LABELS = {
     anchorBeamSearch = "Anchor beam",
     anchorWeaponExpansion = "Anchor weapons",
     anchorSelection = "Anchor selection",
+    rerollSlot = "Reroll slot",
 }
 
 function P.GenerationNowMilliseconds()

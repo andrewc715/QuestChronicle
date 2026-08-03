@@ -52,7 +52,6 @@ local function GenerationStateSignature(state)
     AppendMapSignature(parts, "subtypes", state and state.weaponSubtypes)
     return table.concat(parts, "|")
 end
-
 local function ScheduleNextStep(token)
     if not C_Timer or type(C_Timer.After) ~= "function" then return false end
     C_Timer.After(0, function()
@@ -62,11 +61,9 @@ local function ScheduleNextStep(token)
     end)
     return true
 end
-
 local function Notify(event, ...)
     if QC.Notify then QC.Notify(event, ...) end
 end
-
 local function FinishJob(job, success, message)
     if not job or P.generationJob ~= job then return end
     local finishedAt = NowMilliseconds()
@@ -86,9 +83,9 @@ local function FinishJob(job, success, message)
     if Wardrobe.RecordGenerationPostPhase then
         Wardrobe.RecordGenerationPostPhase(performance, "completionNotify", NowMilliseconds() - notifyStarted)
     end
+    if QC.Diagnostics and QC.Diagnostics.QueueGenerationAttempt then QC.Diagnostics.QueueGenerationAttempt(job, success == true, message, performance) end
     return performance
 end
-
 local function BuildGenerationMessage(job, generatedName, weaponCount, weaponNotice)
     local styleLabel = "Random"
     local profileLabel
@@ -122,12 +119,10 @@ local function BuildGenerationMessage(job, generatedName, weaponCount, weaponNot
     end
     return message
 end
-
 local function CommitDraft(job, weaponCount, weaponNotice)
     if GenerationStateSignature(job.liveState) ~= job.startSignature then
         return FinishJob(job, false, "Outfit generation was cancelled because the workbench changed while Quest Chronicle was preparing the outfit.")
     end
-
     local commitStarted = NowMilliseconds()
     local generatedName = P.RefreshGeneratedOutfitName(job.draft, job.styleEngine, job.styleMode, job.styleContext)
     job.liveState.selections = job.draft.selections
@@ -140,7 +135,6 @@ local function CommitDraft(job, weaponCount, weaponNotice)
     RecordPhase(job, "stateCommit", commitStarted)
     return FinishJob(job, true, BuildGenerationMessage(job, generatedName, weaponCount, weaponNotice))
 end
-
 local function FinalizeArmorSlot(job, work)
     local chosen
     if job.styleEngine then
@@ -159,7 +153,6 @@ local function FinalizeArmorSlot(job, work)
     else
         chosen = work.pool[math.random(1, #work.pool)]
     end
-
     if chosen then
         P.SetSelectedSource(job.draft, work.slotKey, chosen)
         if not job.draft.hidden[work.slotKey] and job.styleEngine and job.styleEngine.AddSourceToGenerationContext then
@@ -446,6 +439,7 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
         }
         P.lastGenerationPerformance = performance
         Notify("WARDROBE_GENERATION_COMPLETE", ok == true, message, performance)
+        if QC.Diagnostics and QC.Diagnostics.RecordImmediateAttempt then QC.Diagnostics.RecordImmediateAttempt({ action = reroll and "REROLL_UNLOCKED" or "GENERATE_OUTFIT", reroll = reroll == true, liveState = P.EnsurePreviewState(), draft = P.EnsurePreviewState(), styleMode = requestedStyleMode }, ok == true, message, performance) end
         return ok, message
     end
 
@@ -465,6 +459,7 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
     P.generationToken = P.generationToken + 1
     local job = {
         token = P.generationToken,
+        action = reroll and "REROLL_UNLOCKED" or "GENERATE_OUTFIT",
         reroll = reroll == true,
         liveState = liveState,
         draft = draft,

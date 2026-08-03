@@ -17,7 +17,7 @@ P.questSyncToken = 0
 
 P.SCHEMA_VERSION = 2
 P.COURIER_FORMAT_VERSION = 1
-P.ADDON_VERSION = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(P.ADDON_NAME, "Version")) or "1.9.0.2"
+P.ADDON_VERSION = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(P.ADDON_NAME, "Version")) or "1.9.0.3"
 P.PREFIX = "|cffd9b36cQuest Chronicle:|r "
 P.OBJECTIVE_SYNC_DELAY = 0.35
 P.REMOVAL_CLASSIFY_DELAY = 0.45
@@ -354,6 +354,8 @@ function P.EnsureDatabase()
     QuestChronicleDB.ui.chronicleSearch = QuestChronicleDB.ui.chronicleSearch or ""
     QuestChronicleDB.ui.activeQuestFilter = QuestChronicleDB.ui.activeQuestFilter or "ALL"
     QuestChronicleDB.ui.activeQuestSort = QuestChronicleDB.ui.activeQuestSort or "READY"
+    QuestChronicleDB.ui.debugRawIDs = QuestChronicleDB.ui.debugRawIDs == true
+    QuestChronicleDB.ui.debugVerbose = QuestChronicleDB.ui.debugVerbose == true
     QuestChronicleDB.ui.window = QuestChronicleDB.ui.window or {}
 end
 

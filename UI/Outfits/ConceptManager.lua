@@ -451,31 +451,24 @@ P.builders[#P.builders + 1] = function(C)
         GameTooltip:SetText("Generation Performance", 1, 0.82, 0)
         GameTooltip:AddLine(Wardrobe.FormatGenerationPerformance(performance), 1, 1, 1, true)
         GameTooltip:AddLine(string.format(
-            "%d appearance candidates • %d era-source checks • %d selected armor slots",
+            "%d candidates • %d era checks • %d weapon yields",
             tonumber(performance.candidates) or 0,
             tonumber(performance.eraCandidates) or 0,
-            tonumber(performance.selectedArmor) or 0
-        ), 0.7, 0.7, 0.7, true)
-        GameTooltip:AddLine(string.format(
-            "%d era-cache hits • %d eligibility-cache hits • %d weapon yields",
-            tonumber(performance.eraCacheHits) or 0,
-            tonumber(performance.eligibilityCacheHits) or 0,
             tonumber(performance.weaponYields) or 0
         ), 0.7, 0.7, 0.7, true)
-        for _, line in ipairs(Wardrobe.GetAnchorSkeletonPerformanceLines and Wardrobe.GetAnchorSkeletonPerformanceLines(performance) or {}) do
-            GameTooltip:AddLine(line, 0.86, 0.72, 1, true)
+        local anchor = performance.anchorStats
+        if anchor then
+            GameTooltip:AddLine(string.format(
+                "Skeleton rank %d/%d • score %.1f • cohesion %.3f",
+                tonumber(anchor.chosenRank) or 0,
+                tonumber(anchor.shortlistSize) or 0,
+                tonumber(anchor.chosenScore) or 0,
+                tonumber(anchor.meanPairCohesion) or 0
+            ), 0.86, 0.72, 1, true)
+        elseif performance.anchorFallbackReason then
+            GameTooltip:AddLine("Anchor fallback: " .. tostring(performance.anchorFallbackReason), 1, 0.65, 0.3, true)
         end
-        for _, line in ipairs(Wardrobe.GetGenerationCachePerformanceLines(performance)) do
-            GameTooltip:AddLine(line, 0.62, 0.82, 1, true)
-        end
-        for _, detail in ipairs(Wardrobe.GetGenerationPerformanceDetails(performance)) do
-            GameTooltip:AddDoubleLine(
-                detail.label,
-                string.format("%.1f ms max • %.1f ms total • %d calls", detail.maxMs, detail.totalMs, detail.calls),
-                1, 1, 1,
-                0.72, 0.82, 1
-            )
-        end
+        GameTooltip:AddLine("Open the Debug tab for the complete beam, scoring, cache, and phase report.", 0.62, 0.82, 1, true)
         GameTooltip:Show()
     end)
     C.performanceHitbox:SetScript("OnLeave", function() GameTooltip:Hide() end)

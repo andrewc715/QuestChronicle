@@ -368,6 +368,7 @@ function P.PrintHelp()
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc weapon debug|r - print weapon slot, option, and selection diagnostics")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc traveler debug|r - explain Traveler cohesion, mismatch budget, and outliers")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc skeleton debug|r - print the latest anchor beam and chosen skeleton")
+    DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc debug|r - open the Diagnostics Workbench")
 end
 
 function P.HandleSlashCommand(message)
@@ -385,6 +386,8 @@ function P.HandleSlashCommand(message)
         P.PrintHelp()
     elseif command == "status" then
         P.PrintStatus()
+    elseif command == "debug" then
+        if QC.ShowWindow then QC.ShowWindow("debug") else P.Print("The Debug Workbench is not available yet.") end
     elseif command == "recent" then
         P.PrintRecent(rest)
     elseif command == "active" then

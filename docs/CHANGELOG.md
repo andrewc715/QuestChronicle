@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.9.0.3 - 2026-08-02
+
+### Added
+
+- Added a top-level Debug tab with the ten newest immutable generation reports.
+- Captured Generate Outfit, Reroll Unlocked, Reroll Slot, fallback, cancellation, and failure outcomes.
+- Added anchor-skeleton composition, beam-stage statistics, score breakdowns, pair-cohesion dimensions, complete performance phases, cache lifecycle counters, warnings, and previous-run comparison.
+- Added raw-ID and verbose diagnostic views plus a copyable plain-text report.
+- Added `/qc debug` while preserving `/qc skeleton debug` as the concise chat summary.
+- Added a versioned, bounded diagnostic store under `QuestChronicleDB.debug`.
+
+### Preserved
+
+- Preserved v1.9.0.2 candidate preparation, beam ordering, weighted finalist selection, weapon routing, supporting-slot generation, locks, hidden slots, and atomic commits.
+- Preserved SavedVariables schema 2, Courier format 1, and wardrobe cache format 7.
+
 ## 1.9.0.2 - 2026-08-02
 
 ### Added

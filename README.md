@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0.2
+# Quest Chronicle v1.9.0.3
 
-> **Phase B: Anchor Skeletons:** generated outfits now choose Chest, Legs, Shoulders, and a legal weapon bundle as one beam-searched visual foundation before filling the supporting armor slots.
+> **Phase B Diagnostics Workbench:** a dedicated Debug tab now preserves the last ten immutable generation reports with anchor skeletons, beam statistics, score ledgers, performance phases, cache activity, warnings, and copyable plain-text output.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.2 begins the Traveler Cohesion Rewrite's active generation phase while preserving the live-validated v1.9.0a10 cooperative cache, dependency, weapon-route, and atomic-commit pipelines.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.3 adds read-only diagnostics around the v1.9.0.2 Anchor Skeleton generator without changing its selection, scoring, weapon-route, cache, or atomic-commit behavior.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -80,6 +80,29 @@ The status page contains:
 
 WoW still decides when SavedVariables are written to disk. Use `/reload`, log out, or exit WoW after refreshing the Courier export when the external Courier needs the new snapshot immediately.
 
+## Debug tab
+
+The Debug Workbench keeps the ten newest generation attempts as bounded immutable snapshots. It captures Generate Outfit, Reroll Unlocked, Reroll Slot, fallback, cancellation, and failure outcomes without reading mutable worker state after the fact.
+
+Each selected report includes:
+
+- action, mode, context, result, timing, and fallback status;
+- the chosen Chest, Legs, Shoulders, and physical weapon appearances;
+- beam candidate pools, expansions, retained nodes, pair-cache activity, shortlist, and chosen rank;
+- the score ledger and pair-cohesion dimensions recorded during generation;
+- every timed phase with maximum, total, and call counts;
+- persistent-cache, metadata dependency, and invalidation diagnostics;
+- warnings for performance overruns, fallback, and repeated Chest/Shoulder foundations;
+- comparison with the previous completed run.
+
+Use **Copy Report** to open a read-only multiline box with the selected report highlighted for `Ctrl+C`. **Clear History** removes only diagnostic snapshots. It never changes Chronicle events, wardrobe caches, concepts, selections, or Custom Sets.
+
+```text
+/qc debug
+```
+
+opens the main window directly to the latest diagnostic report. `/qc skeleton debug` remains available as a concise chat summary.
+
 ## WoW AddOns settings
 
 ```text
@@ -123,6 +146,7 @@ Settings include:
 /qc weapon debug
 /qc traveler debug
 /qc skeleton debug
+/qc debug
 ```
 
 Bare `/qc` toggles the main window. `/qc help` displays command help.
@@ -162,6 +186,11 @@ QuestChronicle\
 │   │   ├── QuestLifecycle.lua
 │   │   ├── Commands.lua
 │   │   └── PublicAPI.lua
+│   ├── Diagnostics\
+│   │   ├── Foundation.lua
+│   │   ├── History.lua
+│   │   ├── SnapshotBuilder.lua
+│   │   └── ReportFormatter.lua
 │   ├── Wardrobe\
 │   │   ├── Foundation.lua
 │   │   ├── GenerationCacheStore.lua
@@ -208,6 +237,9 @@ QuestChronicle\
 │   ├── ActiveQuestsTab.lua
 │   ├── NoteTab.lua
 │   ├── StatusTab.lua
+│   ├── DebugHistory.lua
+│   ├── DebugReport.lua
+│   ├── DebugTab.lua
 │   ├── Outfits\
 │   │   ├── OutfitsHelpers.lua
 │   │   ├── Layout.lua
@@ -232,7 +264,7 @@ QuestChronicle\
 
 The TOC is the dependency manifest. Public subsystem APIs remain on `QuestChronicle`, `QuestChronicle.Wardrobe`, `QuestChronicle.ZoneStyle`, and `QuestChronicle.UI`; module-private helpers are documented in `docs/ARCHITECTURE.md`.
 
-The project enforces a maximum of 500 physical lines per runtime Lua file:
+The project enforces fewer than 500 physical lines per runtime Lua file:
 
 ```text
 python tools/verify_lua_line_limit.py
@@ -297,7 +329,7 @@ The skeleton scorer activates the calibrated Traveler palette, material, finish,
 
 Locks and hidden slots remain authoritative. Locked anchors become fixed beam components, Shoulders can now be deliberately hidden, hidden anchors are omitted without penalty, and an unavailable or impossible locked source sends the job through the preserved legacy generator. The final preview still changes only after an atomic commit.
 
-`/qc skeleton debug` prints the latest Chest, Legs, Shoulders, weapon bundle, beam statistics, chosen rank, score, cohesion, and fallback reason. The Generation Performance tooltip reports pool sizes, beam expansions, pair-cache activity, weapon bundles, and the chosen skeleton.
+`/qc skeleton debug` prints the latest Chest, Legs, Shoulders, weapon bundle, beam statistics, chosen rank, score, cohesion, and fallback reason. The compact Generation Performance tooltip reports the headline timing and chosen skeleton. The Debug tab preserves the complete beam, score, performance, cache, and warning ledger for the last ten attempts.
 
 ### Weapon Appearance Rules
 

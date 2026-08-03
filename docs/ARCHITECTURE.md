@@ -36,6 +36,16 @@ These tables are runtime implementation details. Other subsystems should use pub
 `Core/Chronicle/PublicAPI.lua`
 : Public API completion, abandon hooks, frame events, and lifecycle dispatch.
 
+## Diagnostics Workbench
+
+`QuestChronicle.Diagnostics` owns bounded, immutable generation reports. `Core/Diagnostics/SnapshotBuilder.lua` copies only primitive generation results after completion, cancellation, fallback, or failure; it never stores mutable beam nodes, coroutine state, candidate arrays, or live wardrobe-source tables. UI callbacks consume completed snapshots only.
+
+`Core/Diagnostics/History.lua` persists diagnostic format 1 at `QuestChronicleDB.debug`. The store retains at most ten reports, rejects malformed or incompatible entries, caps each report at 20 KB, caps approximate history at 200 KB, and prunes oldest entries first. Clearing the store is isolated from Chronicle history, wardrobe caches, concepts, and Courier data.
+
+`Core/Diagnostics/ReportFormatter.lua` renders the same snapshot as rich in-game text or a plain copy report. Raw IDs and verbose zero-count diagnostics are presentation options and do not mutate stored reports. `UI/DebugHistory.lua`, `UI/DebugReport.lua`, and `UI/DebugTab.lua` provide the two-column workbench. A new report refreshes the tab only when it is visible and never changes the active main-window tab.
+
+Generation integration is deliberately read-only. `GenerationWorker.lua` queues a snapshot after its existing completion pipeline, and the Reroll Slot wrapper preserves the original return values. Anchor score reasons and selected pair diagnostics are copied only after the winner has already been chosen, preserving v1.9.0.2 selection behavior.
+
 ## Wardrobe
 
 `Core/Wardrobe/Foundation.lua`
@@ -176,6 +186,12 @@ The Outfits tab uses a shared construction context so its formerly 1,700-line co
 `UI/Outfits/OutfitsTab.lua`
 : Small public constructor that executes the ordered builders.
 
+## Debug UI
+
+`UI/DebugTab.lua` constructs the workbench and owns report-added and history-cleared callbacks. `UI/DebugHistory.lua` renders the ten bounded report rows and persists only the selected report ID in ordinary UI state. `UI/DebugReport.lua` renders the selected immutable snapshot and opens a multiline copy dialog with the report preselected for `Ctrl+C`.
+
+The compact Outfits performance tooltip retains only headline timing and skeleton information. Complete phase, cache, score, beam, warning, and comparison ledgers live in the Debug tab, preventing tooltip growth from becoming a usability constraint.
+
 ## Line-limit policy
 
 Run from the addon root:
@@ -184,7 +200,7 @@ Run from the addon root:
 python tools/verify_lua_line_limit.py
 ```
 
-The command exits nonzero if any Lua file exceeds 500 physical lines.
+The command exits nonzero if any Lua file reaches or exceeds 500 physical lines.
 
 ## Traveler cohesion instrumentation (v1.9.0a1 calibration)
 
@@ -209,6 +225,14 @@ The top four legal armor skeletons enter cooperative weapon expansion. Each expa
 After selection, the worker rebuilds the style context around the chosen Chest, Legs, Shoulders, and weapon bundle. Waist, Head, Hands, Feet, Wrists, Back, Shirt, and Tabard are then generated as supporting pieces. The complete draft remains private until the existing atomic commit. If the beam cannot produce at least two active legal components, the unchanged independent generator remains available as a compatibility fallback.
 
 Performance telemetry reports candidate-pool sizes, beam expansions and retained counts, pair-cache hits and misses, legal weapon bundles, chosen rank and score, and fallback reason. `/qc skeleton debug` prints the most recent anchor composition and search summary.
+
+## Phase B diagnostics workbench (v1.9.0.3)
+
+Each generation attempt produces one format-1 diagnostic snapshot after the existing pipeline has settled. The snapshot includes the selected physical appearance recipe, anchor diagnostics, beam counters, recorded score components, phase telemetry, cache lifecycle counters, warnings, and comparison with the previous completed report. Reroll Slot uses a synchronous timing snapshot and intentionally does not inherit a previous anchor beam.
+
+Reports remain bounded and immutable across `/reload`. The Debug tab can show raw visual, source, item, and category IDs without persisting alternate copies. Copy formatting is generated only when requested. `/qc debug` opens the latest report; `/qc skeleton debug` remains the concise chat path.
+
+The release has a strict parity boundary: diagnostics may observe recorded values but may not change candidate preparation, beam ordering, weighted finalist selection, weapon routing, supporting-slot generation, locks, hidden slots, or the atomic commit.
 
 ## Cooperative wardrobe refresh (v1.9.0a2)
 

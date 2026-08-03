@@ -5,7 +5,6 @@ function P.LoadItemMetadata(source)
     if not source or not source.itemID then return nil end
     local itemID = tonumber(source.itemID)
     local genericName = not source.name or tostring(source.name):match("^Appearance %d+$")
-
     -- Metadata stored on wardrobe sources persists in SavedVariables. Only
     -- trust it when this exact item ID was verified by the current loader.
     -- Older builds stored expansionID without recording which representative

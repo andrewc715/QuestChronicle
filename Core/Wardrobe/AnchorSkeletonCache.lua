@@ -113,9 +113,9 @@ function P.BuildAnchorCandidate(source, definition, styleMode, styleContext, fix
         if fixed then coherent = true end
     end
 
-    local score = 10
+    local score, scoreReasons = 10, {}
     if style and style.ScoreSource then
-        score = style.ScoreSource(source, definition, styleMode, styleContext, coherenceScore, coherent, coherenceReason)
+        score, scoreReasons = style.ScoreSource(source, definition, styleMode, styleContext, coherenceScore, coherent, coherenceReason)
     end
     local descriptor = style and style.GetTravelerDescriptor and style.GetTravelerDescriptor(source, definition)
     local weight = math.max(1, (tonumber(score) or 0) + 4) ^ 2
@@ -125,6 +125,7 @@ function P.BuildAnchorCandidate(source, definition, styleMode, styleContext, fix
         definition = definition,
         slotKey = definition.key,
         baseScore = tonumber(score) or 0,
+        scoreReasons = scoreReasons,
         weight = weight,
         poolPriority = math.log(randomValue) / weight,
         descriptor = descriptor,

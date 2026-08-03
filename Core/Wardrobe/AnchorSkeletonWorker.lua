@@ -250,8 +250,60 @@ local function RebuildSelectedStyleContext(job, selected)
     job.styleContext = context
 end
 
+local function CandidateName(candidate)
+    local source = candidate and candidate.source
+    return source and (source.styleName or source.name or source.sourceID) or "Unknown"
+end
+
+local function BuildSelectedDiagnostics(selected, previousSignature)
+    local candidates = {}
+    for slotKey, candidate in pairs(selected.armorNode.sourceBySlot or {}) do candidates[slotKey] = candidate end
+    for _, candidate in ipairs(selected.weaponCandidates or {}) do candidates[candidate.slotKey] = candidate end
+
+    local all = {}
+    for _, candidate in ipairs(selected.armorNode.sources or {}) do all[#all + 1] = candidate end
+    for _, candidate in ipairs(selected.weaponCandidates or {}) do all[#all + 1] = candidate end
+    local componentTotals, componentCount = {}, 0
+    local strongest, weakest
+    for leftIndex = 1, #all - 1 do
+        for rightIndex = leftIndex + 1, #all do
+            local left, right = all[leftIndex], all[rightIndex]
+            local score, components = P.GetAnchorPairCohesion(left.source, right.source, left.definition, right.definition)
+            local relationship = {
+                label = CandidateName(left) .. " ↔ " .. CandidateName(right),
+                score = score,
+            }
+            if not strongest or score > strongest.score then strongest = relationship end
+            if not weakest or score < weakest.score then weakest = relationship end
+            for key, value in pairs(components or {}) do componentTotals[key] = (componentTotals[key] or 0) + value end
+            componentCount = componentCount + 1
+        end
+    end
+    if componentCount > 0 then
+        for key, value in pairs(componentTotals) do componentTotals[key] = value / componentCount end
+    end
+    local weaponBase = 0
+    for _, candidate in ipairs(selected.weaponCandidates or {}) do weaponBase = weaponBase + (candidate.baseScore or 0) end
+    local armorNode = selected.armorNode or {}
+    return {
+        candidates = candidates,
+        cohesionComponents = componentTotals,
+        strongestBridge = strongest,
+        weakestRelationship = weakest,
+        scoreBreakdown = {
+            armorBase = armorNode.baseScore or 0,
+            weaponBase = weaponBase,
+            armorRelationships = armorNode.relationshipBonus or 0,
+            weaponRelationships = selected.relationshipBonus or 0,
+            hardClashPenalty = -(((armorNode.hardClashes or 0) + (selected.hardClashes or 0)) * 18),
+            repeatPenalty = previousSignature and selected.signature == previousSignature and -35 or 0,
+        },
+    }
+end
+
 local function CommitSelectedSkeleton(job, work)
-    local selected, chosenRank, shortlistSize = P.ChooseAnchorSkeleton(work.finalists, job.draft.lastAnchorSkeletonSignature)
+    local previousSignature = job.draft.lastAnchorSkeletonSignature
+    local selected, chosenRank, shortlistSize = P.ChooseAnchorSkeleton(work.finalists, previousSignature)
     if not selected or selected.activeComponents < 2 then
         work.fallbackReason = work.lastWeaponFailure or "fewer than two legal anchor components"
         return false
@@ -277,6 +329,7 @@ local function CommitSelectedSkeleton(job, work)
     RebuildSelectedStyleContext(job, selected)
 
     local pairSnapshot = P.GetAnchorPairCacheSnapshot()
+    local selectedDiagnostics = BuildSelectedDiagnostics(selected, previousSignature)
     job.anchorStats = {
         poolSizes = work.poolSizes,
         expansions = work.beamWork.expansions,
@@ -308,8 +361,15 @@ local function CommitSelectedSkeleton(job, work)
         pairCacheHits = job.anchorStats.pairCacheHits,
         pairCacheMisses = job.anchorStats.pairCacheMisses,
         signature = selected.signature,
+        candidates = selectedDiagnostics.candidates,
+        cohesionComponents = selectedDiagnostics.cohesionComponents,
+        strongestBridge = selectedDiagnostics.strongestBridge,
+        weakestRelationship = selectedDiagnostics.weakestRelationship,
+        scoreBreakdown = selectedDiagnostics.scoreBreakdown,
+        poolSizes = work.poolSizes,
         generatedAt = time and time() or 0,
     }
+    job.anchorDiagnostics = P.lastAnchorSkeletonDiagnostics
     return true
 end
 
@@ -395,6 +455,7 @@ function P.AdvanceAnchorGenerationPhase(job, stepStarted)
             fallbackReason = job.anchorFallbackReason,
             generatedAt = time and time() or 0,
         }
+        job.anchorDiagnostics = P.lastAnchorSkeletonDiagnostics
         job.phase = "ARMOR"
         job.armorOrder = P.ARMOR_GENERATION_ORDER
         job.armorIndex, job.armorWork = 1, nil

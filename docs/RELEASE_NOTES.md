@@ -1,64 +1,92 @@
-# Quest Chronicle v1.9.0.2 - Phase B: Anchor Skeletons
+# Quest Chronicle v1.9.0.3 - Phase B Diagnostics Workbench
 
-v1.9.0.2 begins the active generation phase of the Traveler Cohesion Rewrite. Chest, Legs, Shoulders, and weapons are no longer chosen independently. Quest Chronicle now builds a coherent anchor skeleton first, then asks the remaining armor slots to support that foundation.
+v1.9.0.3 turns the growing Phase B telemetry into a dedicated in-game workbench. The anchor generator itself remains the v1.9.0.2 implementation. This release records what happened, why the skeleton won, where time was spent, and what the cache did without changing any selection result.
 
-The implementation is built on the live-validated v1.9.0a10 cache, dependency, cooperative weapon, and atomic-generation baseline.
+## Debug tab
 
-## Beam-searched armor foundations
+A new top-level **Debug** tab uses a two-column layout:
 
-- Prepares bounded, diversity-balanced candidate pools for Chest, Legs, and Shoulders.
-- Expands the pools through a cooperative beam search rather than evaluating the full cross-product.
-- Retains the strongest 32 partial skeletons after each armor stage.
-- Uses a quality-windowed weighted finalist selection so rerolls remain varied without selecting a dramatically weaker result.
-- Penalizes immediate repetition of the previous skeleton.
+- **Generation History** lists the ten newest attempts with time, action, mode, result, duration, and skeleton rank.
+- **Selected Report** shows the complete immutable snapshot for the chosen attempt.
 
-## Active cohesion scoring
-
-- Activates the calibrated Traveler palette, material, finish, motif, visual-weight, provenance, and loudness relationships during anchor selection.
-- Reuses mode-specific Zone Native, Traveler, Class Fantasy, and Chronicle Echo relevance scores.
-- Adds a bounded pairwise cohesion cache keyed to stable descriptor identity.
-- Limits visual-family saturation in each prepared candidate pool.
-
-## Weapon bundle integration
-
-- Expands the strongest four armor skeletons through the existing cooperative weapon-route engine.
-- Treats each legal Main Hand and Off Hand result as one logical weapon bundle for skeleton scoring.
-- Preserves physical topology, per-hand Blizzard permissions, linked hands, exact visuals, artifacts, subtype filters, and locked weapons.
-- Does not allow cohesion scoring to override weapon legality.
-
-## Supporting armor
-
-- Generates Waist, Head, Hands, Feet, Wrists, Back, Shirt, and Tabard after the skeleton is chosen.
-- Rebuilds the generation context around the selected skeleton so supporting pieces reinforce it.
-- Preserves the private draft and atomic preview commit.
-
-## Locks, hidden slots, and fallback
-
-- Locked Chest, Legs, and Shoulders become fixed beam components.
-- Shoulders can now be deliberately hidden; hidden anchors are omitted without a cohesion penalty.
-- Missing or generation-ineligible locked anchors force the preserved legacy generator.
-- Searches with fewer than two active legal anchor components fall back safely.
-- Existing selections remain untouched until a complete generated draft commits.
-
-## Diagnostics
-
-The Generation Performance tooltip now reports:
+The tab opens through the main window or:
 
 ```text
-Chest, Legs, and Shoulder pool sizes
-Beam expansions and retained entries per stage
-Legal weapon bundles evaluated
-Pairwise cohesion cache hits and misses
-Chosen skeleton rank, score, and mean cohesion
-Fallback reason, when applicable
+/qc debug
 ```
 
-`/qc skeleton debug` prints the latest anchor composition and beam summary.
+A new report never pulls the player away from the Outfits tab. Opening Debug selects the newest report.
+
+## Immutable generation snapshots
+
+Quest Chronicle records one bounded snapshot for:
+
+```text
+Generate Outfit
+Reroll Unlocked
+Reroll Slot
+Completed generation
+Legacy fallback
+Cancellation
+Failure
+```
+
+Snapshots copy only stable primitive data after the generation pipeline settles. They do not retain beam nodes, coroutine workers, candidate arrays, or live wardrobe tables.
+
+## Complete diagnostic report
+
+Each report can include:
+
+- version, character, action, mode, context, result, outfit name, and timing;
+- Chest, Legs, Shoulders, and physical weapon appearances;
+- locks, hidden anchors, chosen rank, score, cohesion, and hard clashes;
+- strongest and weakest anchor relationships;
+- candidate pools, expansions, retained beam nodes, legal weapon bundles, pair-cache activity, shortlist, and fallback;
+- recorded anchor score components and mean pair-cohesion dimensions;
+- every performance phase with maximum, total, and call count;
+- persistent cache, item dependency, evidence outcome, and invalidation metrics;
+- warnings for performance overruns, fallback, and repeated Chest/Shoulder foundations;
+- a lightweight comparison with the previous completed report.
+
+The compact Outfits tooltip now carries only headline timing and skeleton information, then points to the Debug tab for the full ledger.
+
+## History and persistence
+
+Diagnostic format 1 is stored under:
+
+```text
+QuestChronicleDB.debug
+```
+
+The store is deliberately bounded:
+
+```text
+Maximum reports:          10
+Maximum report size:      20 KB
+Maximum history size:     approximately 200 KB
+Pruning order:            oldest first
+```
+
+History survives `/reload` and ordinary logout. **Clear History** removes only diagnostic reports. Chronicle events, wardrobe caches, concepts, selections, preferences, Custom Set links, and Courier data are untouched.
+
+## Copy Report
+
+**Copy Report** opens a multiline read-only report box with all text selected. Press `Ctrl+C` to copy it for a development report. **Show raw IDs** adds visual, source, item, and category identifiers. **Verbose diagnostics** includes otherwise hidden zero-count fields.
+
+## Selection parity
+
+v1.9.0.3 does not calibrate the Phase B beam. Seeded and deterministic harnesses produce the same anchor ranking, mode identity, worker result, selection parity, weapon result, and synthetic benchmark output as v1.9.0.2.
+
+The repeated Rugged Plate Vest and Expedition Defender's Shoulders, plus the observed Anchor weapon-expansion overrun, remain evidence for the planned v1.9.0.4 calibration release rather than changes hidden inside this patch.
 
 ## Compatibility
 
-- SavedVariables schema remains 2.
-- Courier format remains 1.
-- Wardrobe cache format remains 7.
-- Existing concepts, Custom Set links, selections, locks, hidden slots, preferences, and persistent generation caches remain valid.
-- Quest Chronicle applies no transmog and spends no gold.
+```text
+SavedVariables schema:   2
+Courier format:          1
+Wardrobe cache format:   7
+Diagnostic format:       1
+Generation-cache store:  2
+```
+
+No reset is required. Quest Chronicle still applies no transmog and spends no gold.

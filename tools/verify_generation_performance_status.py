@@ -9,6 +9,8 @@ concepts = (ROOT / "UI" / "Outfits" / "ConceptManager.lua").read_text(encoding="
 browser = (ROOT / "UI" / "Outfits" / "AppearanceBrowser.lua").read_text(encoding="utf-8")
 refresh = (ROOT / "UI" / "Outfits" / "RefreshAndEvents.lua").read_text(encoding="utf-8")
 performance = (ROOT / "Core" / "Wardrobe" / "GenerationPerformance.lua").read_text(encoding="utf-8")
+snapshots = (ROOT / "Core" / "Diagnostics" / "SnapshotBuilder.lua").read_text(encoding="utf-8")
+reports = (ROOT / "Core" / "Diagnostics" / "ReportFormatter.lua").read_text(encoding="utf-8")
 
 checks = {
     "dedicated performance font string": 'C.performanceText = C.sourcePanel:CreateFontString' in concepts,
@@ -21,7 +23,9 @@ checks = {
     "preview application measured": 'RecordGenerationPostPhase(performance, "previewApply"' in refresh,
     "final UI refresh measured": 'RecordGenerationPostPhase(performance, "uiRefresh"' in refresh,
     "new generation clears prior measurement": 'C.pane.generationPerformance = nil' in refresh,
-    "phase tooltip": 'Wardrobe.GetGenerationPerformanceDetails(performance)' in concepts,
+    "compact tooltip directs to Debug": "Open the Debug tab" in concepts,
+    "full phase ledger reaches Debug": "phaseStats = CopyTable(performance.phaseStats)" in snapshots
+        and "local function AddPerformance" in reports,
     "appearance rows reserve performance-line space": 'row:SetPoint("TOP", C.sourcePanel, "TOP", 0, -166)' in browser,
 }
 

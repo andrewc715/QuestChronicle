@@ -14,6 +14,7 @@ local TAB_DEFINITIONS = {
     { key = "note", label = "Write Note", width = 122, tooltip = "Record an RP observation with location and character context.", constructor = UI.CreateNoteTab },
     { key = "status", label = "Status", width = 102, tooltip = "Review recorder health, Courier readiness, settings, and maintenance tools.", constructor = UI.CreateStatusTab },
     { key = "outfits", label = "Outfits", width = 102, tooltip = "Generate, refine, preview, save, and load outfit concepts from collected appearances.", constructor = UI.CreateOutfitsTab },
+    { key = "debug", label = "Debug", width = 92, tooltip = "Inspect immutable generation history, anchor skeletons, beam scoring, performance, and cache diagnostics.", constructor = UI.CreateDebugTab },
 }
 
 local function UpdateOutfitsTabLabel(frame)

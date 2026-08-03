@@ -1,0 +1,274 @@
+local QC = QuestChronicle
+local D = QC.Diagnostics
+local P = D._Private
+
+local ACTION_LABELS = {
+    GENERATE_OUTFIT = "Generate Outfit",
+    REROLL_UNLOCKED = "Reroll Unlocked",
+    REROLL_SLOT = "Reroll Slot",
+}
+local RESULT_LABELS = {
+    COMPLETED = "Completed",
+    FALLBACK = "Fallback",
+    CANCELLED = "Cancelled",
+    FAILED = "Failed",
+}
+local PHASE_ORDER = {
+    "setup", "validation", "eraEvidence", "eligibility", "coherence", "scoring",
+    "anchorCandidateScoring", "anchorBeamSearch", "anchorWeaponExpansion", "anchorSelection",
+    "slotSetup", "slotFinalization", "progressUpdate", "weaponRouting", "stateCommit",
+    "previewApply", "uiRefresh", "completionNotify", "rerollSlot",
+}
+local PHASE_LABELS = {
+    setup = "Setup", validation = "Source validation", eraEvidence = "Era evidence",
+    eligibility = "Eligibility", coherence = "Outfit coherence", scoring = "Candidate scoring",
+    anchorCandidateScoring = "Anchor candidate scoring", anchorBeamSearch = "Anchor beam search",
+    anchorWeaponExpansion = "Anchor weapon expansion", anchorSelection = "Anchor selection",
+    slotSetup = "Slot setup", slotFinalization = "Slot finalization", progressUpdate = "Progress update",
+    weaponRouting = "Weapon routing", stateCommit = "State commit", previewApply = "Preview application",
+    uiRefresh = "UI refresh", completionNotify = "Completion callback", rerollSlot = "Reroll slot",
+}
+local MODE_LABELS = {
+    ZONE_NATIVE = "Zone Native", TRAVELER = "Traveler",
+    CLASS_FANTASY = "Class Fantasy", CHRONICLE_ECHO = "Chronicle Echo",
+}
+
+local function F(value, decimals)
+    value = tonumber(value) or 0
+    return string.format("%." .. tostring(decimals or 1) .. "f", value)
+end
+
+local function N(value)
+    local number = math.floor(tonumber(value) or 0)
+    local text = tostring(number)
+    local sign, digits = text:match("^([%-]?)(%d+)$")
+    if not digits then return text end
+    local formatted = digits:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+    return (sign or "") .. formatted
+end
+
+local function YesNo(value)
+    return value and "Yes" or "No"
+end
+
+local function Add(lines, text)
+    lines[#lines + 1] = text or ""
+end
+
+local function AddHeading(lines, title, rich)
+    if #lines > 0 then Add(lines, "") end
+    Add(lines, rich and ("|cffd9b36c" .. title .. "|r") or ("== " .. title .. " =="))
+end
+
+local function FindComponent(report, slotKey)
+    for _, component in ipairs(report and report.skeleton and report.skeleton.components or {}) do
+        if component.slotKey == slotKey then return component end
+    end
+    return nil
+end
+
+local function FormatSource(component, rawIDs)
+    if not component then return "None" end
+    local markers = {}
+    if component.locked then markers[#markers + 1] = "Locked" end
+    if component.hidden then markers[#markers + 1] = "Hidden" end
+    local text = component.hidden and "Hidden" or tostring(component.name or "None")
+    if #markers > 0 and not component.hidden then text = text .. " [" .. table.concat(markers, ", ") .. "]" end
+    if rawIDs then
+        local ids = {}
+        if component.visualID then ids[#ids + 1] = "visual " .. tostring(component.visualID) end
+        if component.sourceID then ids[#ids + 1] = "source " .. tostring(component.sourceID) end
+        if component.itemID then ids[#ids + 1] = "item " .. tostring(component.itemID) end
+        if component.categoryID then ids[#ids + 1] = "category " .. tostring(component.categoryID) end
+        if #ids > 0 then text = text .. " {" .. table.concat(ids, ", ") .. "}" end
+    end
+    return text
+end
+
+local function PhaseRows(report)
+    local stats = report and report.performance and report.performance.phaseStats or {}
+    local rows, seen = {}, {}
+    for _, key in ipairs(PHASE_ORDER) do
+        local phase = stats[key]
+        if phase then
+            rows[#rows + 1] = { key = key, phase = phase }
+            seen[key] = true
+        end
+    end
+    local extras = {}
+    for key, phase in pairs(stats) do
+        if not seen[key] then extras[#extras + 1] = { key = key, phase = phase } end
+    end
+    table.sort(extras, function(left, right) return tostring(left.key) < tostring(right.key) end)
+    for _, entry in ipairs(extras) do rows[#rows + 1] = entry end
+    return rows
+end
+
+local function AddOverview(lines, report, rich)
+    AddHeading(lines, "Overview", rich)
+    Add(lines, "Version: " .. tostring(report.version or "Unknown"))
+    Add(lines, "Time: " .. tostring(report.timestampText or report.timestamp or "Unknown"))
+    local character = report.character or {}
+    Add(lines, string.format("Character: %s - %s%s", tostring(character.name or "Unknown"), tostring(character.realm or "Unknown"), character.className and (" • " .. tostring(character.className)) or ""))
+    local action = ACTION_LABELS[report.action] or tostring(report.action or "Unknown")
+    if report.actionSlotKey then action = action .. " • " .. tostring(report.actionSlotKey) end
+    Add(lines, "Action: " .. action)
+    Add(lines, "Mode: " .. tostring(MODE_LABELS[report.mode] or report.mode or "Unknown"))
+    Add(lines, "Result: " .. tostring(RESULT_LABELS[report.result] or report.result or "Unknown"))
+    if report.outfit and report.outfit.generatedName then Add(lines, "Outfit: " .. tostring(report.outfit.generatedName)) end
+    local context = report.context or {}
+    local location = context.profileLabel or context.provenanceLabel or context.zone
+    if location then Add(lines, "Context: " .. tostring(location) .. (context.eraLabel and (" • through " .. tostring(context.eraLabel)) or "")) end
+    local performance = report.performance or {}
+    Add(lines, string.format("Prepared: %s frames • %.1f sec", N(performance.steps), (tonumber(performance.elapsedMs) or 0) / 1000))
+    Add(lines, string.format("Worst step: %.1f ms • Slowest: %s %.1f ms", tonumber(performance.maxStepMs) or 0, PHASE_LABELS[performance.slowestPhase] or tostring(performance.slowestPhase or "Unknown"), tonumber(performance.slowestPhaseMs) or 0))
+    Add(lines, "Fallback: " .. tostring(report.skeleton and report.skeleton.fallbackReason or "None"))
+end
+
+local function AddSkeleton(lines, report, rawIDs, rich)
+    AddHeading(lines, "Anchor Skeleton", rich)
+    local skeleton = report.skeleton or {}
+    Add(lines, string.format("Chosen: rank %d/%d • score %.1f • cohesion %.3f • hard clashes %d", tonumber(skeleton.chosenRank) or 0, tonumber(skeleton.shortlistSize) or 0, tonumber(skeleton.score) or 0, tonumber(skeleton.meanPairCohesion) or 0, tonumber(skeleton.hardClashes) or 0))
+    for _, slotKey in ipairs({ "CHEST", "LEGS", "SHOULDER", "ONE_HAND", "TWO_HAND", "RANGED", "OFF_HAND" }) do
+        local component = FindComponent(report, slotKey)
+        if component and (component.sourceID or component.visualID or component.locked or component.hidden) then
+            Add(lines, string.format("%-11s %s", tostring(component.slotLabel or slotKey) .. ":", FormatSource(component, rawIDs)))
+        end
+    end
+    if skeleton.strongestBridge and skeleton.strongestBridge.label then
+        Add(lines, "Strongest bridge: " .. tostring(skeleton.strongestBridge.label) .. string.format(" (%.3f)", tonumber(skeleton.strongestBridge.score) or 0))
+    end
+    if skeleton.weakestRelationship and skeleton.weakestRelationship.label then
+        Add(lines, "Weakest relationship: " .. tostring(skeleton.weakestRelationship.label) .. string.format(" (%.3f)", tonumber(skeleton.weakestRelationship.score) or 0))
+    end
+end
+
+local function AddBeam(lines, report, verbose, rich)
+    AddHeading(lines, "Beam Search", rich)
+    local beam = report.beam or {}
+    local pools, expansions, retained = beam.poolSizes or {}, beam.expansions or {}, beam.retained or {}
+    Add(lines, "Stage         Prepared   Expanded   Retained")
+    for _, entry in ipairs({ { "CHEST", "Chest" }, { "LEGS", "Legs" }, { "SHOULDER", "Shoulders" } }) do
+        Add(lines, string.format("%-13s %8s   %8s   %8s", entry[2], N(pools[entry[1]]), N(expansions[entry[1]]), N(retained[entry[1]])))
+    end
+    Add(lines, string.format("Weapons: %s legal bundles • %s complete skeletons", N(beam.weaponBundles), N(beam.completeSkeletons)))
+    Add(lines, string.format("Pair cache: %s hits • %s misses", N(beam.pairCacheHits), N(beam.pairCacheMisses)))
+    Add(lines, string.format("Final shortlist: %s • chosen rank %s • score window %.1f", N(beam.finalShortlist), N(beam.chosenRank), tonumber(beam.weightedWindow) or 0))
+    if beam.fallbackReason then Add(lines, "Fallback reason: " .. tostring(beam.fallbackReason)) end
+    if verbose then
+        Add(lines, string.format("Deduplicated: %s • hard-constraint rejects: %s • hard-clash rejects: %s", N(beam.deduplicated), N(beam.hardConstraintRejections), N(beam.hardClashRejections)))
+    end
+end
+
+local function AddScore(lines, report, rich)
+    AddHeading(lines, "Score Breakdown", rich)
+    local skeleton = report.skeleton or {}
+    local breakdown = skeleton.scoreBreakdown or {}
+    local any = false
+    for _, entry in ipairs({
+        { "armorBase", "Armor relevance" }, { "weaponBase", "Weapon relevance" },
+        { "armorRelationships", "Armor cohesion bonus" }, { "weaponRelationships", "Weapon/body cohesion bonus" },
+        { "hardClashPenalty", "Hard-clash penalty" }, { "repeatPenalty", "Immediate-repeat selection penalty" },
+    }) do
+        local value = breakdown[entry[1]]
+        if value ~= nil then Add(lines, string.format("%-36s %+8.2f", entry[2], tonumber(value) or 0)) any = true end
+    end
+    if any then Add(lines, string.format("%-36s %8.2f", "Skeleton total", tonumber(skeleton.score) or 0)) end
+    local components = skeleton.cohesionComponents or {}
+    if next(components) then
+        Add(lines, "")
+        Add(lines, "Mean pair cohesion dimensions:")
+        for _, entry in ipairs({ { "palette", "Palette" }, { "material", "Material" }, { "finish", "Finish" }, { "visualWeight", "Visual weight" }, { "motif", "Motif" }, { "provenance", "Provenance" } }) do
+            if components[entry[1]] ~= nil then Add(lines, string.format("  %-15s %.3f", entry[2], tonumber(components[entry[1]]) or 0)) end
+        end
+    end
+    if not any and not next(components) then Add(lines, "No anchor score ledger was recorded for this attempt.") end
+end
+
+local function AddPerformance(lines, report, rich)
+    AddHeading(lines, "Performance", rich)
+    Add(lines, "Phase                              Max       Total      Calls")
+    for _, entry in ipairs(PhaseRows(report)) do
+        local phase = entry.phase or {}
+        local severity = (tonumber(phase.maxMs) or 0) > 16 and " !!" or ((tonumber(phase.maxMs) or 0) > 8 and " !" or "")
+        Add(lines, string.format("%-31s %7.1f ms %8.1f ms %7s%s", PHASE_LABELS[entry.key] or tostring(entry.key), tonumber(phase.maxMs) or 0, tonumber(phase.totalMs) or 0, N(phase.calls), severity))
+    end
+end
+
+local function AddCache(lines, report, verbose, rich)
+    AddHeading(lines, "Cache and Metadata", rich)
+    local perf, cache = report.performance or {}, report.cache or {}
+    Add(lines, string.format("Candidates: %s • era-source checks: %s • selected armor: %s", N(perf.candidates), N(perf.eraCandidates), N(perf.selectedArmor)))
+    Add(lines, string.format("Cache hits: %s era • %s eligibility • %s weapon yields", N(perf.eraCacheHits), N(perf.eligibilityCacheHits), N(perf.weaponYields)))
+    if next(cache) then
+        Add(lines, string.format("Persistent: %s evidence • %s prechecks • %s eligibility", N(cache.persistentEvidence), N(cache.persistentPrechecks), N(cache.persistentEligibility)))
+        Add(lines, string.format("Loaded: %s evidence • %s prechecks • %s eligibility • %s migrated", N(cache.loadedEvidence), N(cache.loadedPrechecks), N(cache.loadedEligibility), N(cache.migratedEvidence)))
+        Add(lines, string.format("After scan: %s retained • this generation: %s added • %s invalidated", N(cache.retainedEvidenceAfterScan), N(cache.addedDuringGeneration), N(cache.invalidatedDuringGeneration)))
+        Add(lines, string.format("Item callbacks: %s received • %s coalesced • %s dependencies examined", N(cache.itemCallbacksReceivedDuringGeneration), N(cache.itemEventsCoalescedDuringGeneration), N(cache.dependencyRecordsExaminedDuringGeneration)))
+        Add(lines, string.format("Dependencies: %s pending • %s satisfied • %s unchanged • %s changed", N(cache.dependenciesStillPendingDuringGeneration), N(cache.dependenciesSatisfiedDuringGeneration), N(cache.evidenceOutcomesUnchangedDuringGeneration), N(cache.evidenceOutcomesChangedDuringGeneration)))
+        Add(lines, string.format("Churn: %s pending created • %s downstream invalidated • %s identity changes", N(cache.pendingRecordsCreatedDuringGeneration), N(cache.downstreamRecordsInvalidatedDuringGeneration), N(cache.metadataIdentityChangesDuringGeneration)))
+        local reasons = {}
+        for reason, count in pairs(cache.invalidationReasons or {}) do
+            if verbose or (tonumber(count) or 0) ~= 0 then reasons[#reasons + 1] = { reason = reason, count = count } end
+        end
+        table.sort(reasons, function(left, right) return (tonumber(left.count) or 0) > (tonumber(right.count) or 0) end)
+        for _, entry in ipairs(reasons) do Add(lines, "Invalidated " .. tostring(entry.reason) .. ": " .. N(entry.count)) end
+    end
+end
+
+local function AddComparison(lines, report, rich)
+    local comparison = report.comparison
+    if not comparison then return end
+    AddHeading(lines, "Compared with Previous Completed Run", rich)
+    Add(lines, "Changed: " .. (#comparison.changed > 0 and table.concat(comparison.changed, ", ") or "None"))
+    Add(lines, "Unchanged: " .. (#comparison.unchanged > 0 and table.concat(comparison.unchanged, ", ") or "None"))
+    if comparison.previousScore ~= nil or comparison.score ~= nil then Add(lines, string.format("Skeleton score: %.1f → %.1f", tonumber(comparison.previousScore) or 0, tonumber(comparison.score) or 0)) end
+    if comparison.previousCohesion ~= nil or comparison.cohesion ~= nil then Add(lines, string.format("Cohesion: %.3f → %.3f", tonumber(comparison.previousCohesion) or 0, tonumber(comparison.cohesion) or 0)) end
+end
+
+local function AddWarnings(lines, report, rich)
+    AddHeading(lines, "Warnings and Fallback", rich)
+    if #(report.warnings or {}) == 0 then Add(lines, "None") return end
+    for _, warning in ipairs(report.warnings or {}) do
+        Add(lines, string.format("[%s] %s", tostring(warning.severity or "INFO"), tostring(warning.text or warning.key or "Warning")))
+    end
+end
+
+local function Format(report, options)
+    if not report then return "No diagnostic report is selected." end
+    options = options or {}
+    local lines = {}
+    AddOverview(lines, report, options.rich)
+    AddSkeleton(lines, report, options.rawIDs, options.rich)
+    AddBeam(lines, report, options.verbose, options.rich)
+    AddScore(lines, report, options.rich)
+    AddPerformance(lines, report, options.rich)
+    AddCache(lines, report, options.verbose, options.rich)
+    AddComparison(lines, report, options.rich)
+    AddWarnings(lines, report, options.rich)
+    if not options.rich then
+        Add(lines, "")
+        Add(lines, "Message: " .. tostring(report.message or ""))
+    end
+    return table.concat(lines, "\n")
+end
+
+function D.FormatDisplayReport(report, rawIDs, verbose)
+    return Format(report, { rich = true, rawIDs = rawIDs == true, verbose = verbose == true })
+end
+
+function D.FormatCopyReport(report, rawIDs, verbose)
+    return Format(report, { rich = false, rawIDs = rawIDs == true, verbose = verbose == true })
+end
+
+function D.GetActionLabel(action)
+    return ACTION_LABELS[action] or tostring(action or "Unknown")
+end
+
+function D.GetResultLabel(result)
+    return RESULT_LABELS[result] or tostring(result or "Unknown")
+end
+
+function D.GetModeLabel(mode)
+    return MODE_LABELS[mode] or tostring(mode or "Unknown")
+end
