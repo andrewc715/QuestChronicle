@@ -1,51 +1,64 @@
-# Quest Chronicle v1.9.0a10 - Pending Dependency Pipeline
+# Quest Chronicle v1.9.0.2 - Phase B: Anchor Skeletons
 
-v1.9.0a10 is a focused cache-churn repair built from the v1.9.0a9 diagnostic branch while retaining v1.9.0a8 as the live-validated behavioral baseline. Retail testing showed that v1.9.0a9 correctly preserved the persistent cache but still reopened roughly 814 to 848 pending evidence records and invalidated roughly 1,628 to 1,696 downstream records during each generation. Most callbacks completed item dependencies without changing the final era outcome.
+v1.9.0.2 begins the active generation phase of the Traveler Cohesion Rewrite. Chest, Legs, Shoulders, and weapons are no longer chosen independently. Quest Chronicle now builds a coherent anchor skeleton first, then asks the remaining armor slots to support that foundation.
 
-## Exact dependency lifecycle
+The implementation is built on the live-validated v1.9.0a10 cache, dependency, cooperative weapon, and atomic-generation baseline.
 
-- Persistent evidence records now use explicit `RESOLVED`, `PENDING_ITEMS`, `TRACKING_ONLY`, `STALE`, and `UNKNOWN` states.
-- Item-pending records retain the exact unresolved item IDs rather than a broad pending flag.
-- A reverse dependency index maps each pending item ID to only the affected visual evidence records.
-- Resolving one dependency leaves the record pending when other item dependencies remain.
-- Item completion that leaves only content-tracking work transitions the record to `TRACKING_ONLY` without discarding reusable eligibility.
-- The generation-cache store migrates from internal version 1 to version 2 in place. No blanket purge is performed.
+## Beam-searched armor foundations
 
-## Outcome comparison before invalidation
+- Prepares bounded, diversity-balanced candidate pools for Chest, Legs, and Shoulders.
+- Expands the pools through a cooperative beam search rather than evaluating the full cross-product.
+- Retains the strongest 32 partial skeletons after each armor stage.
+- Uses a quality-windowed weighted finalist selection so rerolls remain varied without selecting a dramatically weaker result.
+- Penalizes immediate repetition of the previous skeleton.
 
-- Fully satisfied item dependencies queue one cooperative evidence reevaluation.
-- The reevaluated evidence is normalized into a generation-relevant outcome fingerprint.
-- Presentation details such as names, links, icons, and quality are excluded from the fingerprint.
-- If the outcome is unchanged, the persistent record is updated in place and dependent eligibility remains valid.
-- If the outcome changes, only final eligibility records derived from that visual are invalidated; era-independent prechecks remain reusable.
-- Genuine stable metadata identity changes continue to invalidate item-derived evidence safely.
+## Active cohesion scoring
 
-## Callback coalescing and cooperative resolution
+- Activates the calibrated Traveler palette, material, finish, motif, visual-weight, provenance, and loudness relationships during anchor selection.
+- Reuses mode-specific Zone Native, Traveler, Class Fantasy, and Chronicle Echo relevance scores.
+- Adds a bounded pairwise cohesion cache keyed to stable descriptor identity.
+- Limits visual-family saturation in each prepared candidate pool.
 
-- Duplicate item callbacks are deduplicated before dependency processing.
-- The pending resolver uses the existing foreground time budget and processes era siblings incrementally.
-- Resolution pauses while collection scanning or foreground outfit generation owns the wardrobe pipeline.
-- Failed or incomplete dependencies remain bounded and fail closed instead of entering an immediate reopen loop.
+## Weapon bundle integration
+
+- Expands the strongest four armor skeletons through the existing cooperative weapon-route engine.
+- Treats each legal Main Hand and Off Hand result as one logical weapon bundle for skeleton scoring.
+- Preserves physical topology, per-hand Blizzard permissions, linked hands, exact visuals, artifacts, subtype filters, and locked weapons.
+- Does not allow cohesion scoring to override weapon legality.
+
+## Supporting armor
+
+- Generates Waist, Head, Hands, Feet, Wrists, Back, Shirt, and Tabard after the skeleton is chosen.
+- Rebuilds the generation context around the selected skeleton so supporting pieces reinforce it.
+- Preserves the private draft and atomic preview commit.
+
+## Locks, hidden slots, and fallback
+
+- Locked Chest, Legs, and Shoulders become fixed beam components.
+- Shoulders can now be deliberately hidden; hidden anchors are omitted without a cohesion penalty.
+- Missing or generation-ineligible locked anchors force the preserved legacy generator.
+- Searches with fewer than two active legal anchor components fall back safely.
+- Existing selections remain untouched until a complete generated draft commits.
 
 ## Diagnostics
 
-The Generation Performance tooltip now distinguishes:
+The Generation Performance tooltip now reports:
 
 ```text
-Item callbacks received and coalesced
-Exact dependencies examined, still pending, and fully satisfied
-Evidence outcomes unchanged and changed
-Pending records created
-Downstream eligibility records invalidated
-Genuine metadata identity changes
+Chest, Legs, and Shoulder pool sizes
+Beam expansions and retained entries per stage
+Legal weapon bundles evaluated
+Pairwise cohesion cache hits and misses
+Chosen skeleton rank, score, and mean cohesion
+Fallback reason, when applicable
 ```
 
-Weapon diagnostics also retain the slowest cooperative resume phase when an individual resume exceeds the responsiveness guard.
+`/qc skeleton debug` prints the latest anchor composition and beam summary.
 
-## Preserved behavior
+## Compatibility
 
-- Armor weighting, random selection order, zone preferences, era restrictions, locks, hidden slots, linked hands, weapon routes, artifacts, and atomic commits are unchanged.
-- Traveler cohesion remains calibrated instrumentation only.
-- The targeted post-generation UI refresh remains unchanged.
-- SavedVariables schema 2, Courier format 1, and wardrobe cache format 7 remain unchanged.
+- SavedVariables schema remains 2.
+- Courier format remains 1.
+- Wardrobe cache format remains 7.
+- Existing concepts, Custom Set links, selections, locks, hidden slots, preferences, and persistent generation caches remain valid.
 - Quest Chronicle applies no transmog and spends no gold.

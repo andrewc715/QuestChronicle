@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.9.0.2 - 2026-08-02
+
+### Added
+
+- Replaced independent Chest, Legs, Shoulders, and weapon selection with cooperative beam-searched anchor skeletons.
+- Added diversity-balanced anchor candidate pools, a bounded pairwise cohesion cache, and quality-windowed weighted finalist selection.
+- Activated Phase A Traveler palette, material, finish, motif, visual-weight, provenance, and loudness relationships during anchor generation.
+- Expanded the strongest armor foundations through the existing legal cooperative weapon-route engine.
+- Conditioned supporting armor slots on the completed anchor skeleton.
+- Added Generation Performance beam statistics and `/qc skeleton debug`.
+- Enabled deliberate Shoulder hiding so the anchor search can honor an omitted Shoulder component.
+
+### Compatibility
+
+- Preserved locks, hidden slots, linked hands, exact visuals, artifacts, mode identity, atomic commits, and a legacy fallback path.
+- Preserved SavedVariables schema 2, Courier format 1, and wardrobe cache format 7.
+
 ## 1.9.0a10 - 2026-08-02
 
 ### Performance

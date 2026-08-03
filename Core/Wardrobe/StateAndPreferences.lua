@@ -192,7 +192,7 @@ end
 
 function Wardrobe.SetSlotHidden(slotKey, hidden)
     if not Wardrobe.IsSlotHideable(slotKey) then
-        return false, "Only helm, cloak, shirt, and tabard can be hidden."
+        return false, "Only shoulders, helm, cloak, shirt, and tabard can be hidden."
     end
     local state = P.EnsurePreviewState()
     state.hidden[slotKey] = hidden == true or nil

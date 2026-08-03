@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0a10
+# Quest Chronicle v1.9.0.2
 
-> **Pending-dependency repair:** exact missing-item dependencies are indexed and resolved cooperatively. When item data arrives, Quest Chronicle compares the normalized era outcome before invalidating anything, so unchanged evidence keeps its reusable eligibility records.
+> **Phase B: Anchor Skeletons:** generated outfits now choose Chest, Legs, Shoulders, and a legal weapon bundle as one beam-searched visual foundation before filling the supporting armor slots.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0a10 preserves the live-validated v1.9.0a8 persistent cache and the responsive v1.9.0a9 pipeline while eliminating the repeated pending-record teardown revealed by Retail diagnostics.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.2 begins the Traveler Cohesion Rewrite's active generation phase while preserving the live-validated v1.9.0a10 cooperative cache, dependency, weapon-route, and atomic-commit pipelines.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -122,6 +122,7 @@ Settings include:
 /qc minimap show|hide|toggle|reset
 /qc weapon debug
 /qc traveler debug
+/qc skeleton debug
 ```
 
 Bare `/qc` toggles the main window. `/qc help` displays command help.
@@ -177,7 +178,10 @@ QuestChronicle\
 │   │   ├── WeaponSelection.lua
 │   │   ├── GenerationAndConcepts.lua
 │   │   ├── WeaponPipeline.lua
+│   │   ├── AnchorSkeletonCache.lua
+│   │   ├── AnchorSkeletonSearch.lua
 │   │   ├── GenerationPerformance.lua
+│   │   ├── AnchorSkeletonWorker.lua
 │   │   ├── GenerationWorker.lua
 │   │   ├── CustomSetBuild.lua
 │   │   ├── CustomSetSyncAndManifest.lua
@@ -285,7 +289,15 @@ Generated outfits and rerolls always reject Blizzard's Trading Post source type.
 
 Manual browsing remains unrestricted. Promotional rows say **Promo excluded**, and their tooltip explains that the restriction applies only to generation.
 
-For visual coherence, the generator establishes the outfit from major armor silhouettes first. It strongly favors pieces belonging to the same Blizzard transmog set, rewards shared motifs such as fire, frost, shadow, radiant, nature, arcane, storm, fel, necrotic, mechanical, rustic, or regal, and rejects isolated dramatic accents that conflict with the established outfit. Weapons are chosen afterward so they reinforce the armor while still passing every equipped-item transmog rule. Individual rerolls build their profile from the rest of the visible preview.
+### Phase B anchor skeletons
+
+Generated outfits no longer choose Chest, Legs, Shoulders, and weapons as independent lotteries. Quest Chronicle prepares bounded legal candidate pools, beam-searches coherent armor foundations, expands the strongest foundations through the existing Blizzard-safe weapon-route engine, and chooses a high-quality finalist with weighted variety.
+
+The skeleton scorer activates the calibrated Traveler palette, material, finish, motif, visual-weight, provenance, and loudness relationships. Zone Native, Traveler, Class Fantasy, and Chronicle Echo retain their own relevance scores, so the shared search engine does not flatten the four modes into one aesthetic. Supporting slots are generated afterward against the completed skeleton.
+
+Locks and hidden slots remain authoritative. Locked anchors become fixed beam components, Shoulders can now be deliberately hidden, hidden anchors are omitted without penalty, and an unavailable or impossible locked source sends the job through the preserved legacy generator. The final preview still changes only after an atomic commit.
+
+`/qc skeleton debug` prints the latest Chest, Legs, Shoulders, weapon bundle, beam statistics, chosen rank, score, cohesion, and fallback reason. The Generation Performance tooltip reports pool sizes, beam expansions, pair-cache activity, weapon bundles, and the chosen skeleton.
 
 ### Weapon Appearance Rules
 

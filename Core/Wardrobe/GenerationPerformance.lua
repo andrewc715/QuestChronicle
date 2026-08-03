@@ -17,6 +17,10 @@ P.GENERATION_PHASE_LABELS = {
     previewApply = "Preview application",
     uiRefresh = "UI refresh",
     completionNotify = "Completion callback",
+    anchorCandidateScoring = "Anchor candidate scoring",
+    anchorBeamSearch = "Anchor beam search",
+    anchorWeaponExpansion = "Anchor weapon expansion",
+    anchorSelection = "Anchor selection",
 }
 
 P.GENERATION_PHASE_SHORT_LABELS = {
@@ -30,6 +34,10 @@ P.GENERATION_PHASE_SHORT_LABELS = {
     stateCommit = "Commit",
     previewApply = "Preview",
     completionNotify = "Completion",
+    anchorCandidateScoring = "Anchor candidates",
+    anchorBeamSearch = "Anchor beam",
+    anchorWeaponExpansion = "Anchor weapons",
+    anchorSelection = "Anchor selection",
 }
 
 function P.GenerationNowMilliseconds()
@@ -82,9 +90,11 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         eraCacheHits = job and job.eraCacheHits or 0,
         eligibilityCacheHits = job and job.eligibilityCacheHits or 0,
         weaponYields = job and job.weaponYields or 0,
-        weaponSlowYieldPhase = job and job.weaponWork and job.weaponWork.slowestYieldPhase or nil,
-        weaponSlowYieldMs = job and job.weaponWork and job.weaponWork.maxResumeMs or 0,
+        weaponSlowYieldPhase = job and ((job.weaponWork and job.weaponWork.slowestYieldPhase) or job.anchorWeaponSlowYieldPhase) or nil,
+        weaponSlowYieldMs = job and math.max(job.weaponWork and job.weaponWork.maxResumeMs or 0, job.anchorWeaponSlowYieldMs or 0) or 0,
         selectedArmor = job and job.selectedArmor or 0,
+        anchorStats = job and job.anchorStats or nil,
+        anchorFallbackReason = job and job.anchorFallbackReason or nil,
         cacheDiagnostics = P.BuildGenerationCachePerformance
             and P.BuildGenerationCachePerformance(job and job.cacheCountersStarted) or nil,
         phaseStats = job and job.phaseStats or {},
@@ -152,6 +162,22 @@ function Wardrobe.GetGenerationPerformanceDetails(performance)
         return left.maxMs > right.maxMs
     end)
     return details
+end
+
+
+function Wardrobe.GetAnchorSkeletonPerformanceLines(performance)
+    local stats = performance and performance.anchorStats
+    if not stats then
+        return performance and performance.anchorFallbackReason and { "Anchor fallback: " .. tostring(performance.anchorFallbackReason) } or {}
+    end
+    local pools, expansions, retained = stats.poolSizes or {}, stats.expansions or {}, stats.retained or {}
+    return {
+        string.format("Anchor pools: %d chest • %d legs • %d shoulders", pools.CHEST or 0, pools.LEGS or 0, pools.SHOULDER or 0),
+        string.format("Beam expansions: %d chest • %d legs • %d shoulders", expansions.CHEST or 0, expansions.LEGS or 0, expansions.SHOULDER or 0),
+        string.format("Beam retained: %d chest • %d legs • %d shoulders • %d weapon bundles", retained.CHEST or 0, retained.LEGS or 0, retained.SHOULDER or 0, stats.weaponBundles or 0),
+        string.format("Chosen skeleton: rank %d/%d • score %.1f • cohesion %.3f • hard clashes %d", stats.chosenRank or 0, stats.shortlistSize or 0, stats.chosenScore or 0, stats.meanPairCohesion or 0, stats.hardClashes or 0),
+        string.format("Pair cache: %d hits • %d misses", stats.pairCacheHits or 0, stats.pairCacheMisses or 0),
+    }
 end
 
 function Wardrobe.GetGenerationCachePerformanceLines(performance)

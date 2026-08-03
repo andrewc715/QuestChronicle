@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0a10 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0.2 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -80,6 +80,12 @@ These tables are runtime implementation details. Other subsystems should use pub
 `Core/Wardrobe/GenerationAndConcepts.lua`
 : Synchronous generation primitives, atomic weapon bundles, rerolls, and concept persistence.
 
+`Core/Wardrobe/AnchorSkeletonCache.lua`
+: Phase B anchor constants, bounded pairwise cohesion cache, candidate construction, relationship scoring, and stable skeleton signatures.
+
+`Core/Wardrobe/AnchorSkeletonSearch.lua`
+: Diversity-balanced candidate pools, bounded Chest/Legs/Shoulders beam expansion, legal weapon-bundle scoring, quality-window selection, and `/qc skeleton debug` diagnostics.
+
 `Core/Wardrobe/WeaponPipeline.lua`
 : Coroutine adapter that resumes the unchanged weapon-route algorithm within the foreground generation budget.
 
@@ -87,7 +93,10 @@ These tables are runtime implementation details. Other subsystems should use pub
 : Generation phase measurements, persistent performance summaries, post-worker preview/UI timing, and tooltip-ready diagnostics.
 
 `Core/Wardrobe/GenerationWorker.lua`
-: Time-first cooperative foreground generation, resumable era-evidence work, private draft state, progress callbacks, and atomic commits.
+: Time-first cooperative foreground generation, anchor-phase dispatch, supporting-slot generation, resumable era-evidence work, private draft state, progress callbacks, and atomic commits.
+
+`Core/Wardrobe/AnchorSkeletonWorker.lua`
+: Cooperative anchor candidate preparation, beam stepping, legal weapon expansion, skeleton selection, supporting-slot context rebuilding, and preserved legacy fallback.
 
 `Core/Wardrobe/CustomSetBuild.lua`
 : Collected-source rebinding and native Custom Set payload construction.
@@ -186,8 +195,20 @@ The command exits nonzero if any Lua file exceeds 500 physical lines.
 - `Cohesion.lua` computes pair compatibility, anchor profiles, accent echo, mismatch classes, and the diagnostic budget.
 - `Debug.lua` analyzes the current outfit and implements `/qc traveler debug`.
 
-In v1.9.0a10 this subsystem remains read-only. It does not participate in candidate selection or mutate the wardrobe preview.
+In v1.9.0.2 the calibrated descriptors and pair-cohesion function become active inputs to the anchor-skeleton search. `/qc traveler debug` remains a read-only explanation of the completed preview and never mutates generation state.
 
+
+## Phase B anchor skeletons (v1.9.0.2)
+
+The foreground worker begins with an `ANCHORS` phase when the Phase B modules are loaded. It prepares bounded legal pools for Chest, Legs, and Shoulders through the same source validation, persistent era evidence, progression restrictions, zone preferences, and eligibility caches used by the legacy generator. Locked anchors are fixed candidates. Shoulders are now hideable through the existing hidden-slot pipeline, and hidden anchors are omitted. Missing or generation-ineligible locked anchors force the legacy fallback rather than disappearing from the result.
+
+`AnchorSkeletonSearch.lua` expands Chest seeds through Legs and Shoulders while retaining only the highest-scoring 32 partial skeletons after each stage. Pairwise scores combine the Phase A Traveler descriptors with mode-specific source relevance and loudness balance. A bounded runtime cache avoids recomputing the same stable visual pair. Candidate-pool diversity limits prevent one set or visual family from occupying the entire beam.
+
+The top four legal armor skeletons enter cooperative weapon expansion. Each expansion clones the private draft and resumes the existing weapon-route algorithm through `WeaponPipeline.lua`; no beam score can make an illegal hand, subtype, artifact, or linked appearance valid. The final shortlist is constrained to a quality window and selected with weighted randomness, including a penalty for immediately repeating the previous skeleton.
+
+After selection, the worker rebuilds the style context around the chosen Chest, Legs, Shoulders, and weapon bundle. Waist, Head, Hands, Feet, Wrists, Back, Shirt, and Tabard are then generated as supporting pieces. The complete draft remains private until the existing atomic commit. If the beam cannot produce at least two active legal components, the unchanged independent generator remains available as a compatibility fallback.
+
+Performance telemetry reports candidate-pool sizes, beam expansions and retained counts, pair-cache hits and misses, legal weapon bundles, chosen rank and score, and fallback reason. `/qc skeleton debug` prints the most recent anchor composition and search summary.
 
 ## Cooperative wardrobe refresh (v1.9.0a2)
 

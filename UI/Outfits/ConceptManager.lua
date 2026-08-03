@@ -462,6 +462,9 @@ P.builders[#P.builders + 1] = function(C)
             tonumber(performance.eligibilityCacheHits) or 0,
             tonumber(performance.weaponYields) or 0
         ), 0.7, 0.7, 0.7, true)
+        for _, line in ipairs(Wardrobe.GetAnchorSkeletonPerformanceLines and Wardrobe.GetAnchorSkeletonPerformanceLines(performance) or {}) do
+            GameTooltip:AddLine(line, 0.86, 0.72, 1, true)
+        end
         for _, line in ipairs(Wardrobe.GetGenerationCachePerformanceLines(performance)) do
             GameTooltip:AddLine(line, 0.62, 0.82, 1, true)
         end

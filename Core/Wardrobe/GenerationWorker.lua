@@ -1,27 +1,20 @@
 local QC = QuestChronicle
 local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
-
--- Time is the primary governor. The operation ceiling is only a runaway guard,
--- replacing the old 30-candidate throttle that forced warm outfits across 204
--- frames even when cached candidate work was inexpensive.
 P.GENERATION_TIME_BUDGET_MS = 2.5
 P.GENERATION_OPERATION_SAFETY_CAP = 2000
 P.GENERATION_ERA_CANDIDATES_PER_OPERATION = 1
 P.generationToken = P.generationToken or 0
 P.generationJob = nil
 P.lastGenerationPerformance = nil
-
 local function NowMilliseconds()
     return P.GenerationNowMilliseconds and P.GenerationNowMilliseconds() or 0
 end
-
 local function RecordPhase(job, phaseKey, startedAt)
     if P.RecordGenerationPhase then
         P.RecordGenerationPhase(job, phaseKey, NowMilliseconds() - startedAt)
     end
 end
-
 local function CopyDraftState(state)
     local draft = {}
     for key, value in pairs(state or {}) do
@@ -36,7 +29,6 @@ local function CopyDraftState(state)
     draft.lastWeaponRoute = state and state.lastWeaponRoute
     return draft
 end
-
 local function AppendMapSignature(parts, label, values)
     local keys = {}
     for key in pairs(values or {}) do table.insert(keys, tostring(key)) end
@@ -48,7 +40,6 @@ local function AppendMapSignature(parts, label, values)
         table.insert(parts, key .. "=" .. tostring(value))
     end
 end
-
 local function GenerationStateSignature(state)
     local parts = {
         "link=" .. tostring(state and state.linkWeaponHands ~= false),
@@ -120,6 +111,11 @@ local function BuildGenerationMessage(job, generatedName, weaponCount, weaponNot
         weaponCount == 1 and "" or "s",
         restrictionLabel and (" under " .. restrictionLabel) or ""
     )
+    if job.anchorStats then
+        message = message .. string.format(" Anchor skeleton rank %d/%d scored %.1f.", job.anchorStats.chosenRank or 0, job.anchorStats.shortlistSize or 0, job.anchorStats.chosenScore or 0)
+    elseif job.anchorFallbackReason then
+        message = message .. " Anchor search used the legacy fallback: " .. tostring(job.anchorFallbackReason) .. "."
+    end
     if weaponNotice then message = message .. " " .. weaponNotice end
     if styleEngine then
         message = message .. " Promotional rewards were excluded, and native-set or shared-motif matches were favored."
@@ -137,6 +133,7 @@ local function CommitDraft(job, weaponCount, weaponNotice)
     job.liveState.selections = job.draft.selections
     job.liveState.selectionVisuals = job.draft.selectionVisuals
     job.liveState.lastWeaponRoute = job.draft.lastWeaponRoute
+    job.liveState.lastAnchorSkeletonSignature = job.draft.lastAnchorSkeletonSignature
     job.liveState.generatedName = generatedName
     job.liveState.styleMode = job.styleMode
     job.liveState.selectedConceptID = nil
@@ -302,10 +299,11 @@ end
 
 local function ProcessArmor(job, stepStarted)
     local operations = 0
-    while job.armorIndex <= #P.ARMOR_GENERATION_ORDER do
+    local armorOrder = job.armorOrder or P.ARMOR_GENERATION_ORDER
+    while job.armorIndex <= #armorOrder do
         if not job.armorWork then
             local setupStarted = NowMilliseconds()
-            local slotKey = P.ARMOR_GENERATION_ORDER[job.armorIndex]
+            local slotKey = armorOrder[job.armorIndex]
             job.armorWork = BeginArmorSlot(job, slotKey)
             RecordPhase(job, "slotSetup", setupStarted)
             if not job.armorWork then job.armorIndex = job.armorIndex + 1 end
@@ -329,7 +327,7 @@ local function ProcessArmor(job, stepStarted)
             FinalizeArmorSlot(job, work)
             RecordPhase(job, "slotFinalization", finalizationStarted)
             local progressStarted = NowMilliseconds()
-            Notify("WARDROBE_GENERATION_PROGRESS", job.armorIndex, #P.ARMOR_GENERATION_ORDER, work.slotKey)
+            Notify("WARDROBE_GENERATION_PROGRESS", job.armorIndex, #armorOrder, work.slotKey)
             RecordPhase(job, "progressUpdate", progressStarted)
             job.armorWork = nil
             job.armorIndex = job.armorIndex + 1
@@ -352,8 +350,15 @@ function P.StepGenerationJob(token)
         return
     end
 
+    if job.phase == "ANCHORS" then
+        P.AdvanceAnchorGenerationPhase(job, stepStarted)
+        job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
+        if not ScheduleNextStep(token) then FinishJob(job, false, "Quest Chronicle could not schedule the cooperative outfit generator. Try /reload.") end
+        return
+    end
+
     if job.phase == "ARMOR" then
-        if ProcessArmor(job, stepStarted) then job.phase = "WEAPONS" end
+        if ProcessArmor(job, stepStarted) then job.phase = job.weaponsPrepared and "COMMIT" or "WEAPONS" end
         job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
         if not ScheduleNextStep(token) then
             FinishJob(job, false, "Quest Chronicle could not schedule the cooperative outfit generator. Try /reload.")
@@ -467,8 +472,8 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
         styleMode = styleMode,
         styleContext = styleContext,
         startSignature = GenerationStateSignature(liveState),
-        phase = "ARMOR",
-        armorIndex = 1,
+        phase = P.AdvanceAnchorGenerationPhase and "ANCHORS" or "ARMOR", armorIndex = 1, armorOrder = nil,
+        anchorWork = nil, anchorStats = nil, anchorFallbackReason = nil, weaponsPrepared = false,
         armorWork = nil,
         selectedArmor = 0,
         candidatesProcessed = 0,

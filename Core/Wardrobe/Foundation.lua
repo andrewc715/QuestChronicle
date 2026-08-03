@@ -58,7 +58,7 @@ P.CUSTOM_SET_SYNC_TIMEOUT = 5.0
 -- Some Blizzard enum tables are not ready during early addon loading.
 Wardrobe.slotDefinitions = {
     { key = "HEAD", label = "Head", slotName = "HEADSLOT", hideable = true, categoryNames = { "Head" }, fallbackCategoryIDs = { 1 } },
-    { key = "SHOULDER", label = "Shoulders", slotName = "SHOULDERSLOT", categoryNames = { "Shoulder" }, fallbackCategoryIDs = { 2 } },
+    { key = "SHOULDER", label = "Shoulders", slotName = "SHOULDERSLOT", hideable = true, categoryNames = { "Shoulder" }, fallbackCategoryIDs = { 2 } },
     { key = "BACK", label = "Back", slotName = "BACKSLOT", hideable = true, categoryNames = { "Back" }, fallbackCategoryIDs = { 3 } },
     { key = "CHEST", label = "Chest", slotName = "CHESTSLOT", categoryNames = { "Chest" }, fallbackCategoryIDs = { 4 } },
     { key = "SHIRT", label = "Shirt", slotName = "SHIRTSLOT", hideable = true, categoryNames = { "Shirt" }, fallbackCategoryIDs = { 5 } },

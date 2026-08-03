@@ -367,6 +367,7 @@ function P.PrintHelp()
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc minimap show|hide|toggle|reset|r - manage the minimap button")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc weapon debug|r - print weapon slot, option, and selection diagnostics")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc traveler debug|r - explain Traveler cohesion, mismatch budget, and outliers")
+    DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc skeleton debug|r - print the latest anchor beam and chosen skeleton")
 end
 
 function P.HandleSlashCommand(message)
@@ -434,6 +435,13 @@ function P.HandleSlashCommand(message)
             QC.Wardrobe.PrintWeaponRuleDiagnostics()
         else
             P.Print("Usage: /qc weapon debug")
+        end
+    elseif command == "skeleton" then
+        local subcommand = string.lower(rest:match("^(%S*)") or "")
+        if subcommand == "debug" and QC.Wardrobe and QC.Wardrobe.PrintAnchorSkeletonDiagnostics then
+            QC.Wardrobe.PrintAnchorSkeletonDiagnostics()
+        else
+            P.Print("Usage: /qc skeleton debug")
         end
     elseif command == "minimap" then
         local value = string.lower(rest or "")
