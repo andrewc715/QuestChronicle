@@ -2,7 +2,7 @@
 ## Title: Quest Chronicle
 ## Notes: Records quest lifecycle, objective progress, completions, and roleplay notes, with a native-styled Chronicle window.
 ## Author: OpenAI & Andrew
-## Version: 1.9.0.11
+## Version: 1.9.0.12
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## AddonCompartmentFunc: QuestChronicle_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: QuestChronicle_OnAddonCompartmentEnter
@@ -18,6 +18,7 @@ Core\Workers\AdaptiveBatch.lua
 UI\Shared.lua
 Core\Wardrobe\Foundation.lua
 Core\Wardrobe\GenerationCacheStore.lua
+Core\Wardrobe\GenerationCacheCounters.lua
 Core\Wardrobe\GenerationCacheAccess.lua
 Core\Wardrobe\GenerationDependencyIndex.lua
 Core\Wardrobe\GenerationCacheInvalidation.lua
@@ -34,6 +35,8 @@ Core\Wardrobe\AnchorSkeletonCache.lua
 Core\Wardrobe\AnchorSkeletonNovelty.lua
 Core\Wardrobe\AnchorSkeletonSearch.lua
 Core\Wardrobe\GenerationPerformance.lua
+Core\Wardrobe\GenerationScheduling.lua
+Core\Wardrobe\GenerationSetupWorker.lua
 Core\Wardrobe\AnchorSkeletonWorker.lua
 Core\Wardrobe\GenerationWorker.lua
 Core\Wardrobe\CustomSetBuild.lua

@@ -13,7 +13,7 @@ formatter = (root / "Core/Diagnostics/ReportFormatter.lua").read_text(encoding="
 comparison = (root / "Core/Diagnostics/Comparison.lua").read_text(encoding="utf-8")
 history = (root / "Core/Diagnostics/History.lua").read_text(encoding="utf-8")
 checks = {
-    "v1.9.0.11 metadata": version == "1.9.0.11" and "## Version: 1.9.0.11" in toc,
+    "v1.9.0.12 metadata": version == "1.9.0.12" and "## Version: 1.9.0.12" in toc,
     "launch and role modules loaded": all(x in toc for x in (
         r"Core\Wardrobe\SupportRerollLaunch.lua", r"Core\Wardrobe\SupportRoleResolver.lua")),
     "launch manifest is primitive": "CreateSupportRerollManifest" in launch and "CopySupportRerollState" not in launch,
@@ -21,7 +21,7 @@ checks = {
     "immutable report references are pinned": "PinReport" in history and "ReleaseReport" in history and "pinnedReportIDs" in worker,
     "snapshot materializes cooperatively": all(x in worker for x in (
         'job.phase == "IDENTITY"', 'job.phase == "STATE"', 'job.phase == "CONTEXT_INIT"', 'job.phase == "CONTEXT_SEED"', 'job.phase == "CONTEXT_PREPARE"',
-        'rerollStateMaterialization', 'rerollDiagnosticIdentity', 'rerollAnchorSummary', 'rerollStyleContextInit', 'rerollStyleContextSeed', 'rerollEligibilityContext', 'rerollSupportSummaryFoundation', 'rerollCacheSummaryFoundation')),
+        'rerollStateMaterialization', 'rerollDiagnosticIdentity', 'rerollAnchorSummary', 'rerollStyleContextInit', 'rerollStyleContextSeed', 'rerollEligibilityContext', 'rerollSupportSummaryFoundation', 'rerollCacheScalarSnapshot')),
     "legacy state capture removed": '"rerollStateCapture"' not in worker,
     "stale state is revision guarded": "ValidateSupportRerollManifest" in worker and "TouchPreviewRevision" in worker,
     "active endpoint roles are centralized": "ResolveSupportRole" in roles and "Chest identity support" in roles and "Chest silhouette support" in roles,
@@ -35,4 +35,4 @@ failed = [name for name, ok in checks.items() if not ok]
 if failed:
     for name in failed: print("FAIL:", name)
     raise SystemExit(1)
-print(f"PASS: v1.9.0.11 final Phase C stabilization verification: {len(checks)} checks")
+print(f"PASS: v1.9.0.12 final Phase C stabilization verification: {len(checks)} checks")

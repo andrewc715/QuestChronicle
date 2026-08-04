@@ -114,6 +114,10 @@ function QC.ZoneStyle.ConsumeSuggestion() end
 local root = (... and (...):match("^(.*)[/\\]") or "")
 local base = root ~= "" and root .. "/../" or ""
 dofile(base .. "Core/Wardrobe/GenerationPerformance.lua")
+dofile(base .. "Core/Workers/SliceBudget.lua")
+dofile(base .. "Core/Workers/AdaptiveBatch.lua")
+dofile(base .. "Core/Wardrobe/GenerationScheduling.lua")
+dofile(base .. "Core/Wardrobe/GenerationSetupWorker.lua")
 dofile(base .. "Core/Wardrobe/GenerationWorker.lua")
 P.GENERATION_TIME_BUDGET_MS = 1000
 
@@ -143,7 +147,7 @@ assert(liveState.selections.ONE_HAND == 5001 and liveState.selections.OFF_HAND =
 assert(liveState.generatedName == "Cooperative Test", "generated name missing")
 
 local perf = Wardrobe.GetLastGenerationPerformance()
-assert(perf and perf.steps == 3, "time-first generation should finish in armor, weapon, and commit frames")
+assert(perf and perf.steps == 4, "cooperative setup, armor, weapon, and commit should finish in four frames")
 assert(perf.candidates == 360, "candidate count mismatch")
 assert(perf.selectedArmor == 3, "selected armor count mismatch")
 assert(perf.phaseStats and perf.phaseStats.scoring and perf.phaseStats.scoring.calls == 360, "scoring phase diagnostics missing")

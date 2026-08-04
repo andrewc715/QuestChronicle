@@ -3,7 +3,15 @@ local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
 
 P.GENERATION_PHASE_LABELS = {
-    setup = "Setup",
+    setup = "Setup (legacy)",
+    generationActionIdentity = "Generation action identity",
+    generationStateSnapshot = "Generation state snapshot",
+    generationModeContext = "Generation mode context",
+    generationContextSeed = "Generation context seed",
+    generationEligibilityContext = "Generation eligibility context",
+    generationNoveltyReference = "Generation novelty reference",
+    generationCacheScalarSnapshot = "Generation cache scalar snapshot",
+    generationWeaponIndexSnapshot = "Generation weapon-index snapshot",
     validation = "Source validation",
     eraEvidence = "Era evidence",
     eligibility = "Eligibility",
@@ -35,7 +43,8 @@ P.GENERATION_PHASE_LABELS = {
     rerollStyleContextSeed = "Reroll style-context seed",
     rerollEligibilityContext = "Reroll eligibility context",
     rerollSupportSummaryFoundation = "Reroll support summary foundation",
-    rerollCacheSummaryFoundation = "Reroll cache summary foundation",
+    rerollCacheSummaryFoundation = "Reroll cache summary foundation (legacy)",
+    rerollCacheScalarSnapshot = "Reroll cache scalar snapshot",
     rerollProfileReuse = "Reroll profile reuse",
     rerollFixedContextCommitments = "Reroll fixed-context commitments", rerollLedgerReconstruction = "Reroll ledger reconstruction",
     rerollCandidatePreparation = "Reroll candidate preparation", rerollSourceValidation = "Reroll source validation",
@@ -78,7 +87,8 @@ P.GENERATION_PHASE_SHORT_LABELS = {
     rerollDiagnosticIdentity = "Reroll diagnostic identity", rerollAnchorSummary = "Reroll anchor summary",
     rerollStyleContextInit = "Reroll context init", rerollStyleContextSeed = "Reroll context seed",
     rerollEligibilityContext = "Reroll eligibility context",
-    rerollSupportSummaryFoundation = "Reroll support summary", rerollCacheSummaryFoundation = "Reroll cache summary",
+    rerollSupportSummaryFoundation = "Reroll support summary", rerollCacheSummaryFoundation = "Reroll cache summary (legacy)",
+    rerollCacheScalarSnapshot = "Reroll cache snapshot",
     rerollProfileReuse = "Reroll profile",
     rerollFixedContextCommitments = "Reroll fixed context", rerollLedgerReconstruction = "Reroll ledger",
     rerollCandidatePreparation = "Reroll candidates", rerollSourceValidation = "Reroll validation",
@@ -169,7 +179,9 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         anchorFallbackReason = job and job.anchorFallbackReason or nil,
         supportStats = job and job.supportStats or nil,
         supportFallbackReason = job and job.supportFallbackReason or nil,
-        weaponIndex = P.GetWeaponCandidateIndexDiagnostics and P.GetWeaponCandidateIndexDiagnostics() or nil,
+        weaponIndex = P.BuildWeaponIndexActionDiagnostics
+            and P.BuildWeaponIndexActionDiagnostics(job and job.weaponIndexActionStarted) or
+            (P.GetWeaponCandidateIndexDiagnostics and P.GetWeaponCandidateIndexDiagnostics() or nil),
         cacheDiagnostics = P.BuildGenerationCachePerformance
             and P.BuildGenerationCachePerformance(job and job.cacheCountersStarted) or nil,
         phaseStats = job and job.phaseStats or {},
@@ -180,6 +192,7 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         supportRerollTiming = job and job.supportReroll == true or false,
         synchronousLaunchPreparationMs = job and (job.synchronousLaunchPreparationMs or job.preWorkerPreparationMs) or 0,
         preWorkerPreparationMs = job and (job.synchronousLaunchPreparationMs or job.preWorkerPreparationMs) or 0,
+        schedulerDiagnostics = job and job.schedulerDiagnostics or nil,
     }
     ApplyTimingDomains(result)
     return result

@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0.11
+# Quest Chronicle v1.9.0.12
 
-> **Phase C Performance Closure:** contextual support rerolls and foreground outfit generation now share elapsed-time slice guards, adaptive batches, resumable eligibility work, and reusable weapon-source buckets.
+> **Scheduler and Diagnostics Closure:** expensive cooperative operations now end their frame immediately, phase transitions reserve time before they begin, cache diagnostics are constant-time snapshots, and full-generation setup is resumable.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.11 closes the remaining Phase C performance paths by decomposing diagnostic capture, enforcing frame-budget-aware yields, and cooperatively building or repairing the weapon candidate index without changing selection semantics.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.12 closes the remaining scheduler and diagnostic hot paths without changing Phase B or Phase C selection semantics.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

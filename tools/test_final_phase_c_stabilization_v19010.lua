@@ -114,7 +114,7 @@ assert(state.selections.HEAD ~= before, "Head reroll did not replace the target"
 local performance = completion.performance
 assert((performance.synchronousLaunchPreparationMs or 99) <= .5, "synthetic launch manifest exceeded 0.5 ms")
 assert(not performance.phaseStats.rerollStateCapture, "legacy monolithic state capture returned")
-for _, phase in ipairs({ "rerollLaunchManifest", "rerollAnchorSnapshotReuse", "rerollStateMaterialization", "rerollDiagnosticIdentity", "rerollAnchorSummary", "rerollStyleContextInit", "rerollStyleContextSeed", "rerollEligibilityContext", "rerollSupportSummaryFoundation", "rerollCacheSummaryFoundation" }) do
+for _, phase in ipairs({ "rerollLaunchManifest", "rerollAnchorSnapshotReuse", "rerollStateMaterialization", "rerollDiagnosticIdentity", "rerollAnchorSummary", "rerollStyleContextInit", "rerollStyleContextSeed", "rerollEligibilityContext", "rerollSupportSummaryFoundation", "rerollCacheScalarSnapshot" }) do
     assert(performance.phaseStats[phase], "missing final-stabilization phase " .. phase)
 end
 local selectedDecision

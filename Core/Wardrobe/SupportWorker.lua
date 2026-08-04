@@ -7,7 +7,10 @@ local function NowMilliseconds()
 end
 
 local function RecordPhase(job, phaseKey, startedAt)
-    if P.RecordGenerationPhase then P.RecordGenerationPhase(job, phaseKey, NowMilliseconds() - startedAt) end
+    local elapsed = math.max(0, NowMilliseconds() - startedAt)
+    if P.RecordGenerationPhase then P.RecordGenerationPhase(job, phaseKey, elapsed) end
+    if P.NoteGenerationWorkerCall then P.NoteGenerationWorkerCall(job, elapsed) end
+    return elapsed
 end
 
 local function ActiveSupportSlots(state)
@@ -175,6 +178,7 @@ function P.StepSupportGenerationJob(job, stepStarted)
     if not work then work = P.CreateSupportGenerationWork(job) job.supportWork = work end
     local operations = 0
     while operations < P.GENERATION_OPERATION_SAFETY_CAP do
+        if P.ShouldYieldGenerationWorker and P.ShouldYieldGenerationWorker(job, 0.5) then return "RUNNING" end
         if work.stage == "PROFILE" then
             local started = NowMilliseconds()
             work.activeAnchorMask = P.BuildActiveAnchorMask(job.draft)
@@ -185,15 +189,19 @@ function P.StepSupportGenerationJob(job, stepStarted)
             job.activeAnchorMask = work.activeAnchorMask
             RecordPhase(job, "supportProfile", started)
             work.stage = "LOCKED"
+            return "RUNNING"
         elseif work.stage == "LOCKED" then
+            if P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.0) then return "RUNNING" end
             local started = NowMilliseconds()
             BuildLocked(job, work)
             RecordPhase(job, "supportLockedCommitments", started)
             work.stage = "POOLS"
+            return "RUNNING"
         elseif work.stage == "POOLS" then
             if work.poolIndex > #work.unlockedSlots then
                 work.beamWork = P.CreateSupportBeamWork(job, work.profile, work.budget, work.unlockedSlots, work.pools, work.lockedSelections, work.lockedDecisions)
                 work.stage = "BEAM"
+                return "RUNNING"
             else
                 local slotKey = work.unlockedSlots[work.poolIndex]
                 if not work.poolWork then work.poolWork = CreatePoolWork(job, slotKey) end
@@ -205,11 +213,13 @@ function P.StepSupportGenerationJob(job, stepStarted)
                 end
             end
         elseif work.stage == "BEAM" then
+            if P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.0) then return "RUNNING" end
             local started = NowMilliseconds()
             local done = P.StepSupportBeamWork(work.beamWork)
             RecordPhase(job, "supportBeamExpansion", started)
-            if done then work.stage = "SELECT" end
+            if done then work.stage = "SELECT" return "RUNNING" end
         elseif work.stage == "SELECT" then
+            if P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.5) then return "RUNNING" end
             local started = NowMilliseconds()
             local selected, rank, shortlist = P.ChooseSupportConfiguration(work.beamWork)
             local ok, reason = ApplySelection(job, work, selected, rank, shortlist)
@@ -218,6 +228,7 @@ function P.StepSupportGenerationJob(job, stepStarted)
             return "READY"
         end
         operations = operations + 1
+        if P.ShouldYieldGenerationWorker and P.ShouldYieldGenerationWorker(job, 0.5) then return "RUNNING" end
         if NowMilliseconds() - stepStarted >= P.GENERATION_TIME_BUDGET_MS then return "RUNNING" end
     end
     return "RUNNING"

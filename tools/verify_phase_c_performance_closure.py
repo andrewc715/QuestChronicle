@@ -18,7 +18,7 @@ performance = read("Core/Wardrobe/GenerationPerformance.lua")
 formatter = read("Core/Diagnostics/ReportFormatter.lua")
 
 checks = {
-    "v1.9.0.11 metadata": version == "1.9.0.11" and "## Version: 1.9.0.11" in toc,
+    "v1.9.0.12 metadata": version == "1.9.0.12" and "## Version: 1.9.0.12" in toc,
     "shared worker helpers loaded": all(x in toc for x in (
         r"Core\Workers\SliceBudget.lua", r"Core\Workers\AdaptiveBatch.lua")),
     "support scheduling helper loaded": r"Core\Wardrobe\SupportRerollScheduling.lua" in toc,
@@ -29,7 +29,7 @@ checks = {
     "diagnostic work decomposed": all(x in worker for x in (
         "rerollDiagnosticIdentity", "rerollAnchorSummary", "rerollStyleContextInit",
         "rerollStyleContextSeed", "rerollEligibilityContext",
-        "rerollSupportSummaryFoundation", "rerollCacheSummaryFoundation")),
+        "rerollSupportSummaryFoundation", "rerollCacheScalarSnapshot")),
     "eligibility is resumable": all(x in eligibility_work for x in (
         "CreateSourceEligibilityWork", "StepSourceEligibilityWork", 'stage = "MARKERS"')),
     "cached eligibility is resumable": all(x in eligibility for x in (
@@ -38,7 +38,7 @@ checks = {
         "ELIGIBILITY_INIT", "ELIGIBILITY_STEP", "StepCachedSourceEligibilityWork")),
     "weapon index format is explicit": "P.WEAPON_INDEX_FORMAT = 1" in index,
     "weapon index builds cooperatively": "MaybeYieldWeaponGeneration" in index and '"weaponIndexBuild"' in index,
-    "weapon index supports warm reuse": 'index.lastUse = "WARM"' in index,
+    "weapon index supports warm reuse": 'index.lastUse = "WARM_REUSE"' in index,
     "weapon index supports bucket repair": "repairingSubtypeKey" in index and "INCREMENTAL_REPAIR" in index,
     "weapon coroutine records exact yield phase": "slowestYieldPhase" in pipeline,
     "weapon index diagnostics are reported": "weaponIndex" in performance and "Weapon index:" in formatter,
@@ -54,4 +54,4 @@ if failed:
     for name in failed:
         print("FAIL:", name)
     raise SystemExit(1)
-print(f"PASS: v1.9.0.11 Phase C performance closure verification: {len(checks)} checks")
+print(f"PASS: v1.9.0.12 Phase C performance closure verification: {len(checks)} checks")

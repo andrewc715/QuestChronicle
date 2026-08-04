@@ -15,21 +15,28 @@ local RESULT_LABELS = {
     NO_ALTERNATIVE = "No Alternative",
 }
 local PHASE_ORDER = {
-    "setup", "validation", "eraEvidence", "eligibility", "coherence", "scoring",
+    "generationActionIdentity", "generationStateSnapshot", "generationModeContext", "generationContextSeed",
+    "generationEligibilityContext", "generationNoveltyReference", "generationCacheScalarSnapshot",
+    "generationWeaponIndexSnapshot", "setup", "validation", "eraEvidence", "eligibility", "coherence", "scoring",
     "anchorCandidateScoring", "anchorBeamSearch", "anchorWeaponExpansion", "anchorSelection",
     "supportProfile", "supportLockedCommitments", "supportValidation", "supportEraEvidence", "supportEligibility",
     "supportCandidateScoring", "supportBeamExpansion", "supportSelection", "slotSetup", "slotFinalization", "progressUpdate", "weaponRouting", "stateCommit",
     "previewApply", "uiRefresh", "completionNotify", "rerollLaunchManifest", "rerollStateCapture",
     "rerollAnchorSnapshotReuse", "rerollStateMaterialization", "rerollDiagnosticIdentity", "rerollAnchorSummary",
     "rerollStyleContextInit", "rerollStyleContextSeed", "rerollEligibilityContext",
-    "rerollSupportSummaryFoundation", "rerollCacheSummaryFoundation", "rerollProfileReuse",
+    "rerollSupportSummaryFoundation", "rerollCacheScalarSnapshot", "rerollCacheSummaryFoundation", "rerollProfileReuse",
     "rerollFixedContextCommitments", "rerollLedgerReconstruction", "rerollCandidatePreparation",
     "rerollSourceValidation", "rerollEraEvidence", "rerollEligibility", "rerollCandidateScoring",
     "rerollNeighborScoring", "rerollBridgeScoring", "rerollBudgetEvaluation", "rerollShortlistSelection",
     "rerollStateCommit", "rerollSlot",
 }
 local PHASE_LABELS = {
-    setup = "Setup", validation = "Source validation", eraEvidence = "Era evidence",
+    setup = "Setup (legacy)",
+    generationActionIdentity = "Generation action identity", generationStateSnapshot = "Generation state snapshot",
+    generationModeContext = "Generation mode context", generationContextSeed = "Generation context seed",
+    generationEligibilityContext = "Generation eligibility context", generationNoveltyReference = "Generation novelty reference",
+    generationCacheScalarSnapshot = "Generation cache scalar snapshot", generationWeaponIndexSnapshot = "Generation weapon-index snapshot",
+    validation = "Source validation", eraEvidence = "Era evidence",
     eligibility = "Eligibility", coherence = "Outfit coherence", scoring = "Candidate scoring",
     anchorCandidateScoring = "Anchor candidate scoring", anchorBeamSearch = "Anchor beam search",
     anchorWeaponExpansion = "Anchor weapon expansion", anchorSelection = "Anchor selection",
@@ -45,7 +52,8 @@ local PHASE_LABELS = {
     rerollDiagnosticIdentity = "Reroll diagnostic identity", rerollAnchorSummary = "Reroll anchor summary",
     rerollStyleContextInit = "Reroll style-context initialization", rerollStyleContextSeed = "Reroll style-context seed",
     rerollEligibilityContext = "Reroll eligibility context",
-    rerollSupportSummaryFoundation = "Reroll support summary foundation", rerollCacheSummaryFoundation = "Reroll cache summary foundation",
+    rerollSupportSummaryFoundation = "Reroll support summary foundation",
+    rerollCacheScalarSnapshot = "Reroll cache scalar snapshot", rerollCacheSummaryFoundation = "Reroll cache summary foundation (legacy)",
     rerollProfileReuse = "Reroll profile reuse",
     rerollFixedContextCommitments = "Reroll fixed-context commitments", rerollLedgerReconstruction = "Reroll ledger reconstruction",
     rerollCandidatePreparation = "Reroll candidate preparation", rerollSourceValidation = "Reroll source validation",
@@ -266,6 +274,11 @@ local function AddPerformance(lines, report, rich)
         local severity = (tonumber(phase.maxMs) or 0) > 16 and " !!" or ((tonumber(phase.maxMs) or 0) > 8 and " !" or "")
         Add(lines, string.format("%-31s %7.1f ms %8.1f ms %7s%s", PHASE_LABELS[entry.key] or tostring(entry.key), tonumber(phase.maxMs) or 0, tonumber(phase.totalMs) or 0, N(phase.calls), severity))
     end
+    local scheduler = report.performance and report.performance.schedulerDiagnostics
+    if scheduler then
+        Add(lines, string.format("Scheduler: %s expensive-call yields • %s phase-transition yields • %s prevented transitions", N(scheduler.expensiveCallYields), N(scheduler.phaseTransitionYields), N(scheduler.preventedPhaseTransitions)))
+        Add(lines, string.format("Scheduler integrity: %s post-expensive continuations • %.2f ms maximum slice debt", N(scheduler.postExpensiveCallContinuations), tonumber(scheduler.maximumSliceDebtMs) or 0))
+    end
 end
 
 local function AddCache(lines, report, verbose, rich)
@@ -275,7 +288,13 @@ local function AddCache(lines, report, verbose, rich)
     Add(lines, string.format("Cache hits: %s era • %s eligibility • %s weapon yields", N(perf.eraCacheHits), N(perf.eligibilityCacheHits), N(perf.weaponYields)))
     local weaponIndex = perf.weaponIndex or report.weaponIndex
     if weaponIndex then
-        Add(lines, string.format("Weapon index: %s • %s • %s buckets • %s examined • %s cooperative yields", tostring(weaponIndex.state or "Unknown"), tostring(weaponIndex.use or "None"), N(weaponIndex.buckets), N(weaponIndex.examined), N(weaponIndex.yields)))
+        if weaponIndex.stateBefore or weaponIndex.stateAfter then
+            Add(lines, string.format("Weapon index: %s → %s • %s", tostring(weaponIndex.stateBefore or "Unknown"), tostring(weaponIndex.stateAfter or "Unknown"), tostring(weaponIndex.use or "NONE")))
+            Add(lines, string.format("Weapon index action: %s reused • %s built • %s repaired • %s examined • %s yields", N(weaponIndex.bucketsReused), N(weaponIndex.bucketsBuilt), N(weaponIndex.bucketsRepaired), N(weaponIndex.examinedThisAction), N(weaponIndex.yieldsThisAction)))
+            Add(lines, string.format("Weapon index lifetime: %s buckets • %s examined • %s yields", N(weaponIndex.lifetimeBuckets), N(weaponIndex.lifetimeExamined), N(weaponIndex.lifetimeYields)))
+        else
+            Add(lines, string.format("Weapon index: %s • %s • %s buckets • %s examined • %s cooperative yields", tostring(weaponIndex.state or "Unknown"), tostring(weaponIndex.use or "None"), N(weaponIndex.buckets), N(weaponIndex.examined), N(weaponIndex.yields)))
+        end
         if weaponIndex.invalidationReason then Add(lines, "Weapon index invalidation: " .. tostring(weaponIndex.invalidationReason)) end
     end
     local history = D.GetHistoryCounters and D.GetHistoryCounters() or nil

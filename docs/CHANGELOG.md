@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.9.0.12 - 2026-08-03
+
+### Performance
+
+- Enforced immediate post-operation yielding and phase-transition time reservations across cooperative generation workers.
+- Replaced generation-time cache recounting with incrementally maintained scalar counters and immutable snapshots.
+- Split full-generation Setup into resumable identity, state, context, novelty, cache, and weapon-index stages.
+- Expanded adaptive cached-work batches while retaining single-operation fallback after expensive calls.
+
+### Diagnostics
+
+- Added scheduler integrity counters for expensive-call yields, prevented phase transitions, slice debt, and post-expensive-call continuations.
+- Added action-local weapon-index before/after state, bucket build/repair/reuse counts, examined sources, yields, lifetime totals, and canonical invalidation reasons.
+- Corrected incremental weapon-index repair accounting to record completed repairs rather than queued invalidations.
+
+### Preserved
+
+- Preserved deterministic v1.9.0.11 anchor, weapon, support, contextual-reroll, profile, budget, and outfit-name results.
+- Preserved SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, diagnostic format 1, and weapon-index format 1.
+
 ## 1.9.0.11 - 2026-08-03
 
 ### Performance

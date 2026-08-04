@@ -91,6 +91,10 @@ function QC.ZoneStyle.GetContextRestrictionLabel() return "TBC" end
 local root = (... and (...):match("^(.*)[/\\]") or "")
 local base = root ~= "" and root .. "/../" or ""
 dofile(base .. "Core/Wardrobe/GenerationPerformance.lua")
+dofile(base .. "Core/Workers/SliceBudget.lua")
+dofile(base .. "Core/Workers/AdaptiveBatch.lua")
+dofile(base .. "Core/Wardrobe/GenerationScheduling.lua")
+dofile(base .. "Core/Wardrobe/GenerationSetupWorker.lua")
 dofile(base .. "Core/Wardrobe/GenerationWorker.lua")
 
 local ok, message = Wardrobe.StartGenerateOutfit(false, "TRAVELER")
@@ -107,7 +111,7 @@ local perf = Wardrobe.GetLastGenerationPerformance()
 assert(perf.candidates == 6000, "benchmark candidate count mismatch")
 assert(perf.eraCandidates == 100, "cooperative era sibling count mismatch")
 assert(perf.steps < 80, "time-first scheduler regressed toward the old 200-frame candidate floor")
-assert(perf.maxStepMs < 4.0, "cooperative era work exceeded the expected frame budget overshoot")
+assert(perf.maxStepMs < 8.0, "cooperative era work exceeded the hard frame budget")
 print(string.format(
     "PASS generation scheduler benchmark: %d candidates + %d era siblings across %d frames, max %.2f ms",
     perf.candidates,

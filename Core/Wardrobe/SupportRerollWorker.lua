@@ -132,7 +132,7 @@ end
 local function MaterializeCacheSummary(job)
     local started = NowMilliseconds()
     job.cacheCountersStarted = P.GetGenerationCacheCounterSnapshot and P.GetGenerationCacheCounterSnapshot() or nil
-    Record(job, "rerollCacheSummaryFoundation", started)
+    Record(job, "rerollCacheScalarSnapshot", started)
 end
 
 local function ReleasePinnedReports(job)
@@ -337,11 +337,14 @@ function P.StepSupportRerollJob(token)
     local batchPhase, batchOperations, batchLimit = nil, 0, P.GENERATION_OPERATION_SAFETY_CAP
     while operations < P.GENERATION_OPERATION_SAFETY_CAP do
         if P.ShouldYieldSupportRerollSlice(slice, 0.25) then break end
+        if P.CanStartSupportRerollPhase and not P.CanStartSupportRerollPhase(job, slice) then break end
         if batchPhase ~= job.phase then
             batchPhase, batchOperations = job.phase, 0
             batchLimit = P.GetSupportRerollAdaptiveBatchLimit(job, slice)
         elseif batchOperations >= batchLimit then
-            break
+            if P.ShouldYieldSupportRerollSlice(slice, 0.5) then break end
+            batchOperations = 0
+            batchLimit = P.GetSupportRerollAdaptiveBatchLimit(job, slice)
         end
         local operationStarted = NowMilliseconds()
 
@@ -437,6 +440,7 @@ function P.StepSupportRerollJob(token)
             Record(job, "rerollShortlistSelection", started)
             job.phase = "COMMIT"
         elseif job.phase == "COMMIT" then
+            if P.AccumulateSupportRerollSliceDiagnostics then P.AccumulateSupportRerollSliceDiagnostics(job, slice) end
             Commit(job)
             return
         else
@@ -452,6 +456,7 @@ function P.StepSupportRerollJob(token)
     end
 
     job.maxStepMs = math.max(job.maxStepMs or 0, NowMilliseconds() - stepStarted)
+    if P.AccumulateSupportRerollSliceDiagnostics then P.AccumulateSupportRerollSliceDiagnostics(job, slice) end
     if not Schedule(token) then
         Finish(job, false, "Quest Chronicle could not schedule the cooperative support-slot reroll. Try /reload.", "FAILED")
     end

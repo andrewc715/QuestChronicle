@@ -37,7 +37,7 @@ local warmFrames, warmOK, warmCount, warmWork = RunIndex()
 assert(warmOK and warmCount == 80, "warm index output changed")
 assert(warmFrames == 1 and warmWork.yields == 0, "warm index rebuilt instead of reusing its bucket")
 local warm = P.GetWeaponCandidateIndexDiagnostics()
-assert(warm.use == "WARM" and warm.reused >= 1, "warm reuse was not recorded")
+assert(warm.use == "WARM_REUSE" and warm.reused >= 1, "warm reuse was not recorded")
 
 P.InvalidateWeaponCandidateIndex("TEST_BUCKET_CHANGE", "SWORD")
 local repairFrames, repairOK, repairCount = RunIndex()

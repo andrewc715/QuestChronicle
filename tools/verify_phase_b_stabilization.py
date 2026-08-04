@@ -12,7 +12,7 @@ selection = (ROOT / "Core/Wardrobe/WeaponSelection.lua").read_text()
 scan = (ROOT / "Core/Wardrobe/CollectionScanWorker.lua").read_text()
 performance = (ROOT / "Core/Wardrobe/GenerationPerformance.lua").read_text()
 checks = {
- "version": version == "1.9.0.11" and "## Version: 1.9.0.11" in toc,
+ "version": version == "1.9.0.12" and "## Version: 1.9.0.12" in toc,
  "comparison loads before snapshots": toc.find(r"Core\Diagnostics\Comparison.lua") < toc.find(r"Core\Diagnostics\SnapshotBuilder.lua"),
  "stable ancestry": all(t in history + snapshot + comparison for t in ("parentCompletedReportID", "BeginGenerationAttempt", "generationToken")),
  "duplicate protection": all(t in history for t in ("duplicateInsertionsIgnored", "ReportFingerprint", "Duplicate diagnostic report ignored")),

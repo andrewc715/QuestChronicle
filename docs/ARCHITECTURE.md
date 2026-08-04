@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0.11 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0.12 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -333,7 +333,7 @@ After Phase B commits Chest, Legs, Shoulders, and the legal weapon bundle, the g
 
 The Debug workbench stores only selected support decisions and aggregate counters. Candidate arrays remain transient. Existing schema, Courier, wardrobe cache, generation cache, and diagnostic format versions remain unchanged.
 
-## Shared cooperative scheduling and weapon indexing (v1.9.0.11)
+## Shared cooperative scheduling and weapon indexing (v1.9.0.12)
 
 `Core/Workers/SliceBudget.lua` provides one elapsed-time guard for foreground generation workers. A slice records its start time, preferred budget, soft ceiling, and the most recent instrumented call. Workers check the guard before batches, after operations, and before phase transitions. An operation at or above the expensive-call threshold forces a yield before another phase begins.
 
@@ -342,3 +342,13 @@ The Debug workbench stores only selected support decisions and aggregate counter
 The support-reroll worker no longer builds one diagnostic foundation. It materializes identity, anchor ancestry, draft state, style context, selected-support summaries, and cache counters as separate resumable phases. Candidate eligibility is also resumable: `EligibilityWork.lua` advances through precheck, era, provenance, curated-source, drop-source, tracked-source, metadata, and marker stages. `GenerationEligibility.lua` wraps that work with the existing transient and persistent cache semantics.
 
 `WeaponCandidateIndex.lua` adds weapon index format 1 as a session acceleration layer. The index is keyed by its format, the completed wardrobe scan identity, visual count, and character key. Each weapon subtype bucket is built cooperatively through the existing weapon coroutine, reused on warm calls, and repaired independently when an affected subtype is invalidated. The index does not replace wardrobe cache format 7 and does not become authoritative for weapon eligibility or ordering. Existing route generation remains the source of truth.
+
+## v1.9.0.12 scheduler and diagnostics closure
+
+`Core/Workers/SliceBudget.lua` is the shared frame-budget authority. It ends a slice immediately after an operation reaches the expensive-call threshold, reserves time before phase transitions, and exports expensive-call, prevented-transition, post-expensive-continuation, and slice-debt counters. `AdaptiveBatch.lua` uses cost hysteresis to expand consistently cheap cached work through batch sizes up to 32 while collapsing cold or expensive work to one operation.
+
+`Core/Wardrobe/GenerationSetupWorker.lua` replaces the old monolithic full-generation Setup phase with resumable action-identity, state-snapshot, mode-context, context-seed, eligibility-context, novelty-reference, cache-scalar, and weapon-index-snapshot stages. `GenerationScheduling.lua` connects those stages and the established anchor and support workers to the shared scheduler without changing ordered candidate inputs or selection semantics.
+
+`Core/Wardrobe/GenerationCacheCounters.lua` maintains evidence, precheck, and eligibility counts incrementally when the persistent cache mutates. Generation diagnostics copy those scalar values and existing session counters in constant time. Expensive ordering and presentation of invalidation details remain a lazy Debug-rendering concern rather than generation work.
+
+`Core/Wardrobe/WeaponCandidateIndex.lua` remains a session acceleration layer with format 1. Every action snapshots index state before and after work, records buckets built, repaired, and reused, separates action-local examined-source and yield counts from lifetime totals, and uses canonical invalidation reasons. Incremental repairs are counted only when the affected bucket finishes rebuilding.

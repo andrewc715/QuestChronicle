@@ -9,7 +9,7 @@ formatter = (root / "Core/Diagnostics/SupportReportFormatter.lua").read_text(enc
 toc = (root / "QuestChronicle.toc").read_text(encoding="utf-8")
 version = (root / "VERSION.txt").read_text(encoding="utf-8").strip()
 checks = {
-    "v1.9.0.11 metadata": version == "1.9.0.11" and "## Version: 1.9.0.11" in toc,
+    "v1.9.0.12 metadata": version == "1.9.0.12" and "## Version: 1.9.0.12" in toc,
     "canonical mask module loaded": "Core\\Wardrobe\\SupportProfileIdentity.lua" in toc,
     "state beats appearance identity": 'state = ResolveState(hidden, available, locked)' in identity,
     "hidden anchors are profile gated": 'P.IsAnchorActive(mask, slotKey)' in profile,

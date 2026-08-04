@@ -9,8 +9,13 @@ local VisualKey = A.VisualKey
 
 local function TrimBucketMap(bucket, field, maxEntries, reason)
     local values = bucket[field]
-    if CountMap(values) <= maxEntries then return end
+    local before = CountMap(values)
+    if before <= maxEntries then return end
     PruneEntryMap(values, maxEntries, CacheNow(), reason)
+    local removed = before - CountMap(values)
+    if removed > 0 and P.AdjustGenerationCacheCountLedger then
+        P.AdjustGenerationCacheCountLedger(0, field == "prechecks" and -removed or 0, field == "eligibility" and -removed or 0)
+    end
 end
 
 function P.StorePersistentGenerationPrecheck(source, key, eligible, kind, reason)
@@ -28,7 +33,10 @@ function P.StorePersistentGenerationPrecheck(source, key, eligible, kind, reason
     }
     bucket.updatedAt = CacheNow()
     store.updatedAt = CacheNow()
-    if added then Stats().addedPrechecks = Stats().addedPrechecks + 1 end
+    if added then
+        Stats().addedPrechecks = Stats().addedPrechecks + 1
+        if P.AdjustGenerationCacheCountLedger then P.AdjustGenerationCacheCountLedger(0, 1, 0) end
+    end
     TrimBucketMap(bucket, "prechecks", P.GENERATION_CACHE_PRECHECKS_PER_VISUAL, "PRECHECK_LRU")
 end
 
@@ -40,6 +48,7 @@ function P.GetPersistentGenerationPrecheck(source, key)
         or record.fingerprint ~= P.GetPersistentGenerationFingerprint(source)
     then
         bucket.prechecks[key] = nil
+        if P.AdjustGenerationCacheCountLedger then P.AdjustGenerationCacheCountLedger(0, -1, 0) end
         NoteInvalidation("PRECHECK_IDENTITY_CHANGED", 1)
         return nil
     end
@@ -62,7 +71,10 @@ function P.StorePersistentGenerationEligibility(source, key, eligible, kind, rea
     }
     bucket.updatedAt = CacheNow()
     store.updatedAt = CacheNow()
-    if added then Stats().addedEligibility = Stats().addedEligibility + 1 end
+    if added then
+        Stats().addedEligibility = Stats().addedEligibility + 1
+        if P.AdjustGenerationCacheCountLedger then P.AdjustGenerationCacheCountLedger(0, 0, 1) end
+    end
     TrimBucketMap(bucket, "eligibility", P.GENERATION_CACHE_ELIGIBILITY_PER_VISUAL, "ELIGIBILITY_LRU")
 end
 
@@ -74,6 +86,7 @@ function P.GetPersistentGenerationEligibility(source, key)
         or record.fingerprint ~= P.GetPersistentGenerationFingerprint(source)
     then
         bucket.eligibility[key] = nil
+        if P.AdjustGenerationCacheCountLedger then P.AdjustGenerationCacheCountLedger(0, 0, -1) end
         NoteInvalidation("ELIGIBILITY_IDENTITY_CHANGED", 1)
         return nil
     end
@@ -100,6 +113,7 @@ function P.InvalidatePersistentGenerationEligibilityForSource(source, reason)
     local removed = CountMap(bucket.eligibility)
     bucket.eligibility = nil
     if removed > 0 then
+        if P.AdjustGenerationCacheCountLedger then P.AdjustGenerationCacheCountLedger(0, 0, -removed) end
         NoteInvalidation(reason or "EVIDENCE_OUTCOME_CHANGED", removed)
         Stats().downstreamRecordsInvalidated =
             Stats().downstreamRecordsInvalidated + removed

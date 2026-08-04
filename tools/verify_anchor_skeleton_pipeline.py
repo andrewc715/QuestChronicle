@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guard the cooperative anchor-skeleton generation pipeline in v1.9.0.11."""
+"""Guard the cooperative anchor-skeleton generation pipeline in v1.9.0.12."""
 from pathlib import Path
 import sys
 
@@ -10,6 +10,7 @@ cache = (ROOT / "Core/Wardrobe/AnchorSkeletonCache.lua").read_text(encoding="utf
 search = (ROOT / "Core/Wardrobe/AnchorSkeletonSearch.lua").read_text(encoding="utf-8")
 worker = (ROOT / "Core/Wardrobe/AnchorSkeletonWorker.lua").read_text(encoding="utf-8")
 generation = (ROOT / "Core/Wardrobe/GenerationWorker.lua").read_text(encoding="utf-8")
+setup = (ROOT / "Core/Wardrobe/GenerationSetupWorker.lua").read_text(encoding="utf-8")
 performance = (ROOT / "Core/Wardrobe/GenerationPerformance.lua").read_text(encoding="utf-8")
 concepts = (ROOT / "UI/Outfits/ConceptManager.lua").read_text(encoding="utf-8")
 snapshots = (ROOT / "Core/Diagnostics/SnapshotBuilder.lua").read_text(encoding="utf-8")
@@ -17,7 +18,7 @@ commands = (ROOT / "Core/Chronicle/Commands.lua").read_text(encoding="utf-8")
 foundation = (ROOT / "Core/Wardrobe/Foundation.lua").read_text(encoding="utf-8")
 
 checks = {
-    "version is v1.9.0.11": version == "1.9.0.11" and "## Version: 1.9.0.11" in toc,
+    "version is v1.9.0.12": version == "1.9.0.12" and "## Version: 1.9.0.12" in toc,
     "anchor modules load in TOC": all(name in toc for name in (
         "AnchorSkeletonCache.lua", "AnchorSkeletonSearch.lua", "AnchorSkeletonWorker.lua")),
     "anchor slot order is explicit": 'P.ANCHOR_SLOT_ORDER = { "CHEST", "LEGS", "SHOULDER" }' in cache,
@@ -28,7 +29,7 @@ checks = {
     "beam search is bounded and quality-windowed": "ANCHOR_BEAM_WIDTH" in search
         and "ANCHOR_FINAL_SCORE_WINDOW" in search
         and "ChooseAnchorSkeleton" in search,
-    "generation begins with anchor phase": 'phase = P.AdvanceAnchorGenerationPhase and "ANCHORS" or "ARMOR"' in generation
+    "generation begins with anchor phase": 'job.phase = P.AdvanceAnchorGenerationPhase and "ANCHORS" or "ARMOR"' in setup
         and 'job.phase == "ANCHORS"' in generation,
     "weapon expansion reuses cooperative route engine": "CreateWeaponGenerationWork" in worker
         and "StepWeaponGenerationWork" in worker,

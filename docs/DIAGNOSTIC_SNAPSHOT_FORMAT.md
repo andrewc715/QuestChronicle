@@ -33,7 +33,7 @@ Every report includes:
     sequence = 1,
     timestamp = 0,
     timestampText = "YYYY-MM-DD HH:MM:SS",
-    version = "1.9.0.8",
+    version = "1.9.0.12",
     action = "GENERATE_OUTFIT",
     result = "COMPLETED",
     success = true,
@@ -307,3 +307,44 @@ rerollCacheSummaryFoundation
 ```
 
 The historical `rerollDiagnosticFoundation` phase remains renderable for older reports but is not emitted by v1.9.0.11. Weapon diagnostics distinguish `weaponAppearance` lookup from `weaponIndexBuild`, `weaponIndexRepair`, and `weaponIndexLookup` work. The index snapshot stores only aggregate counters and readiness state; subtype source arrays are transient and never persisted inside diagnostic history.
+
+## Scheduler diagnostics added in v1.9.0.12
+
+Completed generation and contextual-reroll snapshots may include an additive `scheduler` table:
+
+```lua
+{
+    expensiveCallYields = 0,
+    phaseTransitionYields = 0,
+    preventedPhaseTransitions = 0,
+    postExpensiveCallContinuations = 0,
+    maximumSliceDebtMs = 0,
+}
+```
+
+These values describe execution only and never participate in candidate ranking or selection. Healthy actions keep `postExpensiveCallContinuations` at zero.
+
+Cache diagnostics store scalar counter snapshots rather than references to persistent cache tables. Human-readable invalidation ordering and optional zero-value lines are produced lazily by the report renderer.
+
+## Weapon-index action snapshot
+
+Weapon index format 1 may contribute:
+
+```lua
+{
+    stateBefore = "STALE",
+    stateAfter = "PARTIAL",
+    use = "COLD_BUILD",
+    bucketsBuilt = 1,
+    bucketsRepaired = 0,
+    bucketsReused = 0,
+    examinedThisAction = 240,
+    yieldsThisAction = 30,
+    invalidationReason = "LOGIN_SESSION_RESET",
+    lifetimeBuckets = 1,
+    lifetimeExamined = 240,
+    lifetimeYields = 30,
+}
+```
+
+Action-local values are immutable. Lifetime values are captured at completion and do not change when the session index later grows.

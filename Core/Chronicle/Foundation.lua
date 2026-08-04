@@ -17,7 +17,7 @@ P.questSyncToken = 0
 
 P.SCHEMA_VERSION = 2
 P.COURIER_FORMAT_VERSION = 1
-P.ADDON_VERSION = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(P.ADDON_NAME, "Version")) or "1.9.0.11"
+P.ADDON_VERSION = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(P.ADDON_NAME, "Version")) or "1.9.0.12"
 P.PREFIX = "|cffd9b36cQuest Chronicle:|r "
 P.OBJECTIVE_SYNC_DELAY = 0.35
 P.REMOVAL_CLASSIFY_DELAY = 0.45

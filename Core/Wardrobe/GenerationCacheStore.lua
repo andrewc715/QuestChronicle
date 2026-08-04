@@ -198,10 +198,12 @@ end
 local function InvalidateEvidence(store, key, bucket, reason)
     if not bucket then return end
     if P.RemovePersistentEraDependencies then P.RemovePersistentEraDependencies(key) end
-    local removed = bucket.evidence and 1 or 0
-    removed = removed + CountMap(bucket.eligibility)
+    local removedEvidence = bucket.evidence and 1 or 0
+    local removedEligibility = CountMap(bucket.eligibility)
+    local removed = removedEvidence + removedEligibility
     bucket.evidence = nil
     bucket.eligibility = nil
+    if P.AdjustGenerationCacheCountLedger then P.AdjustGenerationCacheCountLedger(-removedEvidence, 0, -removedEligibility) end
     NoteInvalidation(reason, removed)
     RemoveBucketIfEmpty(store, key, bucket)
 end
@@ -300,6 +302,7 @@ local function PutEvidenceRaw(store, source, result, candidateCount, evidenceVer
     }
     local added = bucket.evidence == nil
     bucket.evidence = record
+    if added and P.AdjustGenerationCacheCountLedger then P.AdjustGenerationCacheCountLedger(1, 0, 0) end
     if P.IndexPersistentEraDependencies then P.IndexPersistentEraDependencies(key, record) end
     bucket.updatedAt = now
     store.updatedAt = now
@@ -352,6 +355,8 @@ function P.EnsurePersistentGenerationCache()
         stats.loadedEvidence = evidence
         stats.loadedPrechecks = prechecks
         stats.loadedEligibility = eligibility
+        if P.InitializeGenerationCacheCountLedger then P.InitializeGenerationCacheCountLedger(evidence, prechecks, eligibility)
+        else stats.currentEvidence, stats.currentPrechecks, stats.currentEligibility = evidence, prechecks, eligibility end
         MigrateLegacySourceFields(cache, store)
         if P.RebuildPersistentEraDependencyIndex then
             P.RebuildPersistentEraDependencyIndex(store)
@@ -439,9 +444,12 @@ P._GenerationCacheStoreAccess = {
 function P.InvalidatePersistentGenerationCache(source, reason)
     local store, bucket, key = GetBucket(source, false)
     if not bucket then return end
-    local removed = (bucket.evidence and 1 or 0) + CountMap(bucket.prechecks) + CountMap(bucket.eligibility)
+    local removedEvidence = bucket.evidence and 1 or 0
+    local removedPrechecks, removedEligibility = CountMap(bucket.prechecks), CountMap(bucket.eligibility)
+    local removed = removedEvidence + removedPrechecks + removedEligibility
     if P.RemovePersistentEraDependencies then P.RemovePersistentEraDependencies(key) end
     store.visuals[key] = nil
+    if P.AdjustGenerationCacheCountLedger then P.AdjustGenerationCacheCountLedger(-removedEvidence, -removedPrechecks, -removedEligibility) end
     NoteInvalidation(reason or "SOURCE_INVALIDATED", removed)
 end
 

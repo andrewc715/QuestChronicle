@@ -99,6 +99,10 @@ local expectedLegs = ExpectedSource(sources.LEGS)
 local root = (... and (...):match("^(.*)[/\\]") or "")
 local base = root ~= "" and root .. "/../" or ""
 dofile(base .. "Core/Wardrobe/GenerationPerformance.lua")
+dofile(base .. "Core/Workers/SliceBudget.lua")
+dofile(base .. "Core/Workers/AdaptiveBatch.lua")
+dofile(base .. "Core/Wardrobe/GenerationScheduling.lua")
+dofile(base .. "Core/Wardrobe/GenerationSetupWorker.lua")
 dofile(base .. "Core/Wardrobe/GenerationWorker.lua")
 P.GENERATION_TIME_BUDGET_MS = 1000
 math.randomseed(seed)

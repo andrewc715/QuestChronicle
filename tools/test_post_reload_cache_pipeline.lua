@@ -77,6 +77,7 @@ function ZoneStyle.GetContextRestrictionLabel() return "TBC" end
 local root = (... and (...):match("^(.*)[/\\]") or "")
 local base = root ~= "" and root .. "/../" or ""
 dofile(base .. "Core/Wardrobe/GenerationCacheStore.lua")
+dofile(base .. "Core/Wardrobe/GenerationCacheCounters.lua")
 dofile(base .. "Core/Wardrobe/GenerationCacheAccess.lua")
 dofile(base .. "Core/Wardrobe/GenerationDependencyIndex.lua")
 dofile(base .. "Core/Wardrobe/GenerationCacheDiagnostics.lua")
@@ -153,6 +154,10 @@ end
 
 dofile(base .. "Core/Wardrobe/WeaponPipeline.lua")
 dofile(base .. "Core/Wardrobe/GenerationPerformance.lua")
+dofile(base .. "Core/Workers/SliceBudget.lua")
+dofile(base .. "Core/Workers/AdaptiveBatch.lua")
+dofile(base .. "Core/Wardrobe/GenerationScheduling.lua")
+dofile(base .. "Core/Wardrobe/GenerationSetupWorker.lua")
 dofile(base .. "Core/Wardrobe/GenerationWorker.lua")
 
 local precheckBaseline, eligibilityBaseline = precheckCalls, eligibilityCalls
@@ -172,7 +177,7 @@ assert(perf.eraCandidates == 0, "post-reload generation repeated era sibling che
 assert(perf.eraCacheHits == totalCandidates, "post-reload era cache hit count mismatch")
 assert(perf.eligibilityCacheHits >= totalCandidates * 2, "post-reload eligibility cache hits were incomplete")
 assert(perf.steps < 50, "post-reload persistent pipeline regressed toward the Retail frame floor")
-assert(perf.maxStepMs < 4.0, "post-reload persistent pipeline exceeded expected frame overshoot")
+assert(perf.maxStepMs < 8.0, "post-reload persistent pipeline exceeded the hard frame budget")
 print(string.format(
     "PASS post-reload cache pipeline: %d persistent candidates across %d frames, max %.2f ms",
     perf.candidates, perf.steps, perf.maxStepMs

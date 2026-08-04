@@ -5,7 +5,10 @@ local function NowMilliseconds()
     return P.GenerationNowMilliseconds and P.GenerationNowMilliseconds() or 0
 end
 local function RecordPhase(job, phaseKey, startedAt)
-    if P.RecordGenerationPhase then P.RecordGenerationPhase(job, phaseKey, NowMilliseconds() - startedAt) end
+    local elapsed = math.max(0, NowMilliseconds() - startedAt)
+    if P.RecordGenerationPhase then P.RecordGenerationPhase(job, phaseKey, elapsed) end
+    if P.NoteGenerationWorkerCall then P.NoteGenerationWorkerCall(job, elapsed) end
+    return elapsed
 end
 local function CopyDraftState(state)
     local draft = {}
@@ -394,10 +397,12 @@ function P.StepAnchorSkeletonJob(job, stepStarted)
     if not work then work = P.CreateAnchorSkeletonWork(job) job.anchorWork = work end
     local operations = 0
     while operations < P.GENERATION_OPERATION_SAFETY_CAP do
+        if P.ShouldYieldGenerationWorker and P.ShouldYieldGenerationWorker(job, 0.5) then return "RUNNING" end
         if work.stage == "POOLS" then
             if work.poolSlotIndex > #P.ANCHOR_SLOT_ORDER then
                 work.beamWork = P.CreateAnchorBeamWork(work.candidatePools)
                 work.stage = "BEAM"
+                return "RUNNING"
             else
                 local slotKey = P.ANCHOR_SLOT_ORDER[work.poolSlotIndex]
                 if not work.poolWork then work.poolWork = CreatePoolWork(job, slotKey) end
@@ -413,6 +418,7 @@ function P.StepAnchorSkeletonJob(job, stepStarted)
                 end
             end
         elseif work.stage == "BEAM" then
+            if P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.5) then return "RUNNING" end
             local beamStarted = NowMilliseconds()
             local done = P.StepAnchorBeamWork(work.beamWork)
             RecordPhase(job, "anchorBeamSearch", beamStarted)
@@ -423,12 +429,15 @@ function P.StepAnchorSkeletonJob(job, stepStarted)
                     return "FALLBACK", work.fallbackReason
                 end
                 work.stage = "WEAPONS"
+                return "RUNNING"
             end
         elseif work.stage == "WEAPONS" then
+            if P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.5) then return "RUNNING" end
             work.weaponCallExceededBudget = false
-            if StepWeaponExpansions(job, work) then work.stage = "SELECT" end
-            if work.weaponCallExceededBudget then return "RUNNING" end
+            if StepWeaponExpansions(job, work) then work.stage = "SELECT" return "RUNNING" end
+            if work.weaponCallExceededBudget or (P.ShouldYieldGenerationWorker and P.ShouldYieldGenerationWorker(job, 0.5)) then return "RUNNING" end
         elseif work.stage == "SELECT" then
+            if P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.5) then return "RUNNING" end
             local selectionStarted = NowMilliseconds()
             local committed = CommitSelectedSkeleton(job, work)
             RecordPhase(job, "anchorSelection", selectionStarted)
@@ -436,6 +445,7 @@ function P.StepAnchorSkeletonJob(job, stepStarted)
             return "READY"
         end
         operations = operations + 1
+        if P.ShouldYieldGenerationWorker and P.ShouldYieldGenerationWorker(job, 0.5) then return "RUNNING" end
         if NowMilliseconds() - stepStarted >= P.GENERATION_TIME_BUDGET_MS then return "RUNNING" end
     end
     return "RUNNING"

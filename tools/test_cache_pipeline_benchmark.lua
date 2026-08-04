@@ -95,6 +95,10 @@ local root = (... and (...):match("^(.*)[/\\]") or "")
 local base = root ~= "" and root .. "/../" or ""
 dofile(base .. "Core/Wardrobe/WeaponPipeline.lua")
 dofile(base .. "Core/Wardrobe/GenerationPerformance.lua")
+dofile(base .. "Core/Workers/SliceBudget.lua")
+dofile(base .. "Core/Workers/AdaptiveBatch.lua")
+dofile(base .. "Core/Wardrobe/GenerationScheduling.lua")
+dofile(base .. "Core/Wardrobe/GenerationSetupWorker.lua")
 dofile(base .. "Core/Wardrobe/GenerationWorker.lua")
 
 local ok, message = Wardrobe.StartGenerateOutfit(true, "TRAVELER")
@@ -113,7 +117,7 @@ assert(perf.eraCandidates == 0, "cached era evidence performed sibling checks")
 assert(perf.eraCacheHits == 3256, "era cache hit count mismatch")
 assert(perf.weaponYields == 120, "weapon coroutine yield count mismatch")
 assert(perf.steps < 50, "warm cache pipeline regressed toward the 204-frame floor")
-assert(perf.maxStepMs < 4.0, "cache pipeline exceeded expected frame overshoot")
+assert(perf.maxStepMs < 8.0, "cache pipeline exceeded the hard frame limit")
 print(string.format(
     "PASS cache pipeline benchmark: %d candidates + %d weapon yields across %d frames, max %.2f ms",
     perf.candidates, perf.weaponYields, perf.steps, perf.maxStepMs

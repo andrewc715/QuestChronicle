@@ -42,8 +42,9 @@ checks = {
         and "pendingItemIDs = pendingItems" in store
         and "trackingPending = result.trackingPending == true" in store,
     "diagnostics expose dependency and outcome events":
-        "dependencyRecordsExaminedDuringGeneration" in diagnostics
-        and "evidenceOutcomesUnchangedDuringGeneration" in diagnostics
+        "dependencyRecordsExamined" in diagnostics
+        and "evidenceOutcomesUnchanged" in diagnostics
+        and 'field .. "DuringGeneration"' in diagnostics
         and "Item callbacks:" in performance
         and "Cache churn:" in performance,
 }
