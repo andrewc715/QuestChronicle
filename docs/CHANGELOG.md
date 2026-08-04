@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.9.0.13 - 2026-08-03
+
+### Diagnostics
+
+- Added canonical weapon-index invalidation causes for login refresh, cache replacement, collection revision, appearance collection, and character capability transitions.
+- Preserved the originating reason through cold and partial bucket construction.
+- Reported `NONE` for warm reuse and actions with no processed invalidation.
+- Added a warning only for genuine `UNKNOWN` fallback paths.
+
+### Preserved
+
+- Preserved deterministic v1.9.0.12 anchor, weapon, support, contextual-reroll, profile, budget, naming, and scheduler results.
+- Preserved SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, diagnostic format 1, and weapon-index format 1.
+
 ## 1.9.0.12 - 2026-08-03
 
 ### Performance

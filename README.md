@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0.12
+# Quest Chronicle v1.9.0.13
 
-> **Scheduler and Diagnostics Closure:** expensive cooperative operations now end their frame immediately, phase transitions reserve time before they begin, cache diagnostics are constant-time snapshots, and full-generation setup is resumable.
+> **Weapon-Index Invalidation Lifecycle:** cold and partial index construction retain their canonical cause, warm reuse reports `NONE`, and only a genuine unclassified transition reports `UNKNOWN`.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.12 closes the remaining scheduler and diagnostic hot paths without changing Phase B or Phase C selection semantics.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.13 closes the weapon-index invalidation dashboard without changing any selection, route, score, or scheduler behavior.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 

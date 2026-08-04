@@ -6,6 +6,11 @@ P.WEAPON_INDEX_FORMAT = 1
 P.weaponCandidateIndex = nil
 P.weaponCandidateIndexKey = nil
 P.weaponCandidateIndexInvalidationReason = P.weaponCandidateIndexInvalidationReason or "LOGIN_SESSION_RESET"
+P.weaponCandidateIndexInvalidationUnknownFallback = P.weaponCandidateIndexInvalidationUnknownFallback == true
+P.weaponCandidateIndexInvalidationSequence = tonumber(P.weaponCandidateIndexInvalidationSequence) or 0
+if P.weaponCandidateIndexInvalidationSequence == 0 then
+    P.weaponCandidateIndexInvalidationSequence = 1
+end
 P.weaponCandidateIndexStats = P.weaponCandidateIndexStats or {
     builds = 0, repairs = 0, reused = 0, examined = 0, yields = 0,
 }
@@ -19,17 +24,33 @@ local CANONICAL_REASONS = {
 }
 
 local function CanonicalReason(reason)
-    reason = tostring(reason or "UNKNOWN")
-    if reason == "TEST_BUCKET_CHANGE" or reason == "BUCKET_INVALIDATED" then return "METADATA_REVISION_CHANGED" end
-    return CANONICAL_REASONS[reason] and reason or "UNKNOWN"
+    if reason == nil or tostring(reason) == "" then return "UNKNOWN", true end
+    reason = tostring(reason)
+    if reason == "TEST_BUCKET_CHANGE" or reason == "BUCKET_INVALIDATED" then
+        return "METADATA_REVISION_CHANGED", false
+    end
+    if CANONICAL_REASONS[reason] then return reason, false end
+    return "UNKNOWN", true
 end
 
-local function CurrentIndexKey()
+local function CanonicalReasonOrNone(reason)
+    if reason == nil or tostring(reason) == "" then return "NONE", false end
+    return CanonicalReason(reason)
+end
+
+local function CurrentIndexIdentity()
     local cache = P.EnsureCache()
-    return table.concat({
-        tostring(P.WEAPON_INDEX_FORMAT), tostring(cache.scanCompletedAt or 0),
-        tostring(cache.totalVisuals or 0), tostring(cache.characterKey or ""),
+    local identity = {
+        format = P.WEAPON_INDEX_FORMAT,
+        scanCompletedAt = cache.scanCompletedAt or 0,
+        totalVisuals = cache.totalVisuals or 0,
+        characterKey = cache.characterKey or "",
+    }
+    identity.key = table.concat({
+        tostring(identity.format), tostring(identity.scanCompletedAt),
+        tostring(identity.totalVisuals), tostring(identity.characterKey),
     }, ":")
+    return identity
 end
 
 local function CountBuckets(index)
@@ -38,26 +59,56 @@ local function CountBuckets(index)
     return count
 end
 
+local function NextInvalidationSequence()
+    P.weaponCandidateIndexInvalidationSequence = (tonumber(P.weaponCandidateIndexInvalidationSequence) or 0) + 1
+    return P.weaponCandidateIndexInvalidationSequence
+end
+
+local function ResolveImplicitInvalidation(index, identity)
+    if type(index) ~= "table" then
+        local reason, unknownFallback = CanonicalReason(P.weaponCandidateIndexInvalidationReason)
+        return reason, unknownFallback, tonumber(P.weaponCandidateIndexInvalidationSequence) or 0
+    end
+    if index.format ~= P.WEAPON_INDEX_FORMAT then
+        return "FORMAT_MISMATCH", false, NextInvalidationSequence()
+    end
+    if tostring(index.characterKey or "") ~= tostring(identity.characterKey or "") then
+        return "CHARACTER_CAPABILITY_CHANGED", false, NextInvalidationSequence()
+    end
+    if tonumber(index.scanCompletedAt or 0) ~= tonumber(identity.scanCompletedAt or 0)
+        or tonumber(index.totalVisuals or 0) ~= tonumber(identity.totalVisuals or 0)
+    then
+        return "WARDROBE_CACHE_REPLACED", false, NextInvalidationSequence()
+    end
+    return "UNKNOWN", true, NextInvalidationSequence()
+end
+
 local function EnsureIndex()
-    local key = CurrentIndexKey()
+    local identity = CurrentIndexIdentity()
     local index = P.weaponCandidateIndex
-    if P.weaponCandidateIndexKey ~= key or type(index) ~= "table" or index.format ~= P.WEAPON_INDEX_FORMAT then
-        local reason = type(index) == "table" and index.format ~= P.WEAPON_INDEX_FORMAT
-            and "FORMAT_MISMATCH" or P.weaponCandidateIndexInvalidationReason
-        P.weaponCandidateIndexKey = key
+    if P.weaponCandidateIndexKey ~= identity.key or type(index) ~= "table" or index.format ~= P.WEAPON_INDEX_FORMAT then
+        local reason, unknownFallback, invalidationSequence = ResolveImplicitInvalidation(index, identity)
+        P.weaponCandidateIndexKey = identity.key
         index = {
-            format = P.WEAPON_INDEX_FORMAT, key = key, state = "PARTIAL", buckets = {},
-            completedBuckets = 0, invalidationReason = CanonicalReason(reason),
-            contributingReasons = { [CanonicalReason(reason)] = true },
+            format = P.WEAPON_INDEX_FORMAT, key = identity.key, state = "PARTIAL", buckets = {},
+            completedBuckets = 0, invalidationReason = reason,
+            invalidationUnknownFallback = unknownFallback == true,
+            invalidationSequence = invalidationSequence,
+            scanCompletedAt = identity.scanCompletedAt, totalVisuals = identity.totalVisuals,
+            characterKey = identity.characterKey,
+            contributingReasons = { [reason] = true },
         }
         P.weaponCandidateIndex = index
         P.weaponCandidateIndexInvalidationReason = nil
+        P.weaponCandidateIndexInvalidationUnknownFallback = false
     end
     return index
 end
 
 function P.InvalidateWeaponCandidateIndex(reason, subtypeKey)
-    reason = CanonicalReason(reason)
+    local unknownFallback
+    reason, unknownFallback = CanonicalReason(reason)
+    local invalidationSequence = NextInvalidationSequence()
     local index = P.weaponCandidateIndex
     if subtypeKey and index and index.buckets and index.buckets[subtypeKey] then
         index.buckets[subtypeKey] = nil
@@ -65,6 +116,8 @@ function P.InvalidateWeaponCandidateIndex(reason, subtypeKey)
         index.state = "REPAIRING"
         index.repairingSubtypeKey = subtypeKey
         index.invalidationReason = reason
+        index.invalidationUnknownFallback = unknownFallback == true
+        index.invalidationSequence = invalidationSequence
         index.contributingReasons = index.contributingReasons or {}
         index.contributingReasons[reason] = true
         return
@@ -73,6 +126,7 @@ function P.InvalidateWeaponCandidateIndex(reason, subtypeKey)
     P.weaponCandidateIndex = nil
     P.weaponCandidateIndexKey = nil
     P.weaponCandidateIndexInvalidationReason = reason
+    P.weaponCandidateIndexInvalidationUnknownFallback = unknownFallback == true
 end
 
 local function YieldIndex(index, phaseKey)
@@ -123,12 +177,19 @@ end
 function P.GetWeaponCandidateIndexDiagnostics()
     local index = P.weaponCandidateIndex
     local stats = P.weaponCandidateIndexStats or {}
+    local invalidationReason, unknownFallback = CanonicalReasonOrNone(
+        index and index.invalidationReason or P.weaponCandidateIndexInvalidationReason
+    )
     return {
         format = P.WEAPON_INDEX_FORMAT, state = index and index.state or "STALE",
         use = index and index.lastUse or "NONE", buckets = CountBuckets(index),
         examined = index and index.examined or 0, yields = index and index.yields or 0,
         builds = stats.builds or 0, repairs = stats.repairs or 0, reused = stats.reused or 0,
-        invalidationReason = CanonicalReason(index and index.invalidationReason or P.weaponCandidateIndexInvalidationReason),
+        invalidationReason = invalidationReason,
+        invalidationUnknownFallback = index and index.invalidationUnknownFallback == true
+            or P.weaponCandidateIndexInvalidationUnknownFallback == true or unknownFallback == true,
+        invalidationSequence = tonumber(index and index.invalidationSequence
+            or P.weaponCandidateIndexInvalidationSequence) or 0,
         contributingReasons = index and index.contributingReasons or nil,
     }
 end
@@ -140,6 +201,8 @@ function P.BeginWeaponIndexActionSnapshot()
         examined = current.examined, yields = current.yields, builds = current.builds,
         repairs = current.repairs, reused = current.reused,
         invalidationReason = current.invalidationReason,
+        invalidationUnknownFallback = current.invalidationUnknownFallback == true,
+        invalidationSequence = current.invalidationSequence,
     }
 end
 
@@ -152,13 +215,25 @@ function P.BuildWeaponIndexActionDiagnostics(start)
     local action = repaired > 0 and "INCREMENTAL_REPAIR"
         or (built > 0 and ((start.buckets or 0) == 0 and "COLD_BUILD" or "PARTIAL_BUILD"))
         or (reused > 0 and "WARM_REUSE" or "NONE")
+    local invalidationChanged = tonumber(finish.invalidationSequence) ~= tonumber(start.invalidationSequence)
+    local invalidationReason, invalidationUnknownFallback = "NONE", false
+    if built > 0 or repaired > 0 then
+        invalidationReason = finish.invalidationReason ~= "NONE" and finish.invalidationReason
+            or (start.invalidationReason ~= "NONE" and start.invalidationReason or "UNKNOWN")
+        invalidationUnknownFallback = finish.invalidationUnknownFallback == true
+            or start.invalidationUnknownFallback == true or invalidationReason == "UNKNOWN"
+    elseif invalidationChanged then
+        invalidationReason = finish.invalidationReason ~= "NONE" and finish.invalidationReason or "UNKNOWN"
+        invalidationUnknownFallback = finish.invalidationUnknownFallback == true or invalidationReason == "UNKNOWN"
+    end
     return {
         format = finish.format, stateBefore = start.state, stateAfter = finish.state,
         use = action, bucketsBefore = start.buckets or 0, bucketsAfter = finish.buckets or 0,
         bucketsBuilt = built, bucketsRepaired = repaired, bucketsReused = reused,
         examinedThisAction = math.max(0, (finish.examined or 0) - (start.examined or 0)),
         yieldsThisAction = math.max(0, (finish.yields or 0) - (start.yields or 0)),
-        invalidationReason = finish.invalidationReason or start.invalidationReason or "NONE",
+        invalidationReason = invalidationReason,
+        invalidationUnknownFallback = invalidationUnknownFallback,
         lifetimeBuckets = finish.buckets or 0, lifetimeExamined = finish.examined or 0,
         lifetimeYields = finish.yields or 0,
     }

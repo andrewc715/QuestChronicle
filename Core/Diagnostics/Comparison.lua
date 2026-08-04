@@ -112,6 +112,10 @@ function P.AttachWarningsAndComparison(report)
         if launch > 12 then AddWarning(report, "SYNC_LAUNCH_OVERRUN", "SEVERE", string.format("Synchronous support-reroll launch preparation reached %.1f ms.", launch))
         elseif launch >= 8 then AddWarning(report, "SYNC_LAUNCH_OVERRUN", "WARNING", string.format("Synchronous support-reroll launch preparation reached %.1f ms.", launch)) end
     end
+    local weaponIndex = performance.weaponIndex or report.weaponIndex
+    if weaponIndex and weaponIndex.invalidationReason == "UNKNOWN" then
+        AddWarning(report, "UNKNOWN_WEAPON_INDEX_INVALIDATION", "WARNING", "The weapon candidate index was invalidated without a recognized lifecycle reason.")
+    end
     local skeleton = report.skeleton or {}
     if skeleton.fallbackReason then AddWarning(report, "LEGACY_FALLBACK", "WARNING", "Anchor search used the legacy generator: " .. tostring(skeleton.fallbackReason)) end
     if report.supportFallbackReason then AddWarning(report, "SUPPORT_LEGACY_FALLBACK", "WARNING", "Contextual support used the legacy selector: " .. tostring(report.supportFallbackReason)) end

@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0.12 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0.13 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -352,3 +352,12 @@ The support-reroll worker no longer builds one diagnostic foundation. It materia
 `Core/Wardrobe/GenerationCacheCounters.lua` maintains evidence, precheck, and eligibility counts incrementally when the persistent cache mutates. Generation diagnostics copy those scalar values and existing session counters in constant time. Expensive ordering and presentation of invalidation details remain a lazy Debug-rendering concern rather than generation work.
 
 `Core/Wardrobe/WeaponCandidateIndex.lua` remains a session acceleration layer with format 1. Every action snapshots index state before and after work, records buckets built, repaired, and reused, separates action-local examined-source and yield counts from lifetime totals, and uses canonical invalidation reasons. Incremental repairs are counted only when the affected bucket finishes rebuilding.
+
+## v1.9.0.13 weapon-index invalidation lifecycle
+
+`Core/Wardrobe/WeaponCandidateIndex.lua` separates the active index lifecycle cause from the invalidation reported for one completed action. The session-only index begins with `LOGIN_SESSION_RESET`; that cause remains attached while cold and partial subtype buckets are constructed. A later warm reuse reports `NONE` because it did not process a new invalidation.
+
+Every production invalidation entrypoint supplies a canonical reason. Automatic login scans retain `LOGIN_SESSION_RESET`, manual scan replacement uses `WARDROBE_CACHE_REPLACED`, collection events use `COLLECTION_REVISION_CHANGED` or `APPEARANCE_COLLECTED`, and equipment, specialization, talent, or character changes use `CHARACTER_CAPABILITY_CHANGED`. Identity mismatches detected inside the index infer the same canonical causes. Missing or unrecognized reasons alone fall back to `UNKNOWN`.
+
+The change is diagnostic-only. Bucket membership, source ordering, route evaluation, eligibility, scoring, selection, worker scheduling, and atomic commit behavior remain unchanged.
+

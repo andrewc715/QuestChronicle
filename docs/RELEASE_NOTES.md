@@ -1,18 +1,15 @@
-# Quest Chronicle v1.9.0.12
+# Quest Chronicle v1.9.0.13
 
-## Scheduler and Diagnostics Closure
+## Weapon-Index Invalidation Lifecycle
 
-Quest Chronicle now ends a cooperative slice immediately after expensive work, reserves frame time before every phase transition, captures generation-cache diagnostics from constant-time scalar ledgers, and decomposes full-generation setup into resumable stages.
+Quest Chronicle now reports the canonical cause of each weapon candidate-index lifecycle transition without carrying an old invalidation label into later warm actions.
 
-- Enforces immediate post-operation yielding after calls at or above the expensive-call threshold.
-- Prevents workers from beginning a new phase when the remaining frame allowance cannot cover that phase's reservation.
-- Records expensive-call yields, prevented phase transitions, slice debt, and post-expensive-call continuations.
-- Replaces generation-time cache aggregation with an immutable scalar snapshot backed by incrementally maintained evidence, precheck, and eligibility counters.
-- Splits full-generation Setup into action identity, state snapshot, mode context, context seeding, eligibility context, novelty reference, cache snapshot, and weapon-index snapshot stages.
-- Adds adaptive batching with a 32-operation fast lane for consistently cheap cached work and immediate single-operation fallback after expensive work.
-- Reports weapon-index state before and after each action, action-local buckets built, repaired, and reused, action-local examined sources and yields, lifetime totals, and canonical invalidation reasons.
-- Corrects bucket-repair bookkeeping so incremental repair is recorded when the bucket is actually rebuilt.
-- Preserves v1.9.0.11 anchor, weapon, support, contextual-reroll, profile, mismatch, and outfit-name selections for identical seeds and state.
+- Reports `LOGIN_SESSION_RESET` for the session-only index after reload and preserves it through the cold and partial bucket-build sequence.
+- Reports `NONE` for warm reuse and other actions that did not process a new invalidation.
+- Assigns explicit reasons for automatic login refresh, manual wardrobe-cache replacement, collection revision changes, newly collected appearances, and character capability changes.
+- Infers canonical reasons when the wardrobe-cache identity or character identity changes before an explicit invalidation call.
+- Emits an `UNKNOWN_WEAPON_INDEX_INVALIDATION` warning only when a caller omits the reason or supplies an unrecognized reason.
+- Preserves v1.9.0.12 candidate ordering, selections, scores, weapon routes, cooperative scheduling, phase transitions, and scheduler diagnostics.
 - Keeps SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, diagnostic format 1, and weapon-index format 1 unchanged.
 
-The package is automated-validated and requires Retail validation before replacing v1.9.0.5 as the live baseline.
+The package is automated-validated and requires Retail validation before replacing v1.9.0.12 as the live baseline.

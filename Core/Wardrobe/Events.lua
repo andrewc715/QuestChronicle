@@ -25,6 +25,7 @@ P.eventFrame:SetScript("OnEvent", function(_, event, ...)
         if character and cache.characterKey and cache.characterKey ~= character.key then
             P.ResetCache(cache, "STALE")
             cache.dirtyReason = "CHARACTER_CHANGED"
+            Wardrobe.InvalidateWeaponAppearanceRoutes("CHARACTER_CAPABILITY_CHANGED")
         end
         -- The automatic login scan rebuilds the metadata watch index while it
         -- discovers the new cache. Performing a full hydration pass over the
@@ -40,7 +41,7 @@ P.eventFrame:SetScript("OnEvent", function(_, event, ...)
         or event == "TRAIT_CONFIG_UPDATED"
     then
         local eventArg1 = select(1, ...)
-        Wardrobe.InvalidateWeaponAppearanceRoutes()
+        Wardrobe.InvalidateWeaponAppearanceRoutes("CHARACTER_CAPABILITY_CHANGED")
         local now = GetTime and GetTime()
         -- Blizzard may emit TRANSMOG_COLLECTION_UPDATED while its own UI
         -- settles after equipment or specialization changes. Suppress that

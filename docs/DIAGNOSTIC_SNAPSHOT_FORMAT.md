@@ -33,7 +33,7 @@ Every report includes:
     sequence = 1,
     timestamp = 0,
     timestampText = "YYYY-MM-DD HH:MM:SS",
-    version = "1.9.0.12",
+    version = "1.9.0.13",
     action = "GENERATE_OUTFIT",
     result = "COMPLETED",
     success = true,
@@ -348,3 +348,16 @@ Weapon index format 1 may contribute:
 ```
 
 Action-local values are immutable. Lifetime values are captured at completion and do not change when the session index later grows.
+
+## Weapon-index invalidation action semantics in v1.9.0.13
+
+The action-local `invalidationReason` field is always present:
+
+```lua
+invalidationReason = "LOGIN_SESSION_RESET" -- cold or partial build after reload
+invalidationReason = "NONE"                -- warm reuse with no new invalidation
+invalidationReason = "UNKNOWN"             -- only an unclassified fallback
+```
+
+The active lifecycle cause remains attached to the transient session index so all buckets built during the same cold/partial sequence report the same cause. Warm actions do not inherit that historical label. When `UNKNOWN` is emitted, `invalidationUnknownFallback = true` may also be stored and the completed report receives an `UNKNOWN_WEAPON_INDEX_INVALIDATION` warning.
+

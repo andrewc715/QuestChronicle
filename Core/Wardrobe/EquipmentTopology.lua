@@ -313,11 +313,11 @@ P.weaponRouteCache = nil
 P.weaponRouteCacheKey = nil
 P.weaponRouteCacheExpiresAt = 0
 
-function Wardrobe.InvalidateWeaponAppearanceRoutes()
+function Wardrobe.InvalidateWeaponAppearanceRoutes(reason)
     P.weaponRouteCache = nil
     P.weaponRouteCacheKey = nil
     P.weaponRouteCacheExpiresAt = 0
-    if P.InvalidateWeaponCandidateIndex then P.InvalidateWeaponCandidateIndex() end
+    if P.InvalidateWeaponCandidateIndex then P.InvalidateWeaponCandidateIndex(reason) end
     P.weaponValidationSessionCache = {}
 end
 

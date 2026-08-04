@@ -67,7 +67,13 @@ end
 function Wardrobe.MarkDirty(reason)
     if P.ClearWeaponGenerationMetadataCaches then P.ClearWeaponGenerationMetadataCaches() end
     if Wardrobe.CancelGeneration then Wardrobe.CancelGeneration("Outfit generation was cancelled because the wardrobe collection changed.") end
-    Wardrobe.InvalidateWeaponAppearanceRoutes()
+    local indexReason = "COLLECTION_REVISION_CHANGED"
+    if reason == "TRANSMOG_COLLECTION_SOURCE_ADDED"
+        or reason == "TRANSMOG_COSMETIC_COLLECTION_SOURCE_ADDED"
+    then
+        indexReason = "APPEARANCE_COLLECTED"
+    end
+    Wardrobe.InvalidateWeaponAppearanceRoutes(indexReason)
     local cache = P.EnsureCache()
     cache.dirty = true
     cache.dirtyReason = reason or "COLLECTION_CHANGED"
@@ -190,7 +196,9 @@ function Wardrobe.Scan(force, trigger)
         cache.characterKey = QC.GetCurrentCharacter().key
         cache.scanDurationMS = scanStartedPrecise and GetTime and math.floor(((GetTime() - scanStartedPrecise) * 1000) + 0.5) or nil
         P.RecoverAppearanceReferences(cache)
-        Wardrobe.InvalidateWeaponAppearanceRoutes()
+        local indexReason = cache.scanTrigger == "AUTO_LOGIN"
+            and "LOGIN_SESSION_RESET" or "WARDROBE_CACHE_REPLACED"
+        Wardrobe.InvalidateWeaponAppearanceRoutes(indexReason)
         if cache.scanTrigger == "AUTO_LOGIN" then
             cache.lastLoginRefreshAt = cache.scanCompletedAt
             cache.loginRefreshDeferredReason = nil
