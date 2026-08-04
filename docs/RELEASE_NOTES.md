@@ -13,3 +13,5 @@ Quest Chronicle now reports the canonical cause of each weapon candidate-index l
 - Keeps SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, diagnostic format 1, and weapon-index format 1 unchanged.
 
 The package is automated-validated and requires Retail validation before replacing v1.9.0.12 as the live baseline.
+
+Follow `docs/testing/V19013_LIVE_VALIDATION_STEPS.md` for the required Retail validation sequence.

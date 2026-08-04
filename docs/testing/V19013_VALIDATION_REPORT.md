@@ -24,24 +24,19 @@ Version-source disagreements:        0
 
 ## Dedicated v1.9.0.13 coverage
 
-- `LOGIN_SESSION_RESET` initialization for the session-only weapon index
-- Reason retention across cold and partial bucket builds
-- `NONE` on fully warm reuse
-- Canonical cache-replacement and character-capability transitions
-- Defensive inference when the index identity changes without an explicit caller reason
-- `UNKNOWN` fallback only for missing or unrecognized reasons
-- Warning emission only for genuine `UNKNOWN` fallback
-- Cold build to partial build to warm reuse action diagnostics
-- Continued v1.9.0.12 scheduler, cache, selection, scoring, route, and contextual-support coverage
-
-## Cross-version regression comparison
-
-```text
-54 of 56 common Lua harness outputs matched byte for byte
-1 benchmark differed only in measured elapsed time
-1 weapon-index diagnostic harness changed intentionally for v1.9.0.13 semantics
-All 58 v1.9.0.13 harnesses passed
-```
+- Post-login `COLD_BUILD -> LOGIN_SESSION_RESET`.
+- Intervening `WARM_REUSE -> NONE` without erasing the login lifecycle.
+- Later `PARTIAL_BUILD -> LOGIN_SESSION_RESET`.
+- Final `WARM_REUSE -> NONE`.
+- Actions that perform no weapon-index work report `NONE`.
+- An invalidation that is queued but not processed reports `NONE` for the current action and retains its cause for the later build.
+- Every recognized canonical reason survives cold construction without being marked unknown.
+- Bucket-local repairs retain their canonical cause.
+- Format, character, and wardrobe identity mismatches are inferred defensively and classified as cold rebuilds.
+- Missing and unrecognized causes are the only `UNKNOWN` fallbacks.
+- `UNKNOWN` does not leak into later warm reuse.
+- Only a final action reason of `UNKNOWN` emits `UNKNOWN_WEAPON_INDEX_INVALIDATION`.
+- All production weapon-route invalidation entrypoints supply explicit reasons.
 
 ## Compatibility
 

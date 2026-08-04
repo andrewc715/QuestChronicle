@@ -4,24 +4,35 @@ D.GetReportByID = function() return nil end
 
 dofile("Core/Diagnostics/Comparison.lua")
 
-local unknown = {
-    action = "GENERATE_OUTFIT", warnings = {}, skeleton = {},
-    performance = { weaponIndex = { invalidationReason = "UNKNOWN" } },
-}
-P.AttachWarningsAndComparison(unknown)
-local found = false
-for _, warning in ipairs(unknown.warnings) do
-    if warning.key == "UNKNOWN_WEAPON_INDEX_INVALIDATION" then found = true end
-end
-assert(found, "UNKNOWN fallback did not produce a warning")
-
-local none = {
-    action = "GENERATE_OUTFIT", warnings = {}, skeleton = {},
-    performance = { weaponIndex = { invalidationReason = "NONE" } },
-}
-P.AttachWarningsAndComparison(none)
-for _, warning in ipairs(none.warnings) do
-    assert(warning.key ~= "UNKNOWN_WEAPON_INDEX_INVALIDATION", "NONE produced an invalidation warning")
+local function HasUnknownWarning(reason)
+    local report = {
+        action = "GENERATE_OUTFIT",
+        warnings = {},
+        skeleton = {},
+        performance = { weaponIndex = { invalidationReason = reason } },
+    }
+    P.AttachWarningsAndComparison(report)
+    for _, warning in ipairs(report.warnings) do
+        if warning.key == "UNKNOWN_WEAPON_INDEX_INVALIDATION" then return true end
+    end
+    return false
 end
 
-print("PASS v1.9.0.13 weapon-index warning: only genuine UNKNOWN fallback warns")
+assert(HasUnknownWarning("UNKNOWN"), "UNKNOWN fallback did not produce its warning")
+for _, reason in ipairs({
+    "NONE",
+    "FORMAT_MISMATCH",
+    "WARDROBE_CACHE_REPLACED",
+    "COLLECTION_REVISION_CHANGED",
+    "METADATA_REVISION_CHANGED",
+    "CHARACTER_CAPABILITY_CHANGED",
+    "APPEARANCE_COLLECTED",
+    "EVIDENCE_OUTCOME_CHANGED",
+    "ELIGIBILITY_OUTCOME_CHANGED",
+    "LOGIN_SESSION_RESET",
+    "MANUAL_DEBUG_RESET",
+}) do
+    assert(not HasUnknownWarning(reason), reason .. " incorrectly produced UNKNOWN_WEAPON_INDEX_INVALIDATION")
+end
+
+print("PASS v1.9.0.13 weapon-index warning gate: only final UNKNOWN reports warn")

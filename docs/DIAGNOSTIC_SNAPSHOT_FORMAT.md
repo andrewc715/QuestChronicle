@@ -360,4 +360,3 @@ invalidationReason = "UNKNOWN"             -- only an unclassified fallback
 ```
 
 The active lifecycle cause remains attached to the transient session index so all buckets built during the same cold/partial sequence report the same cause. Warm actions do not inherit that historical label. When `UNKNOWN` is emitted, `invalidationUnknownFallback = true` may also be stored and the completed report receives an `UNKNOWN_WEAPON_INDEX_INVALIDATION` warning.
-

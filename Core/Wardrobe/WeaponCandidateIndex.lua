@@ -13,6 +13,9 @@ if P.weaponCandidateIndexInvalidationSequence == 0 then
 end
 P.weaponCandidateIndexStats = P.weaponCandidateIndexStats or {
     builds = 0, repairs = 0, reused = 0, examined = 0, yields = 0,
+    lastProcessedInvalidationReason = nil,
+    lastProcessedInvalidationUnknownFallback = false,
+    lastProcessedInvalidationSequence = 0,
 }
 
 local CANONICAL_REASONS = {
@@ -171,6 +174,9 @@ function P.GetIndexedWeaponSources(subtypeKey)
     else
         P.weaponCandidateIndexStats.builds = (P.weaponCandidateIndexStats.builds or 0) + 1
     end
+    P.weaponCandidateIndexStats.lastProcessedInvalidationReason = index.invalidationReason
+    P.weaponCandidateIndexStats.lastProcessedInvalidationUnknownFallback = index.invalidationUnknownFallback == true
+    P.weaponCandidateIndexStats.lastProcessedInvalidationSequence = tonumber(index.invalidationSequence) or 0
     return cached
 end
 
@@ -190,6 +196,9 @@ function P.GetWeaponCandidateIndexDiagnostics()
             or P.weaponCandidateIndexInvalidationUnknownFallback == true or unknownFallback == true,
         invalidationSequence = tonumber(index and index.invalidationSequence
             or P.weaponCandidateIndexInvalidationSequence) or 0,
+        lastProcessedInvalidationReason = stats.lastProcessedInvalidationReason,
+        lastProcessedInvalidationUnknownFallback = stats.lastProcessedInvalidationUnknownFallback == true,
+        lastProcessedInvalidationSequence = tonumber(stats.lastProcessedInvalidationSequence) or 0,
         contributingReasons = index and index.contributingReasons or nil,
     }
 end
@@ -212,19 +221,20 @@ function P.BuildWeaponIndexActionDiagnostics(start)
     local built = math.max(0, (finish.builds or 0) - (start.builds or 0))
     local repaired = math.max(0, (finish.repairs or 0) - (start.repairs or 0))
     local reused = math.max(0, (finish.reused or 0) - (start.reused or 0))
+    local processedSequence = tonumber(finish.lastProcessedInvalidationSequence) or 0
+    local processedNewLifecycle = built > 0
+        and processedSequence ~= (tonumber(start.invalidationSequence) or 0)
     local action = repaired > 0 and "INCREMENTAL_REPAIR"
-        or (built > 0 and ((start.buckets or 0) == 0 and "COLD_BUILD" or "PARTIAL_BUILD"))
+        or (built > 0 and (((start.buckets or 0) == 0 or processedNewLifecycle)
+            and "COLD_BUILD" or "PARTIAL_BUILD"))
         or (reused > 0 and "WARM_REUSE" or "NONE")
-    local invalidationChanged = tonumber(finish.invalidationSequence) ~= tonumber(start.invalidationSequence)
     local invalidationReason, invalidationUnknownFallback = "NONE", false
     if built > 0 or repaired > 0 then
-        invalidationReason = finish.invalidationReason ~= "NONE" and finish.invalidationReason
+        invalidationReason = finish.lastProcessedInvalidationReason
+            or (finish.invalidationReason ~= "NONE" and finish.invalidationReason)
             or (start.invalidationReason ~= "NONE" and start.invalidationReason or "UNKNOWN")
-        invalidationUnknownFallback = finish.invalidationUnknownFallback == true
-            or start.invalidationUnknownFallback == true or invalidationReason == "UNKNOWN"
-    elseif invalidationChanged then
-        invalidationReason = finish.invalidationReason ~= "NONE" and finish.invalidationReason or "UNKNOWN"
-        invalidationUnknownFallback = finish.invalidationUnknownFallback == true or invalidationReason == "UNKNOWN"
+        invalidationUnknownFallback = finish.lastProcessedInvalidationUnknownFallback == true
+            or invalidationReason == "UNKNOWN"
     end
     return {
         format = finish.format, stateBefore = start.state, stateAfter = finish.state,

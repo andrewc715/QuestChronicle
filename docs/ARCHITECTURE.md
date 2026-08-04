@@ -360,4 +360,3 @@ The support-reroll worker no longer builds one diagnostic foundation. It materia
 Every production invalidation entrypoint supplies a canonical reason. Automatic login scans retain `LOGIN_SESSION_RESET`, manual scan replacement uses `WARDROBE_CACHE_REPLACED`, collection events use `COLLECTION_REVISION_CHANGED` or `APPEARANCE_COLLECTED`, and equipment, specialization, talent, or character changes use `CHARACTER_CAPABILITY_CHANGED`. Identity mismatches detected inside the index infer the same canonical causes. Missing or unrecognized reasons alone fall back to `UNKNOWN`.
 
 The change is diagnostic-only. Bucket membership, source ordering, route evaluation, eligibility, scoring, selection, worker scheduling, and atomic commit behavior remain unchanged.
-
