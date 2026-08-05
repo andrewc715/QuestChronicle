@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.9.0.15 - 2026-08-05
+
+### Traveler Phase E promotion
+
+- Promoted the Retail-validated six-visual curated descriptor set without adding further tuning.
+- Finalized exact palette and finish corrections for Gray Woolen Shirt, Stylish Black Shirt, Hide of Lupos, Rugged Plate Vest, Expedition Defender's Shoulders, and Orcish Scout Boots.
+- Retained the bounded local tuning audit, exact stable-ID override architecture, curated confidence, descriptor fingerprinting, and compact diagnostics.
+
+### Regression confirmation
+
+- Confirmed parity across Phase B scoring, Phase C support generation, Phase D validation and repair, weapon routes, reroll isolation, locks, hidden state, report compaction, audit aggregation, and scheduler behavior.
+- Preserved all cache schemas, diagnostic format, and Courier format.
+- Added no new palette, finish, echo, lexicon, scoring, threshold, route, or scheduler changes after a2 Retail validation.
+
 ## 1.9.0.15a2 - 2026-08-05
 
 ### Traveler Phase E curated corrections

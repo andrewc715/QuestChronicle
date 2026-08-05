@@ -1,29 +1,33 @@
-# Quest Chronicle v1.9.0.15a2
+# Quest Chronicle v1.9.0.15
 
-> **Phase E Observation Build:** collect a bounded local batch of completed Traveler outfits, export the suspect ledger as Markdown, and make no scoring or descriptor changes until the evidence is reviewed.
+> **Traveler Cohesion Rewrite complete:** Phase E promotes the Retail-validated curated descriptor set and preserves the full Phase B, Phase C, and Phase D pipeline.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.15a2 applies the first screenshot- and model-reviewed Traveler descriptor corrections on top of the corrected v1.9.0.15a1 observation baseline. Six exact visual identities receive curated palette or finish descriptions while Phase B, Phase C, Phase D, routes, locks, scheduler behavior, and cache schemas remain unchanged.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.15 finalizes the Traveler Cohesion Rewrite with six reviewed visual-ID descriptor corrections, a bounded local tuning audit, completed-outfit validation, deterministic outlier repair, cooperative generation, and stable equipped-weapon-safe routes.
 
-## Traveler Phase E: local tuning observation
+## Traveler Phase E: curated tuning
 
-Start the local audit before generating the next tuning batch:
+Phase E corrects visual descriptors rather than forcing outfit outcomes. The first curated set uses exact stable visual IDs and contains no global lexicon changes, no score overrides, and no Phase D exemptions.
+
+Validated corrections:
+
+- Gray Woolen Shirt: neutral palette retained; plain finish.
+- Stylish Black Shirt: dark palette retained; plain finish.
+- Hide of Lupos: dark, neutral, and purple fur; primal and weathered finish.
+- Rugged Plate Vest: blue, steel, and dark; weathered and plain finish.
+- Expedition Defender's Shoulders: green and steel; military and polished finish.
+- Orcish Scout Boots: dark navy, blue, and steel; plain and polished finish. They are explicitly not green.
+
+The optional local audit remains available for future curated batches:
 
 ```text
 /qc traveler tuning start
-```
-
-The audit groups equivalent sources by stable visual identity and records compact evidence for palette, finish, missing echo, and repeat-offender review. It is opt-in, local only, bounded to 300 visual identities, excluded from Courier export, and stored separately from immutable diagnostic history.
-
-```text
 /qc traveler tuning status
 /qc traveler tuning stop
 /qc traveler tuning export
 /qc traveler tuning clear confirm
 ```
 
-`export` opens a selected Markdown report in the Debug Workbench for `Ctrl+C`. Frequency only raises an appearance for review. No runtime descriptor overrides ship in this observation build, and no screenshot or audit data is sent anywhere automatically.
-
-It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
+The audit is local, opt-in, bounded to 300 visual identities, excluded from Courier export, and stored separately from immutable Debug History. Frequency raises an appearance for review but never creates an automatic override.
 
 ## Traveler Phase D: final validation and outlier repair
 

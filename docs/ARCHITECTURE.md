@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0.15a2 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0.15 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -390,12 +390,17 @@ The observation build does not contain `CuratedOverrides.lua`. Descriptor constr
 Support-slot rerolls rebuild the previous target, fixed contextual spend, and replacement spend from the current live preview under one resolved contextual profile. Parent reports provide ancestry and display context only; their historical budget totals are never mixed into the live reconciliation equation.
 
 
-## v1.9.0.15a2 Phase E curated descriptor corrections
+## v1.9.0.15 Phase E curated descriptor corrections
 
 `Core/ZoneStyle/Traveler/CuratedOverrides.lua` contains a versioned, exact-identity correction layer. It applies reviewed palette and finish vectors during descriptor construction, after the existing name and subtype inference but before normalization, dominance, confidence, profile, or pair calculations.
 
 Resolution is layered from visual identity to optional item and source refinements. The first curated batch uses six visual identities only. No score, selection, mismatch, repair, route, lock, or scheduler override exists.
 
-The curated tuning version participates in the descriptor fingerprint, so descriptor caches rebuild naturally without a wardrobe-cache schema change or manual collection scan. `descriptor.echoPalette` defaults to the final normal palette; Phase E can later add a secondary echo channel without changing pair cohesion, profile centers, or Phase D palette-family counting. v1.9.0.15a2 adds no echo-only corrections.
+The curated tuning version participates in the descriptor fingerprint, so descriptor caches rebuild naturally without a wardrobe-cache schema change or manual collection scan. `descriptor.echoPalette` defaults to the final normal palette; Phase E can later add a secondary echo channel without changing pair cohesion, profile centers, or Phase D palette-family counting. v1.9.0.15 adds no echo-only corrections.
 
 Debug reports store only compact curated field and identity markers. The local tuning audit records whether an observed appearance used curated palette or finish fields while remaining bounded, opt-in, and excluded from Courier export.
+
+
+## v1.9.0.15 release promotion boundary
+
+The final release is built directly from the Retail-validated v1.9.0.15a2 tree. Runtime behavior is frozen: only version metadata, verifier metadata, documentation, and packaging differ. The six curated visual-ID entries remain the complete tuning set. No global lexicon, echo-only, scoring, Phase D, route, scheduler, or cache-format change is part of promotion.

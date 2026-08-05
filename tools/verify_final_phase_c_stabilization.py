@@ -13,7 +13,7 @@ formatter = (root / "Core/Diagnostics/ReportFormatter.lua").read_text(encoding="
 comparison = (root / "Core/Diagnostics/Comparison.lua").read_text(encoding="utf-8")
 history = (root / "Core/Diagnostics/History.lua").read_text(encoding="utf-8")
 checks = {
-    "v1.9.0.15a2 metadata": version == "1.9.0.15a2" and "## Version: 1.9.0.15a2" in toc,
+    "v1.9.0.15 metadata": version == "1.9.0.15" and "## Version: 1.9.0.15" in toc,
     "launch and role modules loaded": all(x in toc for x in (
         r"Core\Wardrobe\SupportRerollLaunch.lua", r"Core\Wardrobe\SupportRoleResolver.lua")),
     "launch manifest is primitive": "CreateSupportRerollManifest" in launch and "CopySupportRerollState" not in launch,
@@ -35,4 +35,4 @@ failed = [name for name, ok in checks.items() if not ok]
 if failed:
     for name in failed: print("FAIL:", name)
     raise SystemExit(1)
-print(f"PASS: v1.9.0.15a2 final Phase C stabilization verification: {len(checks)} checks")
+print(f"PASS: v1.9.0.15 final Phase C stabilization verification: {len(checks)} checks")

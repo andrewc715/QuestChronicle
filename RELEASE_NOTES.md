@@ -1,21 +1,39 @@
-# Quest Chronicle v1.9.0.15a2
+# Quest Chronicle v1.9.0.15
 
-## Phase E: First Curated Descriptor Corrections
+## Traveler Cohesion Rewrite complete
 
-Quest Chronicle now applies the first human-reviewed Traveler descriptor corrections collected through the v1.9.0.15a1 observation batch and standardized appearance renders.
+Quest Chronicle v1.9.0.15 promotes the Retail-validated Phase E curated descriptor set and completes the Traveler Cohesion Rewrite.
 
-- Adds a versioned exact-identity correction layer in `CuratedOverrides.lua`.
-- Corrects six reviewed visual identities without changing any scoring formula or repair threshold.
-- Keeps Gray Woolen Shirt neutral and Stylish Black Shirt dark while classifying both as plain cloth finishes.
-- Reclassifies Hide of Lupos as dark violet-gray fur with primal and weathered finish evidence.
-- Reclassifies Rugged Plate Vest as blue, steel, and dark with a weathered practical finish.
-- Reclassifies Expedition Defender's Shoulders as green-dominant steel armor with a military and polished finish.
-- Reclassifies Orcish Scout Boots as dark navy, muted blue, and steel with a plain lightly polished finish. They are explicitly not green.
-- Adds curated descriptor confidence, cache fingerprinting, compact Debug markers, and audit-export markers.
-- Adds an `echoPalette` descriptor channel with behavior-identical defaults; this batch adds no echo-only corrections.
-- Preserves the corrected v1.9.0.15a1 support-reroll ledger reconciliation.
-- Preserves all Phase B and Phase C scoring, all Phase D gates and repair limits, weapon routes, lock and hidden behavior, scheduler budgets, SavedVariables schemas, and Courier format.
+### Phase E curated tuning
 
-This alpha requires focused Retail validation of all six descriptors and a ten-action Traveler batch before promotion toward the v1.9.0.15 release candidate.
+- Promotes six reviewed exact visual-ID descriptor corrections without adding new tuning after Retail validation.
+- Keeps Gray Woolen Shirt neutral and Stylish Black Shirt dark while supplying their missing plain finish.
+- Classifies Hide of Lupos as dark violet-gray fur with primal and weathered finish evidence.
+- Classifies Rugged Plate Vest as blue-forward steel armor with a weathered practical finish.
+- Classifies Expedition Defender's Shoulders as green-dominant steel armor with a military and polished finish.
+- Classifies Orcish Scout Boots as dark navy, muted blue, and steel with a plain and polished finish; they are explicitly not green.
+- Retains the opt-in bounded local tuning audit and copyable Markdown export for future review batches.
+- Retains behavior-identical `echoPalette` infrastructure; this release adds no echo-only correction.
 
-Follow `docs/testing/V19015A2_LIVE_VALIDATION_STEPS.md` for the streamlined validation sequence.
+### Traveler pipeline preserved
+
+- Preserves all Phase B anchor scoring, novelty, search widths, and quality windows.
+- Preserves all Phase C support profiles, candidate pools, beam search, mismatch ledgers, and contextual rerolls.
+- Preserves Phase D's 2.00 final mismatch budget, strict 0.72 severity threshold, three-family palette limit, loud-accent echo gate, two repair passes, and one alternate-skeleton limit.
+- Preserves weapon routes, equipment topology, locks, hidden slots, random consumption, scheduler budgets, cache formats, diagnostic format, and Courier format.
+
+### Stability fixes included
+
+- Keeps oversized Phase D reports visible and copyable through bounded diagnostic compaction.
+- Reconciles support rerolls from the current live outfit under the reused profile instead of mixing stale parent-report totals.
+- Keeps tuning observation failure-isolated from generation and report persistence.
+
+### Deferred work
+
+- Legacy individual anchor and weapon-slot reroll scheduling remains separate future work.
+- The isolated Zone Native total-slice spike remains separately tracked.
+- Sterling Chain Cloak finish review and future curated batches remain deferred.
+
+No cache reset or collection rescan is required.
+
+Follow `docs/testing/V19015_LIVE_VALIDATION_STEPS.md` for the final release smoke test.
