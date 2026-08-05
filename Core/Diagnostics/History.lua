@@ -29,6 +29,85 @@ local function ApproximateBytes(report)
     return total
 end
 
+
+local function AddTrimWarning(report, originalBytes)
+    report.warnings = type(report.warnings) == "table" and report.warnings or {}
+    for _, warning in ipairs(report.warnings) do
+        if warning.key == "REPORT_TRIMMED" then return end
+    end
+    report.warnings[#report.warnings + 1] = {
+        key = "REPORT_TRIMMED", severity = "WARNING",
+        text = string.format(
+            "Diagnostic details exceeded the %d-byte persistence limit and duplicate raw fields were compacted (originally about %d bytes).",
+            tonumber(D.MAX_REPORT_BYTES) or 0, tonumber(originalBytes) or 0
+        ),
+    }
+end
+
+local function RemoveZeroEntries(values)
+    if type(values) ~= "table" then return end
+    for key, value in pairs(values) do
+        if tonumber(value) == 0 then values[key] = nil end
+    end
+end
+
+local function CompactReportToLimit(report)
+    local originalBytes = ApproximateBytes(report)
+    if originalBytes <= D.MAX_REPORT_BYTES then return originalBytes, false end
+
+    AddTrimWarning(report, originalBytes)
+
+    -- The outfit slot list duplicates the anchor components and contextual-support
+    -- decisions that power formatting, comparisons, and reroll ancestry.
+    if type(report.outfit) == "table" then report.outfit.slots = nil end
+
+    local support = type(report.support) == "table" and report.support or nil
+    local profile = support and type(support.profile) == "table" and support.profile or nil
+    if profile then
+        -- `entries` is the canonical reusable anchor profile. `activeAnchors` is a
+        -- display-only duplicate and can be reconstructed by the formatter.
+        profile.activeAnchors = nil
+        profile.strongestRelationship = nil
+        if type(profile.descriptor) == "table" then
+            -- Set identifiers are not used to restore or score the aggregate profile.
+            profile.descriptor.setIDs = nil
+        end
+    end
+
+    if support then
+        for _, decision in ipairs(support.decisions or {}) do
+            -- Item IDs are optional raw-detail metadata; source and visual IDs remain.
+            decision.itemID = nil
+        end
+    end
+
+    if type(report.cache) == "table" then RemoveZeroEntries(report.cache.invalidationReasons) end
+
+    local bytes = ApproximateBytes(report)
+    if bytes <= D.MAX_REPORT_BYTES then return bytes, true end
+
+    -- Preserve the user-facing score ledger and Phase D result before trimming
+    -- lower-value duplicated/raw diagnostic payloads.
+    if type(report.skeleton) == "table" then
+        for _, component in ipairs(report.skeleton.components or {}) do component.scoreReasons = nil end
+    end
+    bytes = ApproximateBytes(report)
+    if bytes <= D.MAX_REPORT_BYTES then return bytes, true end
+
+    -- Last-resort compaction keeps the complete report summary, selected sources,
+    -- Phase D validation, warnings, and headline performance instead of silently
+    -- deleting the report from Debug History.
+    if type(report.performance) == "table" then report.performance.phaseStats = nil end
+    bytes = ApproximateBytes(report)
+    if bytes <= D.MAX_REPORT_BYTES then return bytes, true end
+
+    if type(report.cache) == "table" then
+        report.cache.invalidationReasons = nil
+    end
+    bytes = ApproximateBytes(report)
+    return bytes, true
+end
+
 local function IsValidReport(report)
     return type(report) == "table"
         and tonumber(report.formatVersion) == D.FORMAT_VERSION
@@ -68,10 +147,15 @@ local function PruneStore(store)
             local fingerprint = P.ReportFingerprint(report)
             if not seenIDs[report.id] and not seenFingerprints[fingerprint] then
                 report.approximateBytes = math.floor(tonumber(report.approximateBytes) or ApproximateBytes(report))
+                if report.approximateBytes > D.MAX_REPORT_BYTES then
+                    report.approximateBytes = CompactReportToLimit(report)
+                end
                 if report.approximateBytes <= D.MAX_REPORT_BYTES then
                     valid[#valid + 1] = report
                     totalBytes = totalBytes + report.approximateBytes
                     seenIDs[report.id], seenFingerprints[fingerprint] = true, true
+                else
+                    store.counters.malformedReportsDiscarded = store.counters.malformedReportsDiscarded + 1
                 end
             else
                 store.counters.duplicateInsertionsIgnored = store.counters.duplicateInsertionsIgnored + 1
@@ -192,14 +276,10 @@ function D.AddReport(report)
             return existing, "Duplicate diagnostic report ignored."
         end
     end
-    report.approximateBytes = ApproximateBytes(report)
+    report.approximateBytes = CompactReportToLimit(report)
     if report.approximateBytes > D.MAX_REPORT_BYTES then
-        report.warnings = report.warnings or {}
-        report.warnings[#report.warnings + 1] = { key = "REPORT_TRIMMED", severity = "WARNING", text = "Diagnostic details exceeded the persistence limit and were compacted." }
-        report.performance = report.performance or {}
-        report.performance.phaseStats = report.performance.phaseStats or {}
-        report.cache = report.cache or {}
-        report.approximateBytes = ApproximateBytes(report)
+        store.counters.malformedReportsDiscarded = store.counters.malformedReportsDiscarded + 1
+        return nil, "Diagnostic report remained above the persistence limit after compaction."
     end
     table.insert(store.reports, 1, report)
     store.counters.reportsRecorded = store.counters.reportsRecorded + 1

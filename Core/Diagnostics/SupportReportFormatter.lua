@@ -111,7 +111,9 @@ function P.AddSupportSection(lines, report, rawIDs, rich)
     Add(lines, string.format("Profile: %d active anchors • cohesion %s", tonumber(profile.activeAnchorCount) or 0, F(profile.meanAnchorCohesion, 3)))
     if profile.activeAnchorMask then Add(lines, "Active-anchor mask: " .. AnchorMaskText(profile.activeAnchorMask)) end
     local anchorLabels = {}
-    for _, anchor in ipairs(profile.activeAnchors or {}) do anchorLabels[#anchorLabels + 1] = tostring(anchor.label or anchor.slotKey) end
+    local anchorRows = profile.activeAnchors
+    if type(anchorRows) ~= "table" or #anchorRows == 0 then anchorRows = profile.entries end
+    for _, anchor in ipairs(anchorRows or {}) do anchorLabels[#anchorLabels + 1] = tostring(anchor.label or anchor.slotKey) end
     if #anchorLabels > 0 then Add(lines, "Active anchors: " .. table.concat(anchorLabels, ", ")) end
     Add(lines, string.format("Centers: palette %s • material %s • finish %s • motif %s • weight %s", tostring(centers.palette or "unknown"), tostring(centers.material or "unknown"), tostring(centers.finish or "unknown"), tostring(centers.motif or "unknown"), F(centers.visualWeight, 2)))
     if profile.weakestRelationship then Add(lines, string.format("Weakest anchor relationship: %s ↔ %s (%s)", tostring(profile.weakestRelationship.left), tostring(profile.weakestRelationship.right), F(profile.weakestRelationship.score, 3))) end

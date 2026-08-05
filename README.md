@@ -354,7 +354,7 @@ The skeleton scorer activates the calibrated Traveler palette, material, finish,
 
 Locks and hidden slots remain authoritative. Locked anchors become fixed beam components, Shoulders can now be deliberately hidden, hidden anchors are omitted without penalty, and an unavailable or impossible locked source sends the job through the preserved legacy generator. The final preview still changes only after an atomic commit.
 
-`/qc skeleton debug` prints the latest Chest, Legs, Shoulders, weapon bundle, beam statistics, chosen rank, score, cohesion, and fallback reason. The compact Generation Performance tooltip reports the headline timing and chosen skeleton. The Debug tab preserves the complete beam, score, performance, cache, and warning ledger for the last ten attempts.
+`/qc skeleton debug` prints the latest Chest, Legs, Shoulders, weapon bundle, beam statistics, chosen rank, score, cohesion, and fallback reason. The compact Generation Performance tooltip reports the headline timing and chosen skeleton. The Debug tab preserves the complete beam, score, performance, cache, and warning ledger for the last ten attempts. If a live report exceeds the 20 KB persistence ceiling, Quest Chronicle removes duplicated raw fields and keeps the report visible rather than silently pruning it.
 
 ### Phase C contextual support slots
 

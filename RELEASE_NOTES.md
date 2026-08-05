@@ -11,6 +11,7 @@ Quest Chronicle now validates the completed Traveler outfit after Phase C suppor
 - Uses the next valid Phase B finalist only after both support repair passes are exhausted, with one alternate-skeleton attempt inside the original quality window.
 - Applies the same final validator to support-only rerolls while allowing only the requested support slot to change.
 - Adds compact before-and-after diagnostics for mismatch, severity, palette families, zero-echo accents, accepted repairs, locked overrides, and alternate skeleton use.
+- Compacts oversized live diagnostic snapshots before persistence so Phase D reports remain visible in Debug History instead of being silently pruned at the 20 KB ceiling.
 - Preserves v1.9.0.13 weapon routes, candidate ordering, Phase B and Phase C scoring, cache formats, scheduler budgets, locks, hidden slots, and atomic preview commits.
 
 The package is automated-validated and requires Retail validation before replacing v1.9.0.13 as the live baseline.

@@ -20,7 +20,7 @@ QuestChronicleDB.debug = {
 }
 ```
 
-The store retains at most ten reports. Each report is limited to 20 KB and the approximate combined history is limited to 200 KB. Invalid, oversized, or incompatible reports are discarded during initialization and ordinary reads.
+The store retains at most ten reports. Each report is limited to 20 KB and the approximate combined history is limited to 200 KB. Oversized valid reports are compacted before persistence by removing duplicated raw fields while preserving the formatted report, selected identities, reusable support profile, Phase D result, warnings, and headline timing. Only reports that remain oversized after compaction, or are otherwise invalid or incompatible, are discarded.
 
 ## Report identity
 
@@ -67,7 +67,7 @@ No account paths, Chronicle event history, SavedVariables dump, or Courier paylo
 
 ## Outfit and skeleton
 
-`outfit.slots` contains compact appearance snapshots for the finished preview. `skeleton.components` contains the anchor components used by the report:
+`outfit.slots` normally contains compact appearance snapshots for the finished preview. In an oversized report it may be omitted because the same selected identities are already represented by `skeleton.components` and `support.decisions`. `skeleton.components` contains the anchor components used by the report:
 
 ```text
 CHEST

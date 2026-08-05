@@ -14,7 +14,11 @@ Keep your normal Traveler settings, locks, and hidden slots. Do not clear any ca
 
 1. Open the Outfit workbench.
 2. Select **Generate Outfit**.
-3. Copy the full Debug report.
+3. Open the **Debug** tab.
+4. Confirm the new generation appears in **Generation History** and **Copy Report** is enabled.
+5. Copy the full Debug report.
+
+A `REPORT_TRIMMED` warning is acceptable when the live report crossed the 20 KB persistence ceiling. The report itself must remain visible and copyable.
 
 The report must show one of:
 
@@ -109,6 +113,7 @@ Post-expensive-call continuations: 0
 Fallback: None
 0 duplicate reports
 0 malformed reports
+Every completed action appears in Debug History
 ```
 
 An isolated small timing overrun may be recorded as variance when it does not repeat, no individual Phase D call exceeds 8 ms, and there is no visible hitch.

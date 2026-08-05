@@ -5,9 +5,9 @@
 All automated validation completed successfully.
 
 ```text
-62 Lua regression harnesses passed
-23 Python static verification tools passed
-158 Lua files passed syntax validation
+63 Lua regression harnesses passed
+24 Python static verification tools passed
+159 Lua files passed syntax validation
 95 runtime Lua modules verified in the TOC
 1 JSON configuration validated
 Every runtime Lua file remained below 500 physical lines
@@ -29,6 +29,8 @@ No orphaned split-helper references found
 - Alternate ordering inside the original quality window
 - Compact maximum-detail formatted report below 20 KB
 - Compact maximum-detail persisted snapshot below 20 KB
+- Oversized live-style diagnostic report compacted and retained in Debug History
+- Compacted support profiles continue formatting active-anchor labels
 
 ## Size gates
 
@@ -36,6 +38,7 @@ No orphaned split-helper references found
 Maximum-detail formatted Phase D report: 7,688 bytes
 Maximum-detail persisted Phase D snapshot: 18,337 bytes
 Maximum allowed persisted report: 20,480 bytes
+Oversized-report retention regression: passed after compaction
 ```
 
 ## Retail status
