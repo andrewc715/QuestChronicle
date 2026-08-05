@@ -21,29 +21,36 @@ function P.BuildSupportRerollStats(job, chosen, chosenRank, shortlistSize)
         if decision.fallback then fallbacks = fallbacks + 1 end
         if decision.contextFixed then fixedContextCount = fixedContextCount + 1 end
     end
-    local previousTarget = job.previousTargetDecision
-    local previousTargetSource
-    if not previousTarget then
-        local sourceID = job.draft.selections and job.draft.selections[job.actionSlotKey]
-        previousTargetSource = sourceID and P.GetSourceByID(job.actionSlotKey, sourceID) or nil
-        local candidate = previousTargetSource and P.BuildSupportCandidate(previousTargetSource, P.slotByKey[job.actionSlotKey], job, job.supportRerollProfile, nil, true) or nil
+    -- Rebuild the current target on the same live profile and ledger basis used
+    -- for every fixed contextual slot. Parent-report totals are ancestry only;
+    -- mixing them with a freshly reconstructed ledger can create false failures
+    -- after locks, Phase D repairs, report compaction, or other preview changes.
+    local sourceID = job.draft.selections and job.draft.selections[job.actionSlotKey]
+    local previousTargetSource = sourceID and P.GetSourceByID(job.actionSlotKey, sourceID) or nil
+    local previousTarget
+    if previousTargetSource then
+        local candidate = P.BuildSupportCandidate(
+            previousTargetSource, P.slotByKey[job.actionSlotKey], job,
+            job.supportRerollProfile, nil, true
+        )
         if candidate then
-            local evaluation = P.EvaluateSupportBudget(root.budget, job.actionSlotKey, candidate.mismatchCost, {}, false)
+            local evaluation = P.EvaluateSupportBudget(
+                root.budget, job.actionSlotKey, candidate.mismatchCost, {}, false
+            )
             previousTarget = {
                 name = previousTargetSource.styleName or previousTargetSource.name or previousTargetSource.itemName,
-                sourceID = previousTargetSource.sourceID, visualID = previousTargetSource.visualID,
+                sourceID = previousTargetSource.sourceID,
+                visualID = previousTargetSource.visualID,
                 mismatchSpent = evaluation.cost,
             }
         end
     end
-    local parentSpend = job.parentReport and job.parentReport.support
-        and ((job.parentReport.support.lockedCommitment or 0) + (job.parentReport.support.generatedSpend or 0))
     local removedCost = previousTarget and previousTarget.mismatchSpent or 0
     local fixedSpend = (root.budget.lockedCommitment or 0) + (root.budget.generatedSpend or 0)
-    local previousSpend = parentSpend or (fixedSpend + removedCost)
+    local previousSpend = fixedSpend + removedCost
     local replacementCost = chosen and chosen.mismatchSpent or 0
     local actualAfter = finalBudget.lockedCommitment + finalBudget.generatedSpend
-    local expectedAfter = previousSpend - removedCost + replacementCost
+    local expectedAfter = fixedSpend + replacementCost
     local adjustment = actualAfter - expectedAfter
     if math.abs(adjustment) < 0.0005 then adjustment = 0 end
     local repaired = job.profileResolution and job.profileResolution.repaired == true

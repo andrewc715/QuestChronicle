@@ -367,6 +367,7 @@ function P.PrintHelp()
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc minimap show|hide|toggle|reset|r - manage the minimap button")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc weapon debug|r - print weapon slot, option, and selection diagnostics")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc traveler debug|r - explain Traveler cohesion, mismatch budget, and outliers")
+    DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc traveler tuning start|status|stop|export|clear confirm|r - collect a local curated-tuning batch")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc skeleton debug|r - print the latest anchor beam and chosen skeleton")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc debug|r - open the Diagnostics Workbench")
 end
@@ -426,11 +427,16 @@ function P.HandleSlashCommand(message)
     elseif command == "removals" then
         P.SetTrackingSetting("removalTracking", string.lower(rest), "Removals")
     elseif command == "traveler" then
-        local subcommand = string.lower(rest:match("^(%S*)") or "")
+        local subcommand, remainder = rest:match("^(%S*)%s*(.-)$")
+        subcommand = string.lower(subcommand or "")
+        remainder = remainder or ""
+        local traveler = QC.ZoneStyle and QC.ZoneStyle.Traveler
         if subcommand == "debug" and QC.ZoneStyle and QC.ZoneStyle.PrintTravelerDiagnostics then
             QC.ZoneStyle.PrintTravelerDiagnostics()
+        elseif subcommand == "tuning" and P.HandleTravelerTuningCommand then
+            P.HandleTravelerTuningCommand(remainder)
         else
-            P.Print("Usage: /qc traveler debug")
+            P.Print("Usage: /qc traveler debug or /qc traveler tuning start|status|stop|export|clear confirm")
         end
     elseif command == "weapon" then
         local subcommand = string.lower(rest:match("^(%S*)") or "")

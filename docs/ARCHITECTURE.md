@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0.14 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0.15a1 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -373,3 +373,18 @@ When both repair passes are exhausted, `AnchorSkeletonApply.lua` restores the pr
 `SupportRerollFinalValidation.lua` applies the same completed-outfit validator to support-only rerolls while keeping every non-target slot fixed. `SupportRerollStats.lua` and the Diagnostics modules persist only compact aggregate validation and repair results. Candidate pools, trial configurations, and mutable analysis entries remain transient.
 
 Phase D uses the established cooperative scheduler and adds resumable phases for final validation, target selection, candidate evaluation, repair application, revalidation, and alternate preparation. Cache formats, Courier format, weapon-index format, generation-cache format, and diagnostic format remain unchanged.
+
+## v1.9.0.15a1 Phase E local tuning observation
+
+`Core/ZoneStyle/Traveler/TuningAudit.lua` owns the opt-in local observation store at `QuestChronicleDB.travelerTuningAudit`. It groups completed Traveler appearances by stable visual identity, records bounded aggregate palette, finish, echo, severity, repair, and context evidence, deduplicates linked weapon visuals, and retains at most 300 identities. The audit has its own format 1 and does not change the main SavedVariables schema.
+
+`Core/Diagnostics/History.lua` invokes the observer only after a valid immutable report has passed compaction and entered Debug History. Observation is wrapped in `pcall`; a tuning failure is counted locally and cannot block report persistence, selection, preview application, or UI notification.
+
+`Core/ZoneStyle/Traveler/TuningExport.lua` renders a deterministic Markdown review ledger with Palette Suspects, Finish Suspects, Missing Echo Suspects, and Repeat Offenders. `Core/Chronicle/TravelerTuningCommands.lua` exposes start, status, stop, export, and confirmed-clear controls. `UI/DebugReport.lua` reuses the existing copy dialog for the export without creating a synthetic diagnostic report.
+
+The observation build does not contain `CuratedOverrides.lua`. Descriptor construction, Phase B and C scoring, Phase D validation and repair, weapon routing, random consumption, scheduler phases, Courier export, and normal report snapshots remain unchanged.
+
+
+## Support reroll reconciliation basis
+
+Support-slot rerolls rebuild the previous target, fixed contextual spend, and replacement spend from the current live preview under one resolved contextual profile. Parent reports provide ancestry and display context only; their historical budget totals are never mixed into the live reconciliation equation.

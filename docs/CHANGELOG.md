@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.9.0.15a1 - 2026-08-04
+
+### Traveler Phase E observation
+
+- Added an opt-in bounded local audit for completed Traveler generations, unlocked rerolls, and contextual support rerolls.
+- Aggregated equivalent sources by stable visual identity and recorded palette, finish, echo, repair, severity, context, and report evidence.
+- Added repeat-offender thresholds without automatically creating descriptor overrides.
+- Added copyable Markdown export and explicit start, status, stop, export, and confirmed-clear commands.
+
+### Safety and compatibility
+
+- Failure-isolated audit observation from diagnostic persistence.
+- Kept tuning data out of normal Debug snapshots and Courier export.
+- Preserved v1.9.0.14 selections, scores, Phase D results, routes, random consumption, scheduler behavior, and cache formats.
+
 ## 1.9.0.14 - 2026-08-04
 
 ### Traveler Phase D

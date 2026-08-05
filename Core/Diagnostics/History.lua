@@ -283,6 +283,17 @@ function D.AddReport(report)
     end
     table.insert(store.reports, 1, report)
     store.counters.reportsRecorded = store.counters.reportsRecorded + 1
+    local traveler = QC.ZoneStyle and QC.ZoneStyle.Traveler
+    if traveler and traveler.ObserveTuningReport then
+        local ok, errorMessage = pcall(traveler.ObserveTuningReport, report)
+        if not ok then
+            local audit = QuestChronicleDB and QuestChronicleDB.travelerTuningAudit
+            if type(audit) == "table" then
+                audit.collectionErrors = (tonumber(audit.collectionErrors) or 0) + 1
+                audit.lastError = tostring(errorMessage or "unknown tuning-audit error"):sub(1, 160)
+            end
+        end
+    end
     PruneStore(store)
     local uiState = P.GetUIState()
     uiState.debugSelectedReportID = report.id

@@ -63,6 +63,7 @@ local function CreateCopyDialog(pane)
     blocker:SetScript("OnClick", function() dialog:Hide() blocker:Hide() end)
 
     pane.copyBlocker, pane.copyDialog, pane.copyEdit = blocker, dialog, edit
+    pane.copyTitle, pane.copyInstruction = title, instruction
 end
 
 function P.CreateReportPanel(pane)
@@ -108,14 +109,38 @@ function P.RefreshSelectedReport(pane, resetScroll)
     pane.reportScroller:SetText(D.FormatDisplayReport(report, pane.rawIDs:GetChecked() == true, pane.verbose:GetChecked() == true), resetScroll)
 end
 
-function P.ShowCopyReport(pane)
-    local report = D.GetReportByID(pane and pane.selectedReportID) or D.GetLatestReport()
-    if not pane or not report then return false end
-    local text = D.FormatCopyReport(report, pane.rawIDs:GetChecked() == true, pane.verbose:GetChecked() == true)
+function P.ShowCopyText(pane, text, title, instruction)
+    if not pane or not pane.copyDialog or type(text) ~= "string" then return false end
+    pane.copyTitle:SetText(title or "Copy Diagnostic Report")
+    pane.copyInstruction:SetText(instruction or "The complete text is selected. Press Ctrl+C, then close this window.")
     pane.copyBlocker:Show()
     pane.copyDialog:Show()
     pane.copyEdit:SetText(text)
     pane.copyEdit:SetFocus()
     pane.copyEdit:HighlightText()
     return true
+end
+
+function P.ShowCopyReport(pane)
+    local report = D.GetReportByID(pane and pane.selectedReportID) or D.GetLatestReport()
+    if not pane or not report then return false end
+    local text = D.FormatCopyReport(report, pane.rawIDs:GetChecked() == true, pane.verbose:GetChecked() == true)
+    return P.ShowCopyText(pane, text, "Copy Diagnostic Report", "The complete report is selected. Press Ctrl+C, then close this window.")
+end
+
+function QC.ShowTravelerTuningExport(text)
+    if type(text) ~= "string" or text == "" then return false end
+    if QC.ShowWindow then QC.ShowWindow("debug") end
+    local function OpenExport()
+        local pane = QC.mainWindow and QC.mainWindow.panes and QC.mainWindow.panes.debug
+        return P.ShowCopyText(
+            pane, text, "Copy Traveler Tuning Audit",
+            "The complete Markdown audit is selected. Press Ctrl+C, save it, then close this window."
+        )
+    end
+    if C_Timer and type(C_Timer.After) == "function" then
+        C_Timer.After(0, OpenExport)
+        return true
+    end
+    return OpenExport()
 end

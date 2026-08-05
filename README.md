@@ -1,8 +1,27 @@
-# Quest Chronicle v1.9.0.14
+# Quest Chronicle v1.9.0.15a1
 
-> **Phase D: Outlier Repair:** the completed Traveler outfit now receives final validation, at most two bounded support repairs, and one last-resort alternate anchor skeleton before atomic commit.
+> **Phase E Observation Build:** collect a bounded local batch of completed Traveler outfits, export the suspect ledger as Markdown, and make no scoring or descriptor changes until the evidence is reviewed.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.14 completes the Traveler cohesion pipeline by repairing strong unsupported support outliers while preserving useful weathering, locks, hidden slots, legal weapon routes, and the live-validated v1.9.0.13 scheduler behavior.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.15a1 begins curated Traveler tuning on top of the live-validated v1.9.0.14 Phase D baseline. It observes completed Traveler actions without changing selections, scores, repairs, routes, scheduler behavior, or normal Debug reports.
+
+## Traveler Phase E: local tuning observation
+
+Start the local audit before generating the next tuning batch:
+
+```text
+/qc traveler tuning start
+```
+
+The audit groups equivalent sources by stable visual identity and records compact evidence for palette, finish, missing echo, and repeat-offender review. It is opt-in, local only, bounded to 300 visual identities, excluded from Courier export, and stored separately from immutable diagnostic history.
+
+```text
+/qc traveler tuning status
+/qc traveler tuning stop
+/qc traveler tuning export
+/qc traveler tuning clear confirm
+```
+
+`export` opens a selected Markdown report in the Debug Workbench for `Ctrl+C`. Frequency only raises an appearance for review. No runtime descriptor overrides ship in this observation build, and no screenshot or audit data is sent anywhere automatically.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
 
@@ -159,6 +178,7 @@ Settings include:
 /qc minimap show|hide|toggle|reset
 /qc weapon debug
 /qc traveler debug
+/qc traveler tuning start|status|stop|export|clear confirm
 /qc skeleton debug
 /qc debug
 ```
