@@ -125,6 +125,10 @@ local function NewEntry(key, identityType, identityValue)
         firstObservedAt = nil,
         lastObservedAt = nil,
         overrideExisting = false,
+        curatedFields = {},
+        curatedTuningVersion = nil,
+        curatedKeyType = nil,
+        curatedKey = nil,
     }
 end
 
@@ -229,6 +233,13 @@ local function TouchEntry(entry, snapshot, report, descriptor, source)
         Increment(entry.dominantFinishCounts, descriptor.dominantFinish)
         UpdateConfidence(entry, "palette", descriptor.confidence and descriptor.confidence.palette)
         UpdateConfidence(entry, "finish", descriptor.confidence and descriptor.confidence.finish)
+        entry.curatedFields = type(entry.curatedFields) == "table" and entry.curatedFields or {}
+        for field, enabled in pairs(descriptor.curatedFields or {}) do
+            if enabled then entry.curatedFields[field] = true end
+        end
+        if descriptor.curatedTuningVersion then entry.curatedTuningVersion = descriptor.curatedTuningVersion end
+        if descriptor.curatedKeyType then entry.curatedKeyType = descriptor.curatedKeyType end
+        if descriptor.curatedKey then entry.curatedKey = descriptor.curatedKey end
     end
 end
 

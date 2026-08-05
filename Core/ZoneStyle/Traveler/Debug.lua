@@ -149,6 +149,19 @@ function T.PrintDiagnostics()
             FormatCost(entry.mismatchPoints),
             tostring(entry.mismatchReason or "")
         ))
+        local descriptor = entry.descriptor or {}
+        if descriptor.curatedFields then
+            local paletteOrigin = descriptor.curatedFields.palette and "curated" or "lexicon"
+            local finishOrigin = descriptor.curatedFields.finish and "curated" or "lexicon"
+            Print(string.format(
+                "  Descriptor: palette %s [%s] | finish %s [%s] | override %s %s | fields %s | tuning v%s",
+                FormatMap(descriptor.palette, 3), paletteOrigin,
+                FormatMap(descriptor.finish, 3), finishOrigin,
+                tostring(descriptor.curatedKeyType or "unknown"), tostring(descriptor.curatedKey or "?"),
+                tostring(T.GetCuratedFieldsLabel and T.GetCuratedFieldsLabel(descriptor) or "unknown"),
+                tostring(descriptor.curatedTuningVersion or T.CURATED_TUNING_VERSION or 0)
+            ))
+        end
     end
     return analysis
 end

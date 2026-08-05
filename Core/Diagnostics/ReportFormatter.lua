@@ -125,6 +125,7 @@ local function FormatSource(component, rawIDs)
         text = text .. " • " .. tostring(component.itemSubtype)
     end
     if #markers > 0 and not component.hidden then text = text .. " [" .. table.concat(markers, ", ") .. "]" end
+    if component.curatedFields and not component.hidden then text = text .. " • Curated tags: " .. tostring(component.curatedFields) end
     if rawIDs then
         local ids = {}
         if component.visualID then ids[#ids + 1] = "visual " .. tostring(component.visualID) end

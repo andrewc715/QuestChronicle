@@ -85,6 +85,10 @@ local function AddEntry(lines, entry, extra)
     Add(lines, string.format("- Outlier evidence: %d zero-echo • %d severe • %d worst-slot observations across %d contexts • max severity %.3f • max mismatch %.2f", entry.zeroEchoCount or 0, entry.severeOutlierCount or 0, entry.worstOutlierCount or 0, #(entry.worstOutlierContexts or {}), entry.maximumSeverity or 0, entry.maximumMismatch or 0))
     Add(lines, string.format("- Palette: %s • confidence %s", TopMap(entry.dominantPaletteCounts), ConfidenceRange(entry, "palette")))
     Add(lines, string.format("- Finish: %s • confidence %s", TopMap(entry.dominantFinishCounts), ConfidenceRange(entry, "finish")))
+    local curated = T.GetCuratedFieldsLabel and T.GetCuratedFieldsLabel({ curatedFields = entry.curatedFields }) or nil
+    if curated then
+        Add(lines, string.format("- Curated: %s • tuning version %s • %s %s", curated, tostring(entry.curatedTuningVersion or T.CURATED_TUNING_VERSION or 0), tostring(entry.curatedKeyType or "identity"), tostring(entry.curatedKey or entry.identityValue or "unknown")))
+    end
     if CountMap(entry.echoFamiliesRequested) > 0 then Add(lines, "- Echo families requested: " .. TopMap(entry.echoFamiliesRequested)) end
     Add(lines, "- Contexts: " .. Join(entry.contexts, "Unknown"))
     Add(lines, "- Sample reports: " .. Join(entry.sampleReportIDs, "None"))

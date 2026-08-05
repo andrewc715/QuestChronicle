@@ -3,6 +3,7 @@ local D = QC.Diagnostics
 local DP = D._Private
 local Wardrobe = QC.Wardrobe
 local WP = Wardrobe and Wardrobe._Private
+local Traveler = QC.ZoneStyle and QC.ZoneStyle.Traveler
 
 local function Copy(value)
     return DP.DeepCopy(value, 8) or {}
@@ -10,6 +11,8 @@ end
 
 local function SourceSnapshot(decision)
     local source = decision and decision.source
+    local curated = source and Traveler and Traveler.GetCuratedDescriptorMetadata and Traveler.GetCuratedDescriptorMetadata(source)
+    local curatedFields = curated and Traveler.GetCuratedFieldsLabel and Traveler.GetCuratedFieldsLabel(curated) or nil
     return {
         slotKey = decision and decision.slotKey,
         slotLabel = decision and decision.slotKey and (Wardrobe.GetSlotDefinition(decision.slotKey) and Wardrobe.GetSlotDefinition(decision.slotKey).label or decision.slotKey),
@@ -43,6 +46,10 @@ local function SourceSnapshot(decision)
         repaired = decision and decision.repaired == true or false,
         replacedVisualID = decision and decision.replacedVisualID or nil,
         protectedByLock = decision and decision.protectedByLock == true or false,
+        curatedFields = curatedFields,
+        curatedTuningVersion = curated and curated.version or nil,
+        curatedKeyType = curated and curated.keyType or nil,
+        curatedKey = curated and curated.key or nil,
     }
 end
 

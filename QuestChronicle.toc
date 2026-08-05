@@ -2,7 +2,7 @@
 ## Title: Quest Chronicle
 ## Notes: Records quest lifecycle, objective progress, completions, and roleplay notes, with a native-styled Chronicle window.
 ## Author: OpenAI & Andrew
-## Version: 1.9.0.15a1
+## Version: 1.9.0.15a2
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## AddonCompartmentFunc: QuestChronicle_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: QuestChronicle_OnAddonCompartmentEnter
@@ -57,6 +57,7 @@ Core\ZoneStyle\Scoring.lua
 Core\ZoneStyle\EligibilityWork.lua
 Core\ZoneStyle\GenerationEligibility.lua
 Core\ZoneStyle\Traveler\StyleLexicon.lua
+Core\ZoneStyle\Traveler\CuratedOverrides.lua
 Core\ZoneStyle\Traveler\Descriptors.lua
 Core\ZoneStyle\Traveler\Cohesion.lua
 Core\ZoneStyle\Traveler\MismatchAnalysis.lua

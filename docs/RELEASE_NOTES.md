@@ -1,19 +1,18 @@
-# Quest Chronicle v1.9.0.14
+# Quest Chronicle v1.9.0.15a2
 
-## Phase D: Outlier Repair
+## Phase E: Curated Correction Alpha
 
-Quest Chronicle now validates the completed Traveler outfit after Phase C support selection and before the visible preview is committed.
+v1.9.0.15a2 converts the first reviewed tuning batch into six exact visual-ID descriptor corrections.
 
-- Enforces the original final-composition gates: a 2.00-point mismatch budget, a strict 0.72 outlier-severity threshold, no more than three dominant palette families, and visible echo for loud accents.
-- Repairs the worst unlocked support outlier through at most two deterministic passes using the already prepared Phase C candidate pools.
-- Rebuilds the exact contextual budget and complete-outfit analysis for every trial replacement without rescanning the wardrobe, repeating eligibility, querying the weapon index, or consuming a new random roll.
-- Preserves locked and hidden appearances. Locked-only violations commit explicitly as `LOCKED_OVERRIDE` rather than being silently replaced.
-- Uses the next valid Phase B finalist only after both support repair passes are exhausted, with one alternate-skeleton attempt inside the original quality window.
-- Applies the same final validator to support-only rerolls while allowing only the requested support slot to change.
-- Adds compact before-and-after diagnostics for mismatch, severity, palette families, zero-echo accents, accepted repairs, locked overrides, and alternate skeleton use.
-- Compacts oversized live diagnostic snapshots before persistence so Phase D reports remain visible in Debug History instead of being silently pruned at the 20 KB ceiling.
-- Preserves v1.9.0.13 weapon routes, candidate ordering, Phase B and Phase C scoring, cache formats, scheduler budgets, locks, hidden slots, and atomic preview commits.
+The release changes visual descriptions only. It does not force selections, suppress repairs, alter mismatch classes, or modify Traveler's search and validation formulas.
 
-The package is automated-validated and requires Retail validation before replacing v1.9.0.13 as the live baseline.
+### Reviewed visual identities
 
-Follow `docs/testing/V19014_LIVE_VALIDATION_STEPS.md` for the streamlined Retail validation sequence.
+- `V:912` Gray Woolen Shirt: palette remains neutral; finish becomes plain.
+- `V:1208` Stylish Black Shirt: palette remains dark; finish becomes plain.
+- `V:1051` Hide of Lupos: dark, neutral, and purple palette; primal and weathered finish.
+- `V:1139` Rugged Plate Vest: blue, steel, and dark palette; weathered and plain finish.
+- `V:5237` Expedition Defender's Shoulders: green and steel palette; military and polished finish.
+- `V:12877` Orcish Scout Boots: dark, blue, and steel palette; plain and polished finish.
+
+The descriptor-cache fingerprint includes curated tuning version 1. Normal reports contain only compact curated markers. No cache format, SavedVariables schema, or Courier format changed.

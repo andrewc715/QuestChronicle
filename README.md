@@ -1,8 +1,8 @@
-# Quest Chronicle v1.9.0.15a1
+# Quest Chronicle v1.9.0.15a2
 
 > **Phase E Observation Build:** collect a bounded local batch of completed Traveler outfits, export the suspect ledger as Markdown, and make no scoring or descriptor changes until the evidence is reviewed.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.15a1 begins curated Traveler tuning on top of the live-validated v1.9.0.14 Phase D baseline. It observes completed Traveler actions without changing selections, scores, repairs, routes, scheduler behavior, or normal Debug reports.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.15a2 applies the first screenshot- and model-reviewed Traveler descriptor corrections on top of the corrected v1.9.0.15a1 observation baseline. Six exact visual identities receive curated palette or finish descriptions while Phase B, Phase C, Phase D, routes, locks, scheduler behavior, and cache schemas remain unchanged.
 
 ## Traveler Phase E: local tuning observation
 

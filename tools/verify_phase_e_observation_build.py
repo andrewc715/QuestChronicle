@@ -16,7 +16,7 @@ checks = {
     "copyable export command": 'tuningCommand == "export"' in text("Core/Chronicle/TravelerTuningCommands.lua"),
     "clear confirmation": 'tuningRest == "confirm"' in text("Core/Chronicle/TravelerTuningCommands.lua"),
     "normal reports do not embed audit": "travelerTuningAudit" not in text("Core/Diagnostics/SnapshotBuilder.lua"),
-    "no curated runtime override yet": not (ROOT / "Core/ZoneStyle/Traveler/CuratedOverrides.lua").exists(),
+    "curated runtime override loaded after observation alpha": (ROOT / "Core/ZoneStyle/Traveler/CuratedOverrides.lua").exists(),
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:

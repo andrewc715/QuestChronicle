@@ -1,21 +1,21 @@
-# Quest Chronicle v1.9.0.15a1
+# Quest Chronicle v1.9.0.15a2
 
-## Phase E: Curated Tuning Observation Build
+## Phase E: First Curated Descriptor Corrections
 
-Quest Chronicle now includes an opt-in local observation workflow for the first curated Traveler tuning batch.
+Quest Chronicle now applies the first human-reviewed Traveler descriptor corrections collected through the v1.9.0.15a1 observation batch and standardized appearance renders.
 
-- Adds `/qc traveler tuning start|status|stop|export|clear confirm`.
-- Aggregates completed Traveler actions by stable visual identity, preferring `visualID` and falling back to `sourceID` or `itemID`.
-- Tracks selection frequency, anchor/support use, Phase D repair targets and replacements, palette-overflow targets, loud zero-echo incidents, severe outliers, and worst-outlier observations across contexts.
-- Records compact dominant palette, finish, confidence, context, and report-ID evidence without copying the audit into normal immutable Debug reports.
-- Deduplicates linked weapon hands so one visual block does not inflate selection frequency.
-- Keeps the audit local, opt-in, bounded to 300 visual identities, and separate from Courier export.
-- Opens a copyable Markdown audit through the Debug Workbench without inserting a synthetic diagnostic report.
-- Requires explicit confirmation before clearing the collected batch.
-- Failure-isolates audit collection so an observation error cannot block Debug History or a completed generation report.
-- Reconciles support-slot rerolls entirely from the current live outfit and reused profile, preventing stale parent-report budget totals from falsely aborting an otherwise valid reroll.
-- Adds no curated descriptor overrides yet and preserves v1.9.0.14 selections, scores, Phase D repairs, routes, scheduler behavior, cache formats, and report snapshots.
+- Adds a versioned exact-identity correction layer in `CuratedOverrides.lua`.
+- Corrects six reviewed visual identities without changing any scoring formula or repair threshold.
+- Keeps Gray Woolen Shirt neutral and Stylish Black Shirt dark while classifying both as plain cloth finishes.
+- Reclassifies Hide of Lupos as dark violet-gray fur with primal and weathered finish evidence.
+- Reclassifies Rugged Plate Vest as blue, steel, and dark with a weathered practical finish.
+- Reclassifies Expedition Defender's Shoulders as green-dominant steel armor with a military and polished finish.
+- Reclassifies Orcish Scout Boots as dark navy, muted blue, and steel with a plain lightly polished finish. They are explicitly not green.
+- Adds curated descriptor confidence, cache fingerprinting, compact Debug markers, and audit-export markers.
+- Adds an `echoPalette` descriptor channel with behavior-identical defaults; this batch adds no echo-only corrections.
+- Preserves the corrected v1.9.0.15a1 support-reroll ledger reconciliation.
+- Preserves all Phase B and Phase C scoring, all Phase D gates and repair limits, weapon routes, lock and hidden behavior, scheduler budgets, SavedVariables schemas, and Courier format.
 
-This alpha is the observation build. Validate the audit controls, then collect at least 20 completed Traveler actions before descriptor corrections are reviewed for v1.9.0.15a2.
+This alpha requires focused Retail validation of all six descriptors and a ten-action Traveler batch before promotion toward the v1.9.0.15 release candidate.
 
-Follow `docs/testing/V19015A1_LIVE_VALIDATION_STEPS.md` for the streamlined Retail validation and collection sequence.
+Follow `docs/testing/V19015A2_LIVE_VALIDATION_STEPS.md` for the streamlined validation sequence.

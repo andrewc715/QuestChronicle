@@ -33,6 +33,12 @@ local function NormalizeMap(values)
     return values
 end
 
+local function CopyMap(values)
+    local copy = {}
+    for key, value in pairs(values or {}) do copy[key] = value end
+    return copy
+end
+
 local function ApplyLexicon(text, lexicon, target, evidence, evidenceLabel)
     local hits = 0
     local padded = " " .. tostring(text or "") .. " "
@@ -106,6 +112,7 @@ end
 
 local function DescriptorFingerprint(source, definition, text)
     return table.concat({
+        tostring(source and source.visualID or ""),
         tostring(source and source.sourceID or ""),
         tostring(source and source.itemID or ""),
         tostring(source and source.styleName or source and source.name or ""),
@@ -113,6 +120,7 @@ local function DescriptorFingerprint(source, definition, text)
         tostring(definition and definition.key or source and source.slotKey or ""),
         tostring(text or ""),
         tostring(T.INSTRUMENTATION_VERSION or 0),
+        tostring(T.CURATED_TUNING_VERSION or 0),
     }, "|")
 end
 
@@ -127,6 +135,7 @@ function T.BuildDescriptor(source, definition)
     local descriptor = {
         source = source,
         definition = definition,
+        visualID = tonumber(source.visualID),
         sourceID = tonumber(source.sourceID),
         itemID = tonumber(source.itemID),
         slotKey = definition and definition.key or source.slotKey,
@@ -148,20 +157,24 @@ function T.BuildDescriptor(source, definition)
     materialHits = materialHits + InferMaterialFromSubtype(source, descriptor.material, descriptor.evidence)
     local finishHits = ApplyLexicon(text, T.LEXICON.finish, descriptor.finish, descriptor.evidence, "name finish lexicon")
     local motifHits = ApplyLexicon(text, T.LEXICON.motif, descriptor.motifs, descriptor.evidence, "name motif lexicon")
+    if T.ApplyCuratedDescriptorOverride then T.ApplyCuratedDescriptorOverride(descriptor) end
 
     NormalizeMap(descriptor.palette)
     NormalizeMap(descriptor.material)
     NormalizeMap(descriptor.finish)
     NormalizeMap(descriptor.motifs)
+    descriptor.echoPalette = T.BuildTravelerEchoPalette and T.BuildTravelerEchoPalette(descriptor) or CopyMap(descriptor.palette)
 
     descriptor.dominantPalette, descriptor.dominantPaletteStrength = Dominant(descriptor.palette)
     descriptor.dominantMaterial, descriptor.dominantMaterialStrength = Dominant(descriptor.material)
     descriptor.dominantFinish, descriptor.dominantFinishStrength = Dominant(descriptor.finish)
     descriptor.dominantMotif, descriptor.dominantMotifStrength = Dominant(descriptor.motifs)
 
-    descriptor.confidence.palette = paletteHits > 0 and 0.70 or 0.00
+    descriptor.confidence.palette = descriptor.curatedFields and descriptor.curatedFields.palette
+        and (T.CURATED_CONFIDENCE or 0.95) or (paletteHits > 0 and 0.70 or 0.00)
     descriptor.confidence.material = materialHits > 0 and (source.styleItemSubType and 0.90 or 0.68) or 0.00
-    descriptor.confidence.finish = finishHits > 0 and 0.66 or 0.00
+    descriptor.confidence.finish = descriptor.curatedFields and descriptor.curatedFields.finish
+        and (T.CURATED_CONFIDENCE or 0.95) or (finishHits > 0 and 0.66 or 0.00)
     descriptor.confidence.motifs = motifHits > 0 and 0.58 or 0.00
     descriptor.confidence.provenance = descriptor.expansionID ~= nil and 0.75 or (#descriptor.setIDs > 0 and 0.65 or 0.00)
 

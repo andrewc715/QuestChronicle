@@ -3,6 +3,7 @@ local D = QC.Diagnostics
 local DP = D._Private
 local Wardrobe = QC.Wardrobe
 local WP = Wardrobe and Wardrobe._Private
+local Traveler = QC.ZoneStyle and QC.ZoneStyle.Traveler
 
 local ANCHOR_KEYS = { "CHEST", "LEGS", "SHOULDER" }
 local WEAPON_KEYS = { "ONE_HAND", "TWO_HAND", "RANGED", "OFF_HAND" }
@@ -27,6 +28,8 @@ end
 local function SourceSnapshot(source, slotKey, state, candidate)
     local sourceID = source and source.sourceID or (state and state.selections and state.selections[slotKey])
     local visualID = source and source.visualID or (state and state.selectionVisuals and state.selectionVisuals[slotKey])
+    local curated = source and Traveler and Traveler.GetCuratedDescriptorMetadata and Traveler.GetCuratedDescriptorMetadata(source)
+    local curatedFields = curated and Traveler.GetCuratedFieldsLabel and Traveler.GetCuratedFieldsLabel(curated) or nil
     return {
         slotKey = slotKey,
         slotLabel = SlotLabel(slotKey),
@@ -42,6 +45,10 @@ local function SourceSnapshot(source, slotKey, state, candidate)
         hidden = state and state.hidden and state.hidden[slotKey] == true or false,
         baseScore = candidate and tonumber(candidate.baseScore) or nil,
         scoreReasons = candidate and CopyTable(candidate.scoreReasons) or nil,
+        curatedFields = curatedFields,
+        curatedTuningVersion = curated and curated.version or nil,
+        curatedKeyType = curated and curated.keyType or nil,
+        curatedKey = curated and curated.key or nil,
     }
 end
 

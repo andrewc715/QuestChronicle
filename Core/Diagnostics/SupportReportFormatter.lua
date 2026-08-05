@@ -79,6 +79,7 @@ local function SourceText(decision, rawIDs)
     if decision.locked then text = text .. " [Locked]"
     elseif decision.contextFixed then text = text .. " [Context Fixed]"
     elseif decision.targetRerolled then text = text .. " [Rerolled]" end
+    if decision.curatedFields then text = text .. " • Curated tags: " .. tostring(decision.curatedFields) end
     if rawIDs then
         local ids = {}
         if decision.visualID then ids[#ids + 1] = "visual " .. tostring(decision.visualID) end

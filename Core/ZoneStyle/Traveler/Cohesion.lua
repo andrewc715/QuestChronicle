@@ -231,7 +231,7 @@ local function EchoSupport(entry, entries)
     for _, other in ipairs(entries or {}) do
         if other ~= entry then
             local visibility = other.slotProminence or T.SLOT_VISIBILITY_WEIGHTS[other.slotKey] or 0.40
-            support = support + (other.descriptor.palette[accent] or 0) * visibility
+            support = support + ((other.descriptor.echoPalette or other.descriptor.palette)[accent] or 0) * visibility
         end
     end
     return Clamp(support, 0, 1)

@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.9.0.15a2 - 2026-08-05
+
+### Traveler Phase E curated corrections
+
+- Added a versioned exact visual-ID descriptor override layer.
+- Corrected palette or finish descriptions for Gray Woolen Shirt, Stylish Black Shirt, Hide of Lupos, Rugged Plate Vest, Expedition Defender's Shoulders, and Orcish Scout Boots.
+- Preserved the reviewed neutral and dark shirt palettes while supplying their missing plain finish.
+- Corrected Orcish Scout Boots to dark navy, muted blue, and steel rather than green.
+- Added curated confidence, descriptor-cache fingerprinting, compact Debug markers, and tuning-audit markers.
+- Added a behavior-identical `echoPalette` channel for future reviewed accent echoes.
+
+### Preserved
+
+- Preserved all Phase B and Phase C formulas, candidate ordering, random consumption, and search widths.
+- Preserved the Phase D 2.00 mismatch budget, 0.72 severity threshold, three-family palette limit, echo gate, two-pass repair limit, and alternate-skeleton policy.
+- Preserved routes, locks, hidden state, scheduler budgets, cache schemas, diagnostic format, Courier format, and corrected a1 reroll reconciliation.
+
 ## 1.9.0.15a1 - 2026-08-04
 
 ### Traveler Phase E observation
