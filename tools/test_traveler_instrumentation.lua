@@ -23,6 +23,7 @@ function time() return 123 end
 assert(loadfile("Core/ZoneStyle/Traveler/StyleLexicon.lua"))()
 assert(loadfile("Core/ZoneStyle/Traveler/Descriptors.lua"))()
 assert(loadfile("Core/ZoneStyle/Traveler/Cohesion.lua"))()
+assert(loadfile("Core/ZoneStyle/Traveler/MismatchAnalysis.lua"))()
 local T = ZoneStyle.Traveler
 
 local weightTotal = 0

@@ -147,12 +147,15 @@ local function ApplySelection(job, work, selected, chosenRank, shortlistSize)
         end
     end
     local profile = work.profile
+    local phaseD = selected.phaseD or (work.phaseDWork and { status = work.phaseDWork.finalStatus, repairPasses = #(work.phaseDWork.repairs or {}), repairs = work.phaseDWork.repairs, initialValidation = work.phaseDWork.initialValidation, finalValidation = work.phaseDWork.finalValidation, alternateSkeleton = work.phaseDWork.options and work.phaseDWork.options.alternate == true })
     local cohesionTotal, count, outliers, accents, fallbacks = 0, 0, 0, 0, 0
     for _, decision in ipairs(selected.decisions or {}) do
         cohesionTotal, count = cohesionTotal + ((decision.profileFit + decision.neighborCohesion) * 0.5), count + 1
         if decision.outlierState == "OUTLIER" then outliers = outliers + 1 elseif decision.outlierState == "ACCENT" or decision.outlierState == "LOUD_ACCENT" then accents = accents + 1 end
         if decision.fallback then fallbacks = fallbacks + 1 end
     end
+    local finalValidation = phaseD and phaseD.finalValidation
+    if finalValidation then outliers = tonumber(finalValidation.repairableOutliers) or 0 end
     job.supportStats = {
         profile = profile, startingBudget = selected.budget.starting, lockedCommitment = selected.budget.lockedCommitment,
         generatedSpend = selected.budget.generatedSpend, borrowed = selected.budget.borrowed, overrun = selected.budget.overrun,
@@ -163,6 +166,9 @@ local function ApplySelection(job, work, selected, chosenRank, shortlistSize)
         expansions = work.beamWork.expansions, retained = work.beamWork.retained,
         deduplicated = (work.poolDeduplicated or 0) + (work.beamWork.deduplicated or 0), budgetRejections = work.beamWork.rejections,
         emptySlots = work.beamWork.emptySlots or 0, decisions = selected.decisions, activeSlots = work.activeSlots,
+        finalValidationStatus = phaseD and phaseD.status or "CLEAN", repairPasses = phaseD and phaseD.repairPasses or 0,
+        repairs = phaseD and phaseD.repairs or {}, phaseDInitial = phaseD and phaseD.initialValidation or nil,
+        phaseDFinal = finalValidation, alternateSkeleton = phaseD and phaseD.alternateSkeleton == true or false,
     }
     job.supportDiagnostics = job.supportStats
     P.lastSupportDiagnostics = job.supportStats
@@ -221,11 +227,32 @@ function P.StepSupportGenerationJob(job, stepStarted)
         elseif work.stage == "SELECT" then
             if P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.5) then return "RUNNING" end
             local started = NowMilliseconds()
-            local selected, rank, shortlist = P.ChooseSupportConfiguration(work.beamWork)
-            local ok, reason = ApplySelection(job, work, selected, rank, shortlist)
+            work.selected, work.chosenRank, work.shortlistSize = P.ChooseSupportConfiguration(work.beamWork)
             RecordPhase(job, "supportSelection", started)
-            if not ok then return "FALLBACK", reason end
-            return "READY"
+            if not work.selected then return "FALLBACK", "No complete contextual support configuration was available." end
+            if not P.CreateSupportFinalizationWork or not P.StepSupportFinalization then
+                local ok, reason = ApplySelection(job, work, work.selected, work.chosenRank, work.shortlistSize)
+                if not ok then return "FAILED", reason end
+                return "READY"
+            end
+            work.phaseDWork = P.CreateSupportFinalizationWork(job, work, work.selected, work.chosenRank, work.shortlistSize, {
+                noRepair = job.phaseDAlternateNoRepair == true,
+                alternate = job.phaseDAlternateNoRepair == true,
+            })
+            work.stage = "FINAL"
+            return "RUNNING"
+        elseif work.stage == "FINAL" then
+            local status, reason = P.StepSupportFinalization(job, work, work.phaseDWork)
+            if status == "READY" then
+                local ok, applyReason = ApplySelection(job, work, work.phaseDWork.finalConfiguration, work.chosenRank, work.shortlistSize)
+                if not ok then return "FAILED", applyReason end
+                return "READY"
+            elseif status == "ALTERNATE" then
+                return "ALTERNATE", "Two support repair passes were exhausted."
+            elseif status == "FAILED" then
+                return "FAILED", reason
+            end
+            return "RUNNING"
         end
         operations = operations + 1
         if P.ShouldYieldGenerationWorker and P.ShouldYieldGenerationWorker(job, 0.5) then return "RUNNING" end

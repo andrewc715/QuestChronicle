@@ -1,10 +1,18 @@
-# Quest Chronicle v1.9.0.13
+# Quest Chronicle v1.9.0.14
 
-> **Weapon-Index Invalidation Lifecycle:** cold and partial index construction retain their canonical cause, warm reuse reports `NONE`, and only a genuine unclassified transition reports `UNKNOWN`.
+> **Phase D: Outlier Repair:** the completed Traveler outfit now receives final validation, at most two bounded support repairs, and one last-resort alternate anchor skeleton before atomic commit.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.13 closes the weapon-index invalidation dashboard without changing any selection, route, score, or scheduler behavior.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.14 completes the Traveler cohesion pipeline by repairing strong unsupported support outliers while preserving useful weathering, locks, hidden slots, legal weapon routes, and the live-validated v1.9.0.13 scheduler behavior.
 
 It does **not** modify, skin, hook into, or add tabs to Blizzard's Quest Log.
+
+## Traveler Phase D: final validation and outlier repair
+
+After Phase B chooses the anchor skeleton and Phase C fills contextual support, Quest Chronicle evaluates the completed Traveler outfit before changing the visible preview. Final validation uses the shared calibrated Traveler mismatch language and checks a 2.00-point final mismatch budget, a strict 0.72 severity threshold, a maximum of three dominant palette families, and visible echo for loud accents.
+
+When an unlocked support piece fails, Quest Chronicle reuses that slot's already prepared candidate pool and repairs the worst outlier through at most two deterministic passes. Every candidate is judged against the complete outfit, and a replacement commits only when the final validation objective strictly improves. Locked and hidden pieces remain sovereign. If both repair passes fail, Quest Chronicle may refill support around one unused Phase B finalist inside the original quality window.
+
+All Phase D work is transient and cooperative. A failed or cancelled action leaves the previous preview unchanged. No cache reset is required.
 
 ## Opening the interface
 
@@ -99,6 +107,7 @@ Each selected report includes:
 - support-reroll ancestry, context-fixed slots, target budget replacement, and detailed cooperative reroll phases.
 - canonical active-anchor masks, immutable profile identity and source, profile-repair state, exact budget reconciliation, and separate pre-worker/cooperative timing domains.
 - decomposed support-reroll snapshot phases, adaptive worker scheduling, and weapon-index cold/warm/repair diagnostics.
+- Phase D final-composition status, mismatch/severity/palette/echo gates, accepted repair passes, locked overrides, and alternate-skeleton ancestry.
 
 Use **Copy Report** to open a read-only multiline box with the selected report highlighted for `Ctrl+C`. **Clear History** removes only diagnostic snapshots. It never changes Chronicle events, wardrobe caches, concepts, selections, or Custom Sets.
 

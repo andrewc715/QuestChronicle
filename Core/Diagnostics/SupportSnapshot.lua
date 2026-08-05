@@ -36,6 +36,61 @@ local function SourceSnapshot(decision)
         bridgeImprovement = decision and decision.bridgeImprovement == true or false,
         fallback = decision and decision.fallback == true or false,
         score = decision and tonumber(decision.score) or 0,
+        finalMismatchClass = decision and decision.finalMismatchClass or nil,
+        echoSupport = decision and tonumber(decision.echoSupport) or nil,
+        outlierSeverity = decision and tonumber(decision.outlierSeverity) or nil,
+        repairPass = decision and tonumber(decision.repairPass) or nil,
+        repaired = decision and decision.repaired == true or false,
+        replacedVisualID = decision and decision.replacedVisualID or nil,
+        protectedByLock = decision and decision.protectedByLock == true or false,
+    }
+end
+
+
+local function ValidationSnapshot(validation)
+    if not validation then return nil end
+    return {
+        status = validation.status,
+        mismatchBudget = tonumber(validation.mismatchBudget) or 0,
+        mismatchUsed = tonumber(validation.mismatchUsed) or 0,
+        mismatchOverflow = tonumber(validation.mismatchOverflow) or 0,
+        severityThreshold = tonumber(validation.severityThreshold) or 0,
+        maximumSeverity = tonumber(validation.maximumSeverity) or 0,
+        paletteLimit = tonumber(validation.paletteLimit) or 0,
+        paletteFamilies = tonumber(validation.paletteFamilies) or 0,
+        paletteOverflow = tonumber(validation.paletteOverflow) or 0,
+        repairableOutliers = tonumber(validation.repairableOutliers) or 0,
+        protectedOutliers = tonumber(validation.protectedOutliers) or 0,
+        repairableZeroEcho = tonumber(validation.repairableZeroEcho) or 0,
+        protectedZeroEcho = tonumber(validation.protectedZeroEcho) or 0,
+        repairableSevere = tonumber(validation.repairableSevere) or 0,
+        protectedSevere = tonumber(validation.protectedSevere) or 0,
+        protectedLockedViolations = tonumber(validation.protectedLockedViolations) or 0,
+        weightedSeverity = tonumber(validation.weightedSeverity) or 0,
+        wholeOutfitCohesion = tonumber(validation.wholeOutfitCohesion) or 0,
+    }
+end
+
+local function RepairSnapshot(repair)
+    return {
+        pass = tonumber(repair and repair.pass) or 0,
+        slotKey = repair and repair.slotKey,
+        previousName = repair and repair.previousName,
+        previousVisualID = repair and repair.previousVisualID,
+        replacementName = repair and repair.replacementName,
+        replacementVisualID = repair and repair.replacementVisualID,
+        trigger = repair and repair.trigger,
+        mismatchBefore = tonumber(repair and repair.mismatchBefore) or 0,
+        mismatchAfter = tonumber(repair and repair.mismatchAfter) or 0,
+        severityBefore = tonumber(repair and repair.severityBefore) or 0,
+        severityAfter = tonumber(repair and repair.severityAfter) or 0,
+        paletteBefore = tonumber(repair and repair.paletteBefore) or 0,
+        paletteAfter = tonumber(repair and repair.paletteAfter) or 0,
+        zeroEchoBefore = tonumber(repair and repair.zeroEchoBefore) or 0,
+        zeroEchoAfter = tonumber(repair and repair.zeroEchoAfter) or 0,
+        cohesionBefore = tonumber(repair and repair.cohesionBefore) or 0,
+        cohesionAfter = tonumber(repair and repair.cohesionAfter) or 0,
+        scoreDelta = tonumber(repair and repair.scoreDelta) or 0,
     }
 end
 
@@ -107,5 +162,15 @@ function DP.BuildSupportSnapshot(state, job)
         profileAdjustment = tonumber(stats.profileAdjustment) or 0,
         expectedBudgetAfter = tonumber(stats.expectedBudgetAfter) or tonumber(stats.budgetAfter) or 0,
         budgetReconciled = stats.budgetReconciled ~= false,
+        finalValidationStatus = stats.finalValidationStatus or "CLEAN",
+        repairPasses = tonumber(stats.repairPasses) or 0,
+        repairs = (function()
+            local result = {}
+            for _, repair in ipairs(stats.repairs or {}) do result[#result + 1] = RepairSnapshot(repair) end
+            return result
+        end)(),
+        phaseDInitial = ValidationSnapshot(stats.phaseDInitial),
+        phaseDFinal = ValidationSnapshot(stats.phaseDFinal),
+        alternateSkeleton = stats.alternateSkeleton == true,
     }
 end

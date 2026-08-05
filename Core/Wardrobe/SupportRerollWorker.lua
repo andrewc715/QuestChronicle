@@ -202,99 +202,13 @@ local function CurrentDecision(job)
     return decision
 end
 
-local function BuildStats(job, chosen, chosenRank, shortlistSize)
-    local root = job.supportRerollRoot
-    local finalBudget = chosen and P.CommitSupportBudget(root.budget, chosen.budgetEvaluation, false) or root.budget
-    local decisions = {}
-    for _, decision in ipairs(root.decisions or {}) do decisions[#decisions + 1] = decision end
-    if chosen then
-        chosen.targetRerolled = not chosen.noAlternative
-        decisions[#decisions + 1] = chosen
-    end
-    local total, scoreTotal, count, accents, outliers, fallbacks, fixedContextCount = 0, 0, 0, 0, 0, 0, 0
-    for _, decision in ipairs(decisions) do
-        total = total + ((decision.profileFit or 0) + (decision.neighborCohesion or 0)) * 0.5
-        scoreTotal = scoreTotal + (decision.score or 0)
-        count = count + 1
-        if decision.outlierState == "OUTLIER" then outliers = outliers + 1
-        elseif decision.outlierState == "ACCENT" or decision.outlierState == "LOUD_ACCENT" then accents = accents + 1 end
-        if decision.fallback then fallbacks = fallbacks + 1 end
-        if decision.contextFixed then fixedContextCount = fixedContextCount + 1 end
-    end
-    local previousTarget = job.previousTargetDecision
-    local previousTargetSource
-    if not previousTarget then
-        local sourceID = job.draft.selections and job.draft.selections[job.actionSlotKey]
-        previousTargetSource = sourceID and P.GetSourceByID(job.actionSlotKey, sourceID) or nil
-        local candidate = previousTargetSource and P.BuildSupportCandidate(previousTargetSource, P.slotByKey[job.actionSlotKey], job, job.supportRerollProfile, nil, true) or nil
-        if candidate then
-            local evaluation = P.EvaluateSupportBudget(root.budget, job.actionSlotKey, candidate.mismatchCost, {}, false)
-            previousTarget = {
-                name = previousTargetSource.styleName or previousTargetSource.name or previousTargetSource.itemName,
-                sourceID = previousTargetSource.sourceID, visualID = previousTargetSource.visualID,
-                mismatchSpent = evaluation.cost,
-            }
-        end
-    end
-    local parentSpend = job.parentReport and job.parentReport.support
-        and ((job.parentReport.support.lockedCommitment or 0) + (job.parentReport.support.generatedSpend or 0))
-    local removedCost = previousTarget and previousTarget.mismatchSpent or 0
-    local fixedSpend = (root.budget.lockedCommitment or 0) + (root.budget.generatedSpend or 0)
-    local previousSpend = parentSpend or (fixedSpend + removedCost)
-    local replacementCost = chosen and chosen.mismatchSpent or 0
-    local actualAfter = finalBudget.lockedCommitment + finalBudget.generatedSpend
-    local expectedAfter = previousSpend - removedCost + replacementCost
-    local adjustment = actualAfter - expectedAfter
-    if math.abs(adjustment) < 0.0005 then adjustment = 0 end
-    local repaired = job.profileResolution and job.profileResolution.repaired == true
-    local reconciled = repaired or adjustment == 0
-    return {
-        profile = job.supportRerollProfile,
-        profileID = job.supportRerollProfile and job.supportRerollProfile.profileID,
-        profileSourceReportID = job.supportRerollProfile and job.supportRerollProfile.profileSourceReportID,
-        profileReused = job.profileResolution and job.profileResolution.reused == true,
-        profileRepaired = repaired,
-        profileMigrated = job.profileResolution and job.profileResolution.migrated == true,
-        profileRepairReason = job.profileResolution and job.profileResolution.repairReason,
-        profileBasisConsistent = true,
-        startingBudget = finalBudget.starting, lockedCommitment = finalBudget.lockedCommitment,
-        generatedSpend = finalBudget.generatedSpend, borrowed = finalBudget.borrowed,
-        overrun = finalBudget.overrun, remainingBudget = finalBudget.remaining,
-        configurationScore = scoreTotal,
-        wholeOutfitCohesion = count > 0 and total / count or job.supportRerollProfile.meanAnchorCohesion,
-        controlledAccents = accents, outliers = outliers, fallbackSlots = fallbacks,
-        chosenRank = chosenRank or 0, shortlistSize = shortlistSize or 0,
-        poolSizes = { [job.actionSlotKey] = #(job.supportRerollPool.pool or {}) },
-        expansions = { [job.actionSlotKey] = job.supportRerollScoreIndex - 1 },
-        retained = { [job.actionSlotKey] = shortlistSize or 0 },
-        deduplicated = job.supportRerollPool.deduplicated or 0,
-        budgetRejections = job.supportRerollBudgetRejections or 0,
-        emptySlots = chosen and 0 or 1, decisions = decisions,
-        activeSlots = job.supportRerollActiveSlots,
-        targetSlotKey = job.actionSlotKey,
-        previousTargetName = previousTarget and previousTarget.name,
-        previousTargetSourceID = previousTarget and previousTarget.sourceID,
-        previousTargetVisualID = previousTarget and previousTarget.visualID,
-        previousTargetCost = removedCost,
-        replacementCost = replacementCost,
-        budgetBefore = previousSpend,
-        fixedContextCost = (finalBudget.lockedCommitment + finalBudget.generatedSpend) - replacementCost,
-        profileAdjustment = adjustment,
-        expectedBudgetAfter = expectedAfter,
-        budgetAfter = actualAfter,
-        budgetReconciled = reconciled,
-        fixedContextCount = fixedContextCount,
-        noAlternative = not chosen or chosen.noAlternative == true,
-    }
-end
-
 local function Commit(job)
     if not P.ValidateSupportRerollManifest(job.manifest, job.liveState)
         or P.SupportRerollStateSignature(job.liveState) ~= job.startSignature then
         return Finish(job, false, "The support-slot reroll was cancelled because the workbench changed while Quest Chronicle was preparing it.", "CANCELLED")
     end
     local chosen = job.supportRerollChosen
-    local stats = BuildStats(job, chosen, job.supportRerollChosenRank, job.supportRerollShortlistSize)
+    local stats = P.BuildSupportRerollStats(job, chosen, job.supportRerollChosenRank, job.supportRerollShortlistSize)
     job.supportDiagnostics, job.supportStats = stats, stats
     P.lastSupportDiagnostics = stats
     if not stats.budgetReconciled then
@@ -438,7 +352,54 @@ function P.StepSupportRerollJob(token)
             if not chosen then chosen, rank, shortlist = CurrentDecision(job), 1, 1 end
             job.supportRerollChosen, job.supportRerollChosenRank, job.supportRerollShortlistSize = chosen, rank, shortlist
             Record(job, "rerollShortlistSelection", started)
-            job.phase = "COMMIT"
+            if P.ValidateSupportConfiguration and P.AttachSupportFinalAnalysis then
+                job.supportRerollPhaseDAlternatives = {}
+                local chosenIdentity = chosen and P.SupportVisualIdentity(chosen.source)
+                for _, alternative in ipairs(work.decisions or {}) do
+                    if P.SupportVisualIdentity(alternative.source) ~= chosenIdentity then
+                        job.supportRerollPhaseDAlternatives[#job.supportRerollPhaseDAlternatives + 1] = alternative
+                    end
+                end
+                job.supportRerollPhaseDAlternativeIndex = 1
+                job.phase = "FINAL_VALIDATE"
+            else
+                job.phase = "COMMIT"
+            end
+        elseif job.phase == "FINAL_VALIDATE" then
+            local started = NowMilliseconds()
+            local phaseWork = { profile = job.supportRerollProfile, activeSlots = job.supportRerollActiveSlots }
+            local configuration = P.BuildSupportRerollPhaseDConfiguration(job, job.supportRerollChosen)
+            local validation = P.ValidateSupportConfiguration(job, phaseWork, configuration)
+            job.supportRerollInitialValidation = validation
+            Record(job, "rerollFinalValidation", started)
+            if validation.status == "CLEAN" or validation.status == "LOCKED_OVERRIDE" then
+                P.ApplySupportRerollFinalValidation(job, job.supportRerollChosen, configuration, validation, {}, validation.status)
+                job.phase = "COMMIT"
+            else
+                job.phase = "FINAL_ALTERNATE"
+            end
+        elseif job.phase == "FINAL_ALTERNATE" then
+            local alternatives = job.supportRerollPhaseDAlternatives or {}
+            local index = job.supportRerollPhaseDAlternativeIndex or 1
+            if index > math.min(2, #alternatives) then
+                local current = CurrentDecision(job)
+                if current then current.noAlternative = true end
+                job.supportRerollChosen = current
+                job.phase = "COMMIT"
+            else
+                local started = NowMilliseconds()
+                local alternative = alternatives[index]
+                job.supportRerollPhaseDAlternativeIndex = index + 1
+                local phaseWork = { profile = job.supportRerollProfile, activeSlots = job.supportRerollActiveSlots }
+                local configuration = P.BuildSupportRerollPhaseDConfiguration(job, alternative)
+                local validation = P.ValidateSupportConfiguration(job, phaseWork, configuration)
+                Record(job, "rerollFinalAlternative", started)
+                if validation.status == "CLEAN" or validation.status == "LOCKED_OVERRIDE" then
+                    local repair = P.BuildSupportRerollRepairRecord(job, job.supportRerollChosen, alternative, job.supportRerollInitialValidation, validation)
+                    P.ApplySupportRerollFinalValidation(job, alternative, configuration, validation, { repair }, validation.status == "LOCKED_OVERRIDE" and "LOCKED_OVERRIDE" or "REPAIRED")
+                    job.phase = "COMMIT"
+                end
+            end
         elseif job.phase == "COMMIT" then
             if P.AccumulateSupportRerollSliceDiagnostics then P.AccumulateSupportRerollSliceDiagnostics(job, slice) end
             Commit(job)

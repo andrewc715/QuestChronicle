@@ -22,6 +22,8 @@ local function CopyDraftState(state)
     draft.lastWeaponRoute = state and state.lastWeaponRoute
     return draft
 end
+P.CopyAnchorDraftState = CopyDraftState
+
 local function CreatePoolWork(job, slotKey)
     local definition = P.slotByKey[slotKey]
     if not definition then return { slotKey = slotKey, done = true, pool = {}, reason = "unknown slot" } end
@@ -156,6 +158,8 @@ local function ApplyArmorNodeToDraft(draft, node, reroll)
     end
     return generated
 end
+P.ApplyArmorNodeToDraft = ApplyArmorNodeToDraft
+
 local function BuildNodeStyleContext(job, draft, node)
     local context = P.CreateStyleGenerationContext(draft, job.styleEngine, job.styleEngine.GetCurrentContext(), nil, true)
     if job.styleEngine.AddSourceToGenerationContext then
@@ -236,6 +240,8 @@ local function RebuildSelectedStyleContext(job, selected)
     if job.styleEngine.PrepareGenerationEligibilityContext then job.styleEngine.PrepareGenerationEligibilityContext(context) end
     job.styleContext = context
 end
+P.RebuildSelectedStyleContext = RebuildSelectedStyleContext
+
 local function CandidateName(candidate)
     local source = candidate and candidate.source
     return source and (source.styleName or source.name or source.sourceID) or "Unknown"
@@ -284,99 +290,16 @@ local function BuildSelectedDiagnostics(selected, selectionDetails)
         },
     }
 end
+P.BuildSelectedAnchorDiagnostics = BuildSelectedDiagnostics
+
 local function CommitSelectedSkeleton(job, work)
-    local previousSignature = job.draft.lastAnchorSkeletonSignature
-    local noveltyContext = job.currentAnchorNovelty
-        or (P.BuildAnchorNoveltyContext and P.BuildAnchorNoveltyContext(job.liveState or job.draft))
-    local selected, chosenRank, shortlistSize, selectionDetails = P.ChooseAnchorSkeleton(work.finalists, {
-        action = job.action,
-        noveltyContext = noveltyContext,
-        previousSignature = previousSignature,
-    })
-    if not selected or selected.activeComponents < 2 then
-        work.fallbackReason = work.lastWeaponFailure or "fewer than two legal anchor components"
+    if not P.CommitInitialAnchorSkeleton then
+        work.fallbackReason = "anchor application helper is unavailable"
         return false
     end
-    job.selectedArmor = job.selectedArmor + ApplyArmorNodeToDraft(job.draft, selected.armorNode, job.reroll)
-    for _, slotKey in ipairs(P.MAIN_WEAPON_SLOT_KEYS) do
-        if slotKey == selected.mainSlotKey then
-            P.SetSelectedSource(job.draft, slotKey, selected.mainSource)
-        elseif not job.draft.locks[slotKey] then
-            P.SetSelectedSource(job.draft, slotKey, nil)
-        end
-    end
-    if selected.offSource then
-        P.SetSelectedSource(job.draft, "OFF_HAND", selected.offSource)
-    elseif not job.draft.locks.OFF_HAND then
-        P.SetSelectedSource(job.draft, "OFF_HAND", nil)
-    end
-    job.draft.lastWeaponRoute = selected.draft.lastWeaponRoute
-    job.draft.lastAnchorSkeletonSignature = selected.signature
-    job.weaponCount = selected.weaponCount
-    job.weaponNotice = selected.weaponNotice
-    RebuildSelectedStyleContext(job, selected)
-    local pairSnapshot = P.GetAnchorPairCacheSnapshot()
-    local selectedDiagnostics = BuildSelectedDiagnostics(selected, selectionDetails)
-    job.anchorStats = {
-        poolSizes = work.poolSizes,
-        expansions = work.beamWork.expansions,
-        retained = work.beamWork.retained,
-        weaponBundles = #work.finalists,
-        chosenRank = chosenRank,
-        shortlistSize = shortlistSize,
-        chosenScore = selected.score,
-        baseSkeletonScore = selectionDetails and selectionDetails.baseScore or selected.score,
-        adjustedSelectionScore = selectionDetails and selectionDetails.adjustedScore or selected.score,
-        repeatPenalty = selectionDetails and selectionDetails.repeatPenalty or 0,
-        noveltyClass = selectionDetails and selectionDetails.class or nil,
-        comparedComponents = selectionDetails and selectionDetails.comparedComponents or {},
-        changedComponents = selectionDetails and selectionDetails.changedComponents or {},
-        repeatedComponents = selectionDetails and selectionDetails.repeatedComponents or {},
-        exactRepeatAccepted = selectionDetails and selectionDetails.exactRepeatAccepted == true or false,
-        exactRepeatReason = selectionDetails and selectionDetails.exactRepeatReason or nil,
-        meanPairCohesion = selected.meanPairCohesion,
-        hardClashes = selected.hardClashes,
-        pairCacheHits = pairSnapshot.hits - (work.pairCacheStarted.hits or 0),
-        pairCacheMisses = pairSnapshot.misses - (work.pairCacheStarted.misses or 0),
-        fallbackReason = nil,
-    }
-    local sources = {}
-    for slotKey, candidate in pairs(selected.armorNode.sourceBySlot or {}) do sources[slotKey] = candidate.source end
-    P.lastAnchorSkeletonDiagnostics = {
-        sources = sources,
-        mainSource = selected.mainSource,
-        offSource = selected.offSource,
-        score = selected.score,
-        baseSkeletonScore = selectionDetails and selectionDetails.baseScore or selected.score,
-        adjustedSelectionScore = selectionDetails and selectionDetails.adjustedScore or selected.score,
-        repeatPenalty = selectionDetails and selectionDetails.repeatPenalty or 0,
-        noveltyClass = selectionDetails and selectionDetails.class or nil,
-        comparedComponents = selectionDetails and selectionDetails.comparedComponents or {},
-        changedComponents = selectionDetails and selectionDetails.changedComponents or {},
-        repeatedComponents = selectionDetails and selectionDetails.repeatedComponents or {},
-        exactRepeatAccepted = selectionDetails and selectionDetails.exactRepeatAccepted == true or false,
-        exactRepeatReason = selectionDetails and selectionDetails.exactRepeatReason or nil,
-        meanPairCohesion = selected.meanPairCohesion,
-        hardClashes = selected.hardClashes,
-        chosenRank = chosenRank,
-        shortlistSize = shortlistSize,
-        expansions = work.beamWork.expansions,
-        retained = work.beamWork.retained,
-        weaponBundles = #work.finalists,
-        pairCacheHits = job.anchorStats.pairCacheHits,
-        pairCacheMisses = job.anchorStats.pairCacheMisses,
-        signature = selected.signature,
-        candidates = selectedDiagnostics.candidates,
-        cohesionComponents = selectedDiagnostics.cohesionComponents,
-        strongestBridge = selectedDiagnostics.strongestBridge,
-        weakestRelationship = selectedDiagnostics.weakestRelationship,
-        scoreBreakdown = selectedDiagnostics.scoreBreakdown,
-        poolSizes = work.poolSizes,
-        generatedAt = time and time() or 0,
-    }
-    job.anchorDiagnostics = P.lastAnchorSkeletonDiagnostics
-    return true
+    return P.CommitInitialAnchorSkeleton(job, work)
 end
+
 function P.CreateAnchorSkeletonWork(job)
     return {
         stage = "POOLS",

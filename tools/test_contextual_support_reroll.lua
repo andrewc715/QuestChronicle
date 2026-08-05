@@ -54,7 +54,7 @@ P.EnsurePreviewState=function() return state end
 local originalAnchorCalls=0
 W.RerollSlot=function(slotKey) originalAnchorCalls=originalAnchorCalls+1; if slotKey=="CHEST" then P.SetSelectedSource(state,"CHEST",chestB) end; return true,"anchor rerolled" end
 math.randomseed(1907)
-for _,f in ipairs({"SupportProfileIdentity.lua","SupportProfile.lua","SupportBudget.lua","SupportRoleResolver.lua","SupportScoring.lua","SupportBeam.lua","SupportWorker.lua","SupportRerollLaunch.lua","SupportRerollFoundation.lua", "SupportRerollScheduling.lua","SupportRerollScoring.lua","SupportRerollWorker.lua","SupportRerollLegacy.lua","SupportReroll.lua"}) do dofile("Core/Wardrobe/"..f) end
+for _,f in ipairs({"SupportProfileIdentity.lua","SupportProfile.lua","SupportBudget.lua","SupportRoleResolver.lua","SupportScoring.lua","SupportBeam.lua","SupportWorker.lua","SupportRerollLaunch.lua","SupportRerollFoundation.lua", "SupportRerollScheduling.lua","SupportRerollScoring.lua","SupportRerollFinalValidation.lua","SupportRerollStats.lua","SupportRerollWorker.lua","SupportRerollLegacy.lua","SupportReroll.lua"}) do dofile("Core/Wardrobe/"..f) end
 local before={}; for slot,id in pairs(state.selections) do before[slot]=id end
 local ok,message,asynchronous=W.RerollSlot("WAIST")
 assert(ok and asynchronous and message:find("contextually",1,true),"support reroll should start cooperatively")

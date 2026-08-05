@@ -351,7 +351,7 @@ end
 
 function T.AnalyzeEntries(entries, context)
     local selectedAppearanceCount = #(entries or {})
-    local units = BuildAnalysisUnits(entries or {})
+    local units = T.BuildMismatchAnalysisUnits and T.BuildMismatchAnalysisUnits(entries or {}) or BuildAnalysisUnits(entries or {})
     local anchors = {}
     for _, entry in ipairs(units) do
         local weight = T.ANCHOR_SLOT_WEIGHTS[entry.slotKey]
@@ -373,9 +373,18 @@ function T.AnalyzeEntries(entries, context)
     local mismatchUsed, postalCount, supportedVariationCount = 0, 0, 0
 
     for _, entry in ipairs(units) do
-        local score, components = ProfileCohesion(entry.descriptor, profile)
-        local echo = EchoSupport(entry, units)
-        local classification, points, reason, bridge, bridgeKey = ClassifyMismatch(entry, score, components, echo)
+        local score, components
+        if T.GetTravelerProfileCohesion then score, components = T.GetTravelerProfileCohesion(entry.descriptor, profile)
+        else score, components = ProfileCohesion(entry.descriptor, profile) end
+        local echo
+        if T.GetTravelerEchoSupport then echo = T.GetTravelerEchoSupport(entry, units)
+        else echo = EchoSupport(entry, units) end
+        local classification, points, reason, bridge, bridgeKey
+        if T.ClassifyTravelerMismatch then
+            classification, points, reason, bridge, bridgeKey = T.ClassifyTravelerMismatch(entry, score, components, echo)
+        else
+            classification, points, reason, bridge, bridgeKey = ClassifyMismatch(entry, score, components, echo)
+        end
         entry.profileCohesion = score
         entry.cohesionComponents = components
         entry.echoSupport = echo

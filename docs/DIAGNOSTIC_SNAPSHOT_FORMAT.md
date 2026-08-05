@@ -360,3 +360,30 @@ invalidationReason = "UNKNOWN"             -- only an unclassified fallback
 ```
 
 The active lifecycle cause remains attached to the transient session index so all buckets built during the same cold/partial sequence report the same cause. Warm actions do not inherit that historical label. When `UNKNOWN` is emitted, `invalidationUnknownFallback = true` may also be stored and the completed report receives an `UNKNOWN_WEAPON_INDEX_INVALIDATION` warning.
+
+## Phase D support validation fields in v1.9.0.14
+
+The optional `support` snapshot may include:
+
+```text
+finalValidationStatus
+repairPasses
+repairs
+phaseDInitial
+phaseDFinal
+alternateSkeleton
+```
+
+Each support decision may additionally include:
+
+```text
+finalMismatchClass
+echoSupport
+outlierSeverity
+repairPass
+repaired
+replacedVisualID
+protectedByLock
+```
+
+`phaseDInitial` and `phaseDFinal` are compact aggregate snapshots. They do not contain candidate pools, trial configurations, mutable analysis entries, or transient repair state. Diagnostic format remains 1.

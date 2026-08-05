@@ -1,17 +1,18 @@
-# Quest Chronicle v1.9.0.13
+# Quest Chronicle v1.9.0.14
 
-## Weapon-Index Invalidation Lifecycle
+## Phase D: Outlier Repair
 
-Quest Chronicle now reports the canonical cause of each weapon candidate-index lifecycle transition without carrying an old invalidation label into later warm actions.
+Quest Chronicle now validates the completed Traveler outfit after Phase C support selection and before the visible preview is committed.
 
-- Reports `LOGIN_SESSION_RESET` for the session-only index after reload and preserves it through the cold and partial bucket-build sequence.
-- Reports `NONE` for warm reuse and other actions that did not process a new invalidation.
-- Assigns explicit reasons for automatic login refresh, manual wardrobe-cache replacement, collection revision changes, newly collected appearances, and character capability changes.
-- Infers canonical reasons when the wardrobe-cache identity or character identity changes before an explicit invalidation call.
-- Emits an `UNKNOWN_WEAPON_INDEX_INVALIDATION` warning only when a caller omits the reason or supplies an unrecognized reason.
-- Preserves v1.9.0.12 candidate ordering, selections, scores, weapon routes, cooperative scheduling, phase transitions, and scheduler diagnostics.
-- Keeps SavedVariables schema 2, Courier format 1, wardrobe cache format 7, generation-cache store 2, diagnostic format 1, and weapon-index format 1 unchanged.
+- Enforces the original final-composition gates: a 2.00-point mismatch budget, a strict 0.72 outlier-severity threshold, no more than three dominant palette families, and visible echo for loud accents.
+- Repairs the worst unlocked support outlier through at most two deterministic passes using the already prepared Phase C candidate pools.
+- Rebuilds the exact contextual budget and complete-outfit analysis for every trial replacement without rescanning the wardrobe, repeating eligibility, querying the weapon index, or consuming a new random roll.
+- Preserves locked and hidden appearances. Locked-only violations commit explicitly as `LOCKED_OVERRIDE` rather than being silently replaced.
+- Uses the next valid Phase B finalist only after both support repair passes are exhausted, with one alternate-skeleton attempt inside the original quality window.
+- Applies the same final validator to support-only rerolls while allowing only the requested support slot to change.
+- Adds compact before-and-after diagnostics for mismatch, severity, palette families, zero-echo accents, accepted repairs, locked overrides, and alternate skeleton use.
+- Preserves v1.9.0.13 weapon routes, candidate ordering, Phase B and Phase C scoring, cache formats, scheduler budgets, locks, hidden slots, and atomic preview commits.
 
-The package is automated-validated and requires Retail validation before replacing v1.9.0.12 as the live baseline.
+The package is automated-validated and requires Retail validation before replacing v1.9.0.13 as the live baseline.
 
-Follow `docs/testing/V19013_LIVE_VALIDATION_STEPS.md` for the required Retail validation sequence.
+Follow `docs/testing/V19014_LIVE_VALIDATION_STEPS.md` for the streamlined Retail validation sequence.

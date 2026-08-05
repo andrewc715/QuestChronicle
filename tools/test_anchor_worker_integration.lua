@@ -85,6 +85,7 @@ dofile("Core/Wardrobe/AnchorSkeletonCache.lua")
 dofile("Core/Wardrobe/AnchorSkeletonNovelty.lua")
 dofile("Core/Wardrobe/AnchorSkeletonSearch.lua")
 dofile("Core/Wardrobe/AnchorSkeletonWorker.lua")
+dofile("Core/Wardrobe/AnchorSkeletonApply.lua")
 
 local draft = {
     selections = {}, selectionVisuals = {}, locks = {}, hidden = {},

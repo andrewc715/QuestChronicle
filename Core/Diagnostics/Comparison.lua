@@ -137,7 +137,14 @@ function P.AttachWarningsAndComparison(report)
     end
     local support = report.support
     if support and (tonumber(support.overrun) or 0) > 0 then AddWarning(report, "SUPPORT_BUDGET_OVERRUN", "WARNING", string.format("Contextual support exceeded its mismatch budget by %.2f points.", tonumber(support.overrun) or 0)) end
-    if support and (tonumber(support.outliers) or 0) > 0 then AddWarning(report, "SUPPORT_OUTLIER", "WARNING", string.format("Contextual support retained %d visual outlier%s.", support.outliers, support.outliers == 1 and "" or "s")) end
+    if support and support.finalValidationStatus == "REPAIRED" then
+        AddWarning(report, "SUPPORT_REPAIR_APPLIED", "INFO", string.format("Final validation repaired %d contextual support outlier%s.", tonumber(support.repairPasses) or 0, tonumber(support.repairPasses) == 1 and "" or "s"))
+    elseif support and support.finalValidationStatus == "LOCKED_OVERRIDE" then
+        AddWarning(report, "SUPPORT_LOCKED_OVERRIDE", "INFO", "Final validation preserved user-locked visual mismatch.")
+    elseif support and support.finalValidationStatus == "ALTERNATE_SKELETON" then
+        AddWarning(report, "SUPPORT_ALTERNATE_SKELETON", "INFO", "Final validation used the next valid anchor skeleton after support repair was exhausted.")
+    end
+    if support and (tonumber(support.outliers) or 0) > 0 then AddWarning(report, "SUPPORT_OUTLIER", "WARNING", string.format("Contextual support retained %d unresolved visual outlier%s after final validation.", support.outliers, support.outliers == 1 and "" or "s")) end
     if support and (tonumber(support.fallbackSlots) or 0) > 0 then AddWarning(report, "SUPPORT_FALLBACK", "INFO", string.format("Contextual support used %d slot-local fallback%s.", support.fallbackSlots, support.fallbackSlots == 1 and "" or "s")) end
     if support and (tonumber(support.emptySlots) or 0) > 0 then AddWarning(report, "SUPPORT_EMPTY_SLOT", "INFO", string.format("Contextual support left %d active slot%s empty because no legal appearance was available.", support.emptySlots, support.emptySlots == 1 and "" or "s")) end
     if support and support.profileRepaired then AddWarning(report, "PROFILE_REPAIRED", "INFO", "Quest Chronicle repaired an inherited contextual profile before scoring this support reroll: " .. tostring(support.profileRepairReason or "profile mismatch")) end

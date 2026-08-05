@@ -229,13 +229,24 @@ function P.ScoreWeaponBundleForAnchor(node, draft, styleMode, styleContext)
     }
 end
 
-function P.ChooseAnchorSkeleton(finalists, options)
-    if not finalists or #finalists == 0 then return nil end
-    if type(options) ~= "table" then
-        options = { previousSignature = options }
+local function AnchorSelectionDetails(choice, qualitySize, classSize, chosenClass)
+    local selection = choice.novelty or {}
+    selection.baseScore = tonumber(choice.entry.score) or 0
+    selection.adjustedScore = tonumber(choice.adjustedScore) or selection.baseScore
+    selection.repeatPenalty = tonumber(selection.repeatPenalty) or 0
+    selection.qualityShortlistSize = qualitySize
+    selection.noveltyClassSize = classSize
+    if chosenClass == "EXACT_REPEAT" then
+        selection.exactRepeatAccepted = true
+        selection.exactRepeatReason = "No meaningfully new or partial-change skeleton remained inside the quality window."
     end
-    table.sort(finalists, function(left, right) return (left.score or 0) > (right.score or 0) end)
+    return selection
+end
 
+function P.BuildAnchorSkeletonChoices(finalists, options)
+    if not finalists or #finalists == 0 then return {}, {}, nil end
+    if type(options) ~= "table" then options = { previousSignature = options } end
+    table.sort(finalists, function(left, right) return (left.score or 0) > (right.score or 0) end)
     local quality = {}
     local bestScore = tonumber(finalists[1].score) or 0
     for index = 1, math.min(P.ANCHOR_FINAL_SHORTLIST, #finalists) do
@@ -246,11 +257,8 @@ function P.ChooseAnchorSkeleton(finalists, options)
             novelty = P.EvaluateAnchorNovelty(entry, options.noveltyContext)
         else
             novelty = {
-                class = nil,
-                classPriority = 0,
-                baseScore = tonumber(entry.score) or 0,
-                adjustedScore = tonumber(entry.score) or 0,
-                repeatPenalty = 0,
+                class = nil, classPriority = 0, baseScore = tonumber(entry.score) or 0,
+                adjustedScore = tonumber(entry.score) or 0, repeatPenalty = 0,
                 comparedComponents = {}, changedComponents = {}, repeatedComponents = {},
                 comparedCount = 0, changedCount = 0, repeatedCount = 0,
             }
@@ -259,21 +267,12 @@ function P.ChooseAnchorSkeleton(finalists, options)
                 novelty.repeatPenalty = -35
             end
         end
-        quality[#quality + 1] = {
-            entry = entry,
-            baseRank = index,
-            adjustedScore = novelty.adjustedScore,
-            novelty = novelty,
-        }
+        quality[#quality + 1] = { entry = entry, baseRank = index, adjustedScore = novelty.adjustedScore, novelty = novelty }
     end
-
-    local choices = quality
-    local chosenClass
+    local choices, chosenClass = quality, nil
     if options.action == "GENERATE_OUTFIT" and options.noveltyContext and options.noveltyContext.available then
         local bestPriority = -math.huge
-        for _, choice in ipairs(quality) do
-            bestPriority = math.max(bestPriority, tonumber(choice.novelty.classPriority) or 0)
-        end
+        for _, choice in ipairs(quality) do bestPriority = math.max(bestPriority, tonumber(choice.novelty.classPriority) or 0) end
         choices = {}
         for _, choice in ipairs(quality) do
             if (tonumber(choice.novelty.classPriority) or 0) == bestPriority then
@@ -282,9 +281,14 @@ function P.ChooseAnchorSkeleton(finalists, options)
             end
         end
     end
+    return quality, choices, chosenClass
+end
 
+function P.ChooseAnchorSkeleton(finalists, options)
+    local quality, choices, chosenClass = P.BuildAnchorSkeletonChoices(finalists, options)
+    if #choices == 0 then return nil end
     local minimum = tonumber(choices[#choices].adjustedScore) or 0
-    if options.action == "GENERATE_OUTFIT" and options.noveltyContext and options.noveltyContext.available then
+    if type(options) == "table" and options.action == "GENERATE_OUTFIT" and options.noveltyContext and options.noveltyContext.available then
         minimum = math.huge
         for _, choice in ipairs(choices) do minimum = math.min(minimum, tonumber(choice.adjustedScore) or 0) end
     end
@@ -299,18 +303,28 @@ function P.ChooseAnchorSkeleton(finalists, options)
         roll = roll - choice.weight
         if roll <= 0 then selectedChoice = choice break end
     end
+    return selectedChoice.entry, selectedChoice.baseRank, #quality,
+        AnchorSelectionDetails(selectedChoice, #quality, #choices, chosenClass)
+end
 
-    local selection = selectedChoice.novelty or {}
-    selection.baseScore = tonumber(selectedChoice.entry.score) or 0
-    selection.adjustedScore = tonumber(selectedChoice.adjustedScore) or selection.baseScore
-    selection.repeatPenalty = tonumber(selection.repeatPenalty) or 0
-    selection.qualityShortlistSize = #quality
-    selection.noveltyClassSize = #choices
-    if chosenClass == "EXACT_REPEAT" then
-        selection.exactRepeatAccepted = true
-        selection.exactRepeatReason = "No meaningfully new or partial-change skeleton remained inside the quality window."
+function P.GetNextAnchorSkeleton(finalists, options, excludedSignatures)
+    local quality, choices, chosenClass = P.BuildAnchorSkeletonChoices(finalists, options)
+    local visited = {}
+    local function Find(pool, classLabel)
+        for _, choice in ipairs(pool or {}) do
+            local signature = choice.entry and choice.entry.signature
+            if signature and not visited[signature] then
+                visited[signature] = true
+                if not (excludedSignatures and excludedSignatures[signature]) then
+                    return choice.entry, choice.baseRank, #quality,
+                        AnchorSelectionDetails(choice, #quality, #choices, classLabel or choice.novelty.class)
+                end
+            end
+        end
     end
-    return selectedChoice.entry, selectedChoice.baseRank, #quality, selection
+    local selected, rank, shortlist, details = Find(choices, chosenClass)
+    if selected then return selected, rank, shortlist, details end
+    return Find(quality, nil)
 end
 
 function Wardrobe.GetLastAnchorSkeletonDiagnostics()

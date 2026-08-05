@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0.13 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.9.0.14 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -360,3 +360,16 @@ The support-reroll worker no longer builds one diagnostic foundation. It materia
 Every production invalidation entrypoint supplies a canonical reason. Automatic login scans retain `LOGIN_SESSION_RESET`, manual scan replacement uses `WARDROBE_CACHE_REPLACED`, collection events use `COLLECTION_REVISION_CHANGED` or `APPEARANCE_COLLECTED`, and equipment, specialization, talent, or character changes use `CHARACTER_CAPABILITY_CHANGED`. Identity mismatches detected inside the index infer the same canonical causes. Missing or unrecognized reasons alone fall back to `UNKNOWN`.
 
 The change is diagnostic-only. Bucket membership, source ordering, route evaluation, eligibility, scoring, selection, worker scheduling, and atomic commit behavior remain unchanged.
+## v1.9.0.14 Phase D final validation and outlier repair
+
+`Core/ZoneStyle/Traveler/MismatchAnalysis.lua` is the shared calibrated mismatch authority for both Traveler instrumentation and runtime final validation. It owns profile cohesion, echo support, bridge support, final mismatch classification, dominant palette identification, and the accepted outlier-severity formula. Extracting these helpers does not change the Phase A calibration.
+
+`Core/Wardrobe/SupportFinalValidation.lua` evaluates the completed support configuration after Phase C chooses its finalist. It combines active anchors and selected support, applies the 2.00-point final mismatch budget, strict 0.72 severity threshold, three-palette-family limit, and loud zero-echo rule, and emits an immutable validation objective. Locked entries participate in the analysis but are never repairable.
+
+`Core/Wardrobe/SupportRepair.lua` is a bounded deterministic state machine. It selects the worst unlocked support outlier, reuses that slot's prepared Phase C pool, excludes the failed appearance, rebuilds the exact support ledger for every transient substitution, and accepts only a strictly improving replacement. It allows at most two support repair passes and consumes no random values.
+
+When both repair passes are exhausted, `AnchorSkeletonApply.lua` restores the pre-support draft and applies one unused Phase B finalist inside the original quality window. Phase C then derives a new immutable profile and refills support once. A still-invalid alternate fails atomically without invoking the legacy independent armor generator.
+
+`SupportRerollFinalValidation.lua` applies the same completed-outfit validator to support-only rerolls while keeping every non-target slot fixed. `SupportRerollStats.lua` and the Diagnostics modules persist only compact aggregate validation and repair results. Candidate pools, trial configurations, and mutable analysis entries remain transient.
+
+Phase D uses the established cooperative scheduler and adds resumable phases for final validation, target selection, candidate evaluation, repair application, revalidation, and alternate preparation. Cache formats, Courier format, weapon-index format, generation-cache format, and diagnostic format remain unchanged.

@@ -13,6 +13,7 @@ toc = (ROOT / "QuestChronicle.toc").read_text(encoding="utf-8")
 novelty = (ROOT / "Core/Wardrobe/AnchorSkeletonNovelty.lua").read_text(encoding="utf-8")
 search = (ROOT / "Core/Wardrobe/AnchorSkeletonSearch.lua").read_text(encoding="utf-8")
 worker = (ROOT / "Core/Wardrobe/AnchorSkeletonWorker.lua").read_text(encoding="utf-8")
+apply = (ROOT / "Core/Wardrobe/AnchorSkeletonApply.lua").read_text(encoding="utf-8")
 snapshot = (ROOT / "Core/Diagnostics/SnapshotBuilder.lua").read_text(encoding="utf-8")
 comparison = (ROOT / "Core/Diagnostics/Comparison.lua").read_text(encoding="utf-8")
 formatter = (ROOT / "Core/Diagnostics/ReportFormatter.lua").read_text(encoding="utf-8")
@@ -51,8 +52,8 @@ for token in (
     "repeatPenalty",
     "noveltyClass",
 ):
-    if token not in worker:
-        fail(f"worker does not preserve novelty diagnostics: {token}")
+    if token not in worker and token not in apply:
+        fail(f"anchor apply pipeline does not preserve novelty diagnostics: {token}")
 
 for token in ('return "Main Hand"', "longestWorkerSliceMs", "largestInstrumentedCallMs"):
     if token not in snapshot: fail(f"snapshot correction missing: {token}")

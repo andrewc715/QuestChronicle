@@ -79,7 +79,9 @@ for index, slotKey in ipairs(WP.SUPPORT_SLOT_ORDER) do
         profileFit = 0.812, neighborCohesion = 0.784, bridgeBonus = 5.25,
         bridgeTarget = "Chest ↔ Legs", bridgeBefore = 0.51, bridgeAfter = 0.73,
         mismatchSpent = 0.74, budgetState = "WITHIN", outlierState = "NORMAL",
-        repeatPenalty = 0, score = 42.5,
+        repeatPenalty = 0, score = 42.5, finalMismatchClass = "SUPPORTED VARIATION",
+        echoSupport = 0.72, outlierSeverity = 0.41, repaired = index <= 2, repairPass = index <= 2 and index or nil,
+        replacedVisualID = index <= 2 and 9000 + index or nil, protectedByLock = false,
     }
 end
 local stats = {
@@ -97,6 +99,13 @@ local stats = {
     profileReused = true, profileRepaired = false, profileMigrated = false,
     profileBasisConsistent = true, fixedContextCost = 5.65, profileAdjustment = 0,
     expectedBudgetAfter = 5.92, budgetReconciled = true,
+    finalValidationStatus = "REPAIRED", repairPasses = 2, alternateSkeleton = false,
+    phaseDInitial = { status = "REPAIR_REQUIRED", mismatchBudget = 2, mismatchUsed = 2.84, maximumSeverity = 0.81, severityThreshold = 0.72, paletteFamilies = 4, paletteLimit = 3, repairableZeroEcho = 1, repairableOutliers = 2, protectedLockedViolations = 0 },
+    phaseDFinal = { status = "CLEAN", mismatchBudget = 2, mismatchUsed = 1.74, maximumSeverity = 0.54, severityThreshold = 0.72, paletteFamilies = 3, paletteLimit = 3, repairableZeroEcho = 0, repairableOutliers = 0, protectedLockedViolations = 0 },
+    repairs = {
+        { pass = 1, slotKey = "BACK", previousName = string.rep("Loud Postal Cape ", 3), replacementName = string.rep("Weathered Chain Cloak ", 3), trigger = "zero-echo loud accent", mismatchBefore = 2.84, mismatchAfter = 2.10, severityBefore = 0.81, severityAfter = 0.43, paletteBefore = 4, paletteAfter = 3, cohesionBefore = 0.61, cohesionAfter = 0.65 },
+        { pass = 2, slotKey = "HEAD", previousName = string.rep("Ornate Postal Crown ", 3), replacementName = string.rep("Frontier Plate Helm ", 3), trigger = "outlier severity", mismatchBefore = 2.10, mismatchAfter = 1.74, severityBefore = 0.76, severityAfter = 0.54, paletteBefore = 3, paletteAfter = 3, cohesionBefore = 0.65, cohesionAfter = 0.68 },
+    },
 }
 for _, slotKey in ipairs(WP.SUPPORT_SLOT_ORDER) do
     stats.poolSizes[slotKey], stats.expansions[slotKey], stats.retained[slotKey] = 32, 768, 24
@@ -117,4 +126,5 @@ local report = D.AddReport({
 assert(report, "maximum-detail support snapshot should be accepted")
 assert((report.approximateBytes or 0) < D.MAX_REPORT_BYTES,
     string.format("maximum-detail persisted Phase C snapshot exceeds 20 KB: %d", report.approximateBytes or 0))
-print(string.format("PASS v1.9.0.9 persisted support snapshot size: %d bytes, %d profile entries, %d decisions", report.approximateBytes or 0, #snapshot.profile.entries, #snapshot.decisions))
+assert(snapshot.finalValidationStatus == "REPAIRED" and #snapshot.repairs == 2, "Phase D snapshot fields were not retained")
+print(string.format("PASS Phase D persisted support snapshot size: %d bytes, %d profile entries, %d decisions, %d repairs", report.approximateBytes or 0, #snapshot.profile.entries, #snapshot.decisions, #snapshot.repairs))

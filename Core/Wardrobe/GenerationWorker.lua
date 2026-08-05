@@ -92,6 +92,13 @@ local function BuildGenerationMessage(job, generatedName, weaponCount, weaponNot
     end
     if job.supportStats then
         message = message .. string.format(" Contextual support cohesion %.3f used %.2f of %.2f mismatch points.", job.supportStats.wholeOutfitCohesion or 0, (job.supportStats.lockedCommitment or 0) + (job.supportStats.generatedSpend or 0), job.supportStats.startingBudget or 0)
+        if job.supportStats.finalValidationStatus == "REPAIRED" then
+            message = message .. string.format(" Final validation repaired %d support outlier%s.", job.supportStats.repairPasses or 0, (job.supportStats.repairPasses or 0) == 1 and "" or "s")
+        elseif job.supportStats.finalValidationStatus == "LOCKED_OVERRIDE" then
+            message = message .. " Final validation preserved user-locked mismatch."
+        elseif job.supportStats.finalValidationStatus == "ALTERNATE_SKELETON" then
+            message = message .. " Final validation used the next valid anchor skeleton after support repair was exhausted."
+        end
     elseif job.supportFallbackReason then message = message .. " Contextual support used the legacy fallback: " .. tostring(job.supportFallbackReason) .. "." end
     if weaponNotice then message = message .. " " .. weaponNotice end
     if styleEngine then
@@ -330,8 +337,28 @@ function P.StepGenerationJob(token)
     end
     if job.phase == "SUPPORT" then
         local status, reason = P.StepSupportGenerationJob(job, stepStarted)
-        if status == "READY" then job.phase = "COMMIT"
-        elseif status == "FALLBACK" then job.supportFallbackReason = reason job.phase = "ARMOR" job.armorOrder = P.SUPPORTING_ARMOR_GENERATION_ORDER job.armorIndex, job.armorWork = 1, nil end
+        if status == "READY" then
+            job.phase = "COMMIT"
+        elseif status == "ALTERNATE" then
+            local started = NowMilliseconds()
+            local ok, alternateReason = P.ApplyNextAnchorSkeleton and P.ApplyNextAnchorSkeleton(job)
+            RecordPhase(job, "supportAlternateSkeleton", started)
+            if not ok then
+                FinishJob(job, false, alternateReason or reason or "No alternate anchor skeleton could resolve the final support outliers.")
+                return
+            end
+            job.phaseDAlternateNoRepair = true
+            job.supportWork = nil
+            job.phase = "SUPPORT"
+        elseif status == "FAILED" then
+            FinishJob(job, false, reason or "Final support validation failed; the preview was left unchanged.")
+            return
+        elseif status == "FALLBACK" then
+            job.supportFallbackReason = reason
+            job.phase = "ARMOR"
+            job.armorOrder = P.SUPPORTING_ARMOR_GENERATION_ORDER
+            job.armorIndex, job.armorWork = 1, nil
+        end
         job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
         if P.AccumulateGenerationSliceDiagnostics then P.AccumulateGenerationSliceDiagnostics(job) end
         if not ScheduleNextStep(token) then FinishJob(job, false, "Quest Chronicle could not schedule the cooperative outfit generator. Try /reload.") end
@@ -443,6 +470,7 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
         phase = "SETUP", setupPhase = "IDENTITY",
         anchorWork = nil, anchorStats = nil, anchorFallbackReason = nil, weaponsPrepared = false,
         supportWork = nil, supportStats = nil, supportFallbackReason = nil, armorWork = nil,
+        phaseDAlternateNoRepair = false, phaseDAlternateInfo = nil,
         selectedArmor = 0, candidatesProcessed = 0, eraCandidatesProcessed = 0,
         eraCacheHits = 0, eligibilityCacheHits = 0, weaponYields = 0,
         steps = 0, maxStepMs = 0, phaseStats = {}, startedAtMs = startedAtMs,

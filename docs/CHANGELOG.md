@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.9.0.14 - 2026-08-04
+
+### Traveler Phase D
+
+- Added completed-outfit validation after Phase C support selection and before atomic preview commit.
+- Added the original 2.00 mismatch, 0.72 severity, three-palette-family, and loud-accent echo gates.
+- Added deterministic one-pass and two-pass repair using existing Phase C candidate pools.
+- Added locked-only override handling and one bounded alternate Phase B skeleton after support repair exhaustion.
+- Added target-isolated final validation for support-only rerolls.
+
+### Diagnostics and scheduling
+
+- Added compact before-and-after Phase D snapshots, repair records, locked-override state, and alternate-skeleton reporting.
+- Added cooperative timing phases for final validation, repair targeting, candidate evaluation, both repair passes, revalidation, and alternate preparation.
+- Preserved the shared 5.5 ms preferred budget, 7.5 ms soft ceiling, 2.0 ms expensive-call yield threshold, and zero post-expensive-continuation requirement.
+
+### Preserved
+
+- Preserved v1.9.0.13 clean-path selections, scores, routes, locks, hidden slots, cache formats, diagnostic format, and atomic commit behavior.
+
 ## 1.9.0.13 - 2026-08-03
 
 ### Diagnostics

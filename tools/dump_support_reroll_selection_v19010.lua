@@ -48,7 +48,7 @@ local function exists(path) local f = io.open(path, "rb"); if f then f:close(); 
 if exists(root .. "/Core/Wardrobe/SupportRoleResolver.lua") then files[#files + 1] = "SupportRoleResolver.lua" end
 for _, f in ipairs({ "SupportScoring.lua", "SupportBeam.lua", "SupportWorker.lua" }) do files[#files + 1] = f end
 if exists(root .. "/Core/Wardrobe/SupportRerollLaunch.lua") then files[#files + 1] = "SupportRerollLaunch.lua" end
-for _, f in ipairs({ "SupportRerollFoundation.lua", "SupportRerollScheduling.lua", "SupportRerollScoring.lua", "SupportRerollWorker.lua", "SupportRerollLegacy.lua", "SupportReroll.lua" }) do files[#files + 1] = f end
+for _, f in ipairs({ "SupportRerollFoundation.lua", "SupportRerollScheduling.lua", "SupportRerollScoring.lua", "SupportRerollFinalValidation.lua", "SupportRerollStats.lua", "SupportRerollWorker.lua", "SupportRerollLegacy.lua", "SupportReroll.lua" }) do files[#files + 1] = f end
 for _, f in ipairs(files) do dofile(root .. "/Core/Wardrobe/" .. f) end
 clock = 0; function P.GenerationNowMilliseconds() clock = clock + .04 return clock end
 math.randomseed(19010)

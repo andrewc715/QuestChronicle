@@ -82,7 +82,7 @@ W.RerollSlot = function() return true, "anchor" end
 math.randomseed(198)
 for _, file in ipairs({
     "GenerationPerformance.lua", "SupportProfileIdentity.lua", "SupportProfile.lua", "SupportBudget.lua", "SupportRoleResolver.lua", "SupportScoring.lua", "SupportBeam.lua", "SupportWorker.lua",
-    "SupportRerollLaunch.lua", "SupportRerollFoundation.lua", "SupportRerollScheduling.lua", "SupportRerollScoring.lua", "SupportRerollWorker.lua", "SupportRerollLegacy.lua", "SupportReroll.lua",
+    "SupportRerollLaunch.lua", "SupportRerollFoundation.lua", "SupportRerollScheduling.lua", "SupportRerollScoring.lua", "SupportRerollFinalValidation.lua", "SupportRerollStats.lua", "SupportRerollWorker.lua", "SupportRerollLegacy.lua", "SupportReroll.lua",
 }) do dofile("Core/Wardrobe/" .. file) end
 clock = 0
 function P.GenerationNowMilliseconds() clock = clock + 0.04 return clock end
