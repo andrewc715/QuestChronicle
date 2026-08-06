@@ -20,7 +20,7 @@ QuestChronicleDB.debug = {
 }
 ```
 
-The store retains at most ten reports. Each report is limited to 20 KB and the approximate combined history is limited to 200 KB. Oversized valid reports are compacted before persistence by removing duplicated raw fields while preserving the formatted report, selected identities, reusable support profile, Phase D result, warnings, and headline timing. Only reports that remain oversized after compaction, or are otherwise invalid or incompatible, are discarded.
+The store retains at most ten reports. Each report is limited to 20 KB and the approximate combined history is limited to 200 KB. Oversized valid reports are compacted before persistence by removing duplicated raw fields while preserving the formatted report, selected identities, reusable support profile, Phase D result, warnings, and headline timing. Zone reports preserve one authoritative `zoneFoundation.anchorPolicy` summary while discarding duplicated component-level policy calculations and persisted per-piece affinity detail only when required by the ceiling. Only reports that remain oversized after compaction, or are otherwise invalid or incompatible, are discarded. Runtime rejection prints a visible warning and emits `DIAGNOSTIC_REPORT_REJECTED`.
 
 ## Report identity
 
@@ -404,3 +404,29 @@ Diagnostic format 1 remains unchanged. New Zone Native reports may add Zone affi
 Each component status is `VALUE`, `MISSING`, or `NOT_APPLICABLE`. Not-applicable channels contribute no affinity score weight, confidence weight, or missing-channel warning. Retained format-1 reports remain readable through display-time normalization and are not migrated in place.
 
 Zone debug export format 2 serializes arbitrary dynamic values with `DIAGNOSTIC_ESCAPE_V1`. Literal pipes use `\u007C`; literal backticks use `\u0060`; backslashes and line breaks use deterministic escaped representations. Markdown structure remains formatter-owned and readable.
+## v1.11.4 Zone policy-aware compaction
+
+Diagnostic format 1 is unchanged. v1.11.4 changes only the compaction contract for oversized Zone reports:
+
+```text
+Preserved
+- report identity and ancestry
+- selected skeleton sources
+- authoritative zoneFoundation.anchorPolicy summary
+- selected Zone adjustments and candidate-pool summaries
+- visual and Zone pair channels
+- legal weapon route and linked-visual deduplication
+- reusable support profile entries
+- completed-outfit validation and repair result
+- warnings and headline performance
+
+Removed only when required
+- outfit.slots duplicate
+- profile.activeAnchors display duplicate
+- per-component anchorPolicy calculation duplicate
+- zoneFoundation.affinity.pieces detail duplicate
+- verbose score reasons and raw timing ledgers at later stages
+```
+
+The complete current-look Zone affinity dossier remains available through `/qc zone debug export`, which rebuilds it from the live preview rather than relying on the compacted persisted report.
+

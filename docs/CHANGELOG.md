@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.4 - 2026-08-06
+
+- Repaired oversized Zone anchor-policy report persistence.
+- Added policy-aware compaction that preserves the authoritative Zone summary while removing duplicated component calculations.
+- Preserved aggregate Zone affinity while trimming per-piece affinity detail only when required by the persistence ceiling.
+- Added visible chat and callback reporting for any future diagnostic persistence rejection.
+- Added realistic near-limit Zone report and rejection-visibility regression coverage.
+
 ## 1.11.3 - 2026-08-06
 
 ### Zone Anchor Policy v1

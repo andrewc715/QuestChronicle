@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the v1.11.3 diagnostics workbench wiring and read-only boundaries."""
+"""Verify the v1.11.4 diagnostics workbench wiring and read-only boundaries."""
 from pathlib import Path
 import sys
 
@@ -16,9 +16,9 @@ debug_tab = (ROOT / "UI/DebugTab.lua").read_text(encoding="utf-8")
 tooltip = (ROOT / "UI/Outfits/ConceptManager.lua").read_text(encoding="utf-8")
 
 checks = {
-    "version is v1.11.3": version == "1.11.3" and "## Version: 1.11.3" in toc,
+    "version is v1.11.4": version == "1.11.4" and "## Version: 1.11.4" in toc,
     "all diagnostics modules load": all(name in toc for name in (
-        "Core\\Diagnostics\\Foundation.lua", "Core\\Diagnostics\\History.lua",
+        "Core\\Diagnostics\\Foundation.lua", "Core\\Diagnostics\\ReportCompaction.lua", "Core\\Diagnostics\\History.lua",
         "Core\\Diagnostics\\SnapshotBuilder.lua", "Core\\Diagnostics\\ReportFormatter.lua",
         "UI\\DebugHistory.lua", "UI\\DebugReport.lua", "UI\\DebugTab.lua")),
     "debug is a top-level tab": 'key = "debug"' in main and "UI.CreateDebugTab" in main,

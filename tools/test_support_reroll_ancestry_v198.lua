@@ -26,7 +26,7 @@ local state = {
 }
 WP.EnsurePreviewState = function() return state end
 
-for _, file in ipairs({ "Foundation.lua", "AnchorAncestry.lua", "History.lua", "SupportComparison.lua", "SupportSnapshot.lua", "Comparison.lua", "SnapshotBuilder.lua" }) do dofile("Core/Diagnostics/" .. file) end
+for _, file in ipairs({ "Foundation.lua", "ReportCompaction.lua", "AnchorAncestry.lua", "History.lua", "SupportComparison.lua", "SupportSnapshot.lua", "Comparison.lua", "SnapshotBuilder.lua" }) do dofile("Core/Diagnostics/" .. file) end
 
 local skeleton = {
     chosenRank = 1, shortlistSize = 4, score = 135.7, baseSkeletonScore = 135.7,

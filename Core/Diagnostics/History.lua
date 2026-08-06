@@ -3,117 +3,20 @@ local D = QC.Diagnostics
 local P = D._Private
 
 local function ApproximateBytes(report)
-    if type(report) ~= "table" then return 0 end
-    if QC._Core and QC._Core.JsonEncode then
-        local ok, encoded = pcall(QC._Core.JsonEncode, report)
-        if ok and type(encoded) == "string" then return #encoded end
-    end
-    local total = 0
-    local function Count(value, depth, seen)
-        if depth <= 0 then return end
-        local valueType = type(value)
-        if valueType == "string" then total = total + #value + 4
-        elseif valueType == "number" or valueType == "boolean" then total = total + 16
-        elseif valueType == "table" then
-            if seen[value] then return end
-            seen[value] = true
-            for key, child in pairs(value) do
-                total = total + #tostring(key) + 4
-                Count(child, depth - 1, seen)
-                if total > D.MAX_REPORT_BYTES * 2 then break end
-            end
-            seen[value] = nil
-        end
-    end
-    Count(report, 10, {})
-    return total
-end
-
-
-local function AddTrimWarning(report, originalBytes)
-    report.warnings = type(report.warnings) == "table" and report.warnings or {}
-    for _, warning in ipairs(report.warnings) do
-        if warning.key == "REPORT_TRIMMED" then return end
-    end
-    report.warnings[#report.warnings + 1] = {
-        key = "REPORT_TRIMMED", severity = "WARNING",
-        text = string.format(
-            "Diagnostic details exceeded the %d-byte persistence limit and duplicate raw fields were compacted (originally about %d bytes).",
-            tonumber(D.MAX_REPORT_BYTES) or 0, tonumber(originalBytes) or 0
-        ),
-    }
-end
-
-local function RemoveZeroEntries(values)
-    if type(values) ~= "table" then return end
-    for key, value in pairs(values) do
-        if tonumber(value) == 0 then values[key] = nil end
-    end
+    assert(P.ApproximateReportBytes, "Diagnostic report compaction module is unavailable.")
+    return P.ApproximateReportBytes(report)
 end
 
 local function CompactReportToLimit(report)
-    local originalBytes = ApproximateBytes(report)
-    if originalBytes <= D.MAX_REPORT_BYTES then return originalBytes, false end
+    assert(P.CompactReportToLimit, "Diagnostic report compaction module is unavailable.")
+    return P.CompactReportToLimit(report)
+end
 
-    AddTrimWarning(report, originalBytes)
-
-    -- The outfit slot list duplicates the anchor components and contextual-support
-    -- decisions that power formatting, comparisons, and reroll ancestry.
-    if type(report.outfit) == "table" then report.outfit.slots = nil end
-
-    local support = type(report.support) == "table" and report.support or nil
-    local profile = support and type(support.profile) == "table" and support.profile or nil
-    if profile then
-        -- `entries` is the canonical reusable anchor profile. `activeAnchors` is a
-        -- display-only duplicate and can be reconstructed by the formatter.
-        profile.activeAnchors = nil
-        profile.strongestRelationship = nil
-        if type(profile.descriptor) == "table" then
-            -- Set identifiers are not used to restore or score the aggregate profile.
-            profile.descriptor.setIDs = nil
-        end
-    end
-
-    if support then
-        for _, decision in ipairs(support.decisions or {}) do
-            -- Item IDs are optional raw-detail metadata; source and visual IDs remain.
-            decision.itemID = nil
-        end
-    end
-
-    if type(report.cache) == "table" then RemoveZeroEntries(report.cache.invalidationReasons) end
-
-    local bytes = ApproximateBytes(report)
-    if bytes <= D.MAX_REPORT_BYTES then return bytes, true end
-
-    -- Preserve the user-facing score ledger and Phase D result before trimming
-    -- lower-value duplicated/raw diagnostic payloads.
-    if type(report.skeleton) == "table" then
-        for _, component in ipairs(report.skeleton.components or {}) do
-            component.scoreReasons = nil
-            if type(component.anchorPolicy) == "table" then
-                component.anchorPolicy.reasons = nil
-                component.anchorPolicy.rawAdjustment = nil
-                component.anchorPolicy.boundedAdjustment = nil
-                component.anchorPolicy.confidenceFactor = nil
-            end
-        end
-    end
-    bytes = ApproximateBytes(report)
-    if bytes <= D.MAX_REPORT_BYTES then return bytes, true end
-
-    -- Last-resort compaction keeps the complete report summary, selected sources,
-    -- Phase D validation, warnings, and headline performance instead of silently
-    -- deleting the report from Debug History.
-    if type(report.performance) == "table" then report.performance.phaseStats = nil end
-    bytes = ApproximateBytes(report)
-    if bytes <= D.MAX_REPORT_BYTES then return bytes, true end
-
-    if type(report.cache) == "table" then
-        report.cache.invalidationReasons = nil
-    end
-    bytes = ApproximateBytes(report)
-    return bytes, true
+local function NotifyPersistenceFailure(message, report)
+    local text = "Debug report could not be saved: " .. tostring(message or "Unknown persistence failure.")
+    if QC.Print then QC.Print(text)
+    elseif DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then DEFAULT_CHAT_FRAME:AddMessage("Quest Chronicle: " .. text) end
+    P.Notify("DIAGNOSTIC_REPORT_REJECTED", text, report)
 end
 
 local function IsValidReport(report)
@@ -266,8 +169,10 @@ end
 function D.AddReport(report)
     local store = P.EnsureStore()
     if type(report) ~= "table" then
+        local message = "Diagnostic report was empty."
         store.counters.malformedReportsDiscarded = store.counters.malformedReportsDiscarded + 1
-        return nil, "Diagnostic report was empty."
+        NotifyPersistenceFailure(message, report)
+        return nil, message
     end
     report.formatVersion = D.FORMAT_VERSION
     if not report.sequence then
@@ -286,8 +191,10 @@ function D.AddReport(report)
     end
     report.approximateBytes = CompactReportToLimit(report)
     if report.approximateBytes > D.MAX_REPORT_BYTES then
+        local message = "Diagnostic report remained above the persistence limit after compaction."
         store.counters.malformedReportsDiscarded = store.counters.malformedReportsDiscarded + 1
-        return nil, "Diagnostic report remained above the persistence limit after compaction."
+        NotifyPersistenceFailure(message, report)
+        return nil, message
     end
     table.insert(store.reports, 1, report)
     store.counters.reportsRecorded = store.counters.reportsRecorded + 1

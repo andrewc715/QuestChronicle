@@ -263,7 +263,7 @@ local function AddZoneAnchorPolicy(lines, report)
     Add(lines, "")
     local policy = report and report.zoneFoundation and report.zoneFoundation.anchorPolicy
     if type(policy) ~= "table" or not policy.policyID then
-        Add(lines, "No v1.11.3 Zone anchor-policy report is currently available.")
+        Add(lines, "No current Zone anchor-policy report is available.")
         Add(lines, "")
         return
     end
