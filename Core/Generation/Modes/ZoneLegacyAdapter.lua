@@ -14,7 +14,8 @@ local policy = Generation._Private.CreateLegacyWardrobePolicy({
         rerollSupportSlot = true, cancel = true,
         sharedFramework = false, legacy = true,
         zoneContextFormat = 1, zoneEvidence = true, zoneAffinityDiagnostics = true,
-        zoneAnchorPolicy = false, zoneSupportPolicy = false,
+        zoneAnchorPolicy = true, zoneAnchorPolicyVersion = 1,
+        zoneAnchorAuthority = "ACTIVE", zoneSupportPolicy = false,
         zoneFinalValidation = false, zoneTuningAudit = false,
         zoneFoundation = "CONTEXT_EVIDENCE_V1",
     },
@@ -24,6 +25,7 @@ local policy = Generation._Private.CreateLegacyWardrobePolicy({
         GetCuratedMetadata = function(...) return Traveler and Traveler.GetCuratedDescriptorMetadata and Traveler.GetCuratedDescriptorMetadata(...) end,
     },
     contextPolicy = Generation.ZoneContextPolicy,
+    anchorPolicy = Generation.ZoneAnchorPolicy,
     diagnosticsPolicy = Generation.ZoneDiagnosticsPolicy,
 })
 policy.affinityPolicy = Generation.ZoneAffinityPolicy

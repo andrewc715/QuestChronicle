@@ -2,7 +2,7 @@
 ## Title: Quest Chronicle
 ## Notes: Records quest lifecycle, objective progress, completions, and roleplay notes, with a native-styled Chronicle window.
 ## Author: OpenAI & Andrew
-## Version: 1.11.2
+## Version: 1.11.3
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## AddonCompartmentFunc: QuestChronicle_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: QuestChronicle_OnAddonCompartmentEnter
@@ -34,11 +34,13 @@ Core\Wardrobe\WeaponSelection.lua
 Core\Wardrobe\GenerationAndConcepts.lua
 Core\Wardrobe\WeaponPipeline.lua
 Core\Wardrobe\AnchorSkeletonCache.lua
+Core\Wardrobe\AnchorPolicyBridge.lua
 Core\Wardrobe\AnchorSkeletonNovelty.lua
 Core\Wardrobe\AnchorSkeletonSearch.lua
 Core\Wardrobe\GenerationPerformance.lua
 Core\Wardrobe\GenerationScheduling.lua
 Core\Wardrobe\GenerationSetupWorker.lua
+Core\Wardrobe\GenerationJobFactory.lua
 Core\Wardrobe\AnchorSkeletonWorker.lua
 Core\Wardrobe\AnchorSkeletonApply.lua
 Core\Wardrobe\GenerationWorker.lua
@@ -74,6 +76,7 @@ Core\ZoneStyle\Traveler\MismatchAnalysis.lua
 Core\ZoneStyle\Traveler\TuningAudit.lua
 Core\ZoneStyle\Traveler\TuningExport.lua
 Core\ZoneStyle\Zone\Affinity.lua
+Core\ZoneStyle\Zone\AnchorScoring.lua
 Core\Wardrobe\SupportProfileIdentity.lua
 Core\Wardrobe\SupportProfile.lua
 Core\Wardrobe\SupportBudget.lua
@@ -128,6 +131,7 @@ Core\Generation\Modes\Traveler\Policy.lua
 Core\Generation\Modes\Zone\Context.lua
 Core\Generation\Modes\Zone\Affinity.lua
 Core\Generation\Modes\Zone\Diagnostics.lua
+Core\Generation\Modes\Zone\AnchorPolicy.lua
 Core\Generation\Modes\ZoneLegacyAdapter.lua
 Core\Generation\Modes\ClassLegacyAdapter.lua
 Core\Generation\Modes\EchoLegacyAdapter.lua

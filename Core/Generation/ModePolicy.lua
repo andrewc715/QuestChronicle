@@ -20,6 +20,26 @@ local SHARED_RUNTIME_CALLBACKS = {
     "BuildStateSignature", "GetActiveJob", "SetActiveJob",
 }
 
+
+local ZONE_ANCHOR_CALLBACKS = {
+    "GetAnchorSlots", "GetAnchorSearchConfiguration", "EvaluateAnchorCandidate",
+    "ScoreAnchorPair", "ScoreAnchorSkeleton", "BuildNoveltyReference", "ClassifyNovelty",
+}
+
+local function ValidateZoneAnchorPolicy(policy)
+    if not (policy.capabilities and policy.capabilities.zoneAnchorPolicy == true) then return true end
+    if type(policy.anchorPolicy) ~= "table" then
+        return false, "Zone anchor policy " .. tostring(policy.modeID) .. " is missing its policy table."
+    end
+    for _, callback in ipairs(ZONE_ANCHOR_CALLBACKS) do
+        if type(policy.anchorPolicy[callback]) ~= "function" then
+            return false, "Zone anchor policy " .. tostring(policy.modeID)
+                .. " is missing callback " .. callback .. "."
+        end
+    end
+    return true
+end
+
 local function CopyPrimitiveMap(source)
     local result = {}
     for key, value in pairs(type(source) == "table" and source or {}) do
@@ -65,6 +85,8 @@ function P.ValidateModePolicy(policy)
             return false, "Generation mode policy " .. modeID .. " has no " .. callback .. " callback."
         end
     end
+    local zoneOK, zoneReason = ValidateZoneAnchorPolicy(policy)
+    if not zoneOK then return false, zoneReason end
     if policy.implementation == Generation.IMPLEMENTATION_SHARED_FRAMEWORK then
         return ValidateSharedRuntime(policy)
     end

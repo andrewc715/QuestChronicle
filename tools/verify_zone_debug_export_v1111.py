@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the v1.11.2 copy-ready Zone debug export contract."""
+"""Verify the v1.11.3 copy-ready Zone debug export contract."""
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
@@ -10,7 +10,7 @@ ui = (root / "UI/DebugReport.lua").read_text()
 toc = (root / "QuestChronicle.toc").read_text()
 
 checks = {
-    "numeric v1.11.2 metadata": "## Version: 1.11.2" in toc and (root / "VERSION.txt").read_text().strip() == "1.11.2",
+    "numeric v1.11.3 metadata": "## Version: 1.11.3" in toc and (root / "VERSION.txt").read_text().strip() == "1.11.3",
     "command module listed once": toc.count(r"Core\Chronicle\ZoneDebugCommands.lua") == 1,
     "export module listed once": toc.count(r"Core\ZoneStyle\Zone\DebugExport.lua") == 1,
     "help advertises export": "/qc zone debug [export]" in commands,
@@ -27,8 +27,8 @@ checks = {
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
-    print("FAIL: v1.11.2 Zone debug export guard failed:")
+    print("FAIL: v1.11.3 Zone debug export guard failed:")
     for name in failed:
         print("  -", name)
     raise SystemExit(1)
-print(f"PASS: v1.11.2 Zone debug export verification: {len(checks)} checks")
+print(f"PASS: v1.11.3 Zone debug export verification: {len(checks)} checks")

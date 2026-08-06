@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify v1.11.2 weapon-index invalidation lifecycle wiring and scope."""
+"""Verify v1.11.3 weapon-index invalidation lifecycle wiring and scope."""
 from pathlib import Path
 import re
 
@@ -22,7 +22,7 @@ canonical = {
 route_calls = re.findall(r"InvalidateWeaponAppearanceRoutes\(([^)]*)\)", scan + "\n" + events)
 
 checks = {
-    "v1.11.2 metadata": version == "1.11.2" and "## Version: 1.11.2" in toc,
+    "v1.11.3 metadata": version == "1.11.3" and "## Version: 1.11.3" in toc,
     "canonical registry is complete": all(f"{reason} = true" in index for reason in canonical),
     "session-only index starts with LOGIN_SESSION_RESET": 'weaponCandidateIndexInvalidationReason or "LOGIN_SESSION_RESET"' in index,
     "lifecycle sequence exists": "weaponCandidateIndexInvalidationSequence" in index and "NextInvalidationSequence" in index,
@@ -60,4 +60,4 @@ if failed:
         print(f"- {name}")
     raise SystemExit(1)
 
-print(f"PASS: v1.11.2 weapon-index invalidation lifecycle verification: {len(checks)} checks")
+print(f"PASS: v1.11.3 weapon-index invalidation lifecycle verification: {len(checks)} checks")

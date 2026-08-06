@@ -1,3 +1,16 @@
+# Quest Chronicle v1.11.3 Release Notes
+
+Quest Chronicle v1.11.3 makes the live-validated Zone evidence foundation authoritative for anchor preference through `ZONE_ANCHOR_POLICY_V1`.
+
+Zone Native still reports `Generation implementation: LEGACY`, because support, final validation, repair, and rerolls remain on their existing paths. The release changes only eligible anchor preference and its diagnostics. Shared visual cohesion, hard clashes, legal weapons, novelty, locks, hidden slots, eligibility, provenance, era, promotional exclusions, Heritage restrictions, and random-call counts remain protected.
+
+The policy uses one immutable Zone Context Snapshot per action, bounded Affinity v2 adjustments, bounded pair support, and one logical affinity contribution for linked weapon visuals. A changed Zone fingerprint cancels the action before atomic commit.
+
+`/qc zone debug export` now uses format 3 and includes policy identity, authority, selected score decomposition, pool aggregates, pair-support channels, weapon deduplication, context-staleness state, policy timing, and the explicit `Zone support policy: LEGACY` boundary.
+
+Retail validation is required before promotion to live-validated status.
+
+
 # Quest Chronicle v1.11.2
 
 ## Zone debug export fidelity and applicability semantics

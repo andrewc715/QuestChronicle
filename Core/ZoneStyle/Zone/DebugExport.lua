@@ -2,7 +2,7 @@ local QC = QuestChronicle
 local ZoneStyle = QC.ZoneStyle
 local Zone = ZoneStyle.Zone
 
-Zone.DEBUG_EXPORT_FORMAT = 2
+Zone.DEBUG_EXPORT_FORMAT = 3
 
 local STYLE_CHANNELS = {
     "culture", "climate", "terrain", "palette", "material",
@@ -71,6 +71,9 @@ local function ModeRows()
             implementation = caps and caps.implementation or "UNAVAILABLE",
             generation = caps and caps.implementationGeneration or "?",
             foundation = caps and caps.zoneFoundation or nil,
+            anchorPolicy = caps and caps.zoneAnchorPolicyVersion or nil,
+            anchorAuthority = caps and caps.zoneAnchorAuthority or nil,
+            supportPolicy = caps and caps.zoneSupportPolicy == true and "ACTIVE" or (modeID == (ZoneStyle.MODE_ZONE_NATIVE or "ZONE_NATIVE") and "LEGACY" or nil),
         }
     end
     return rows
@@ -110,6 +113,9 @@ local function AddArchitecture(lines)
     Add(lines, "- Generation API contract: " .. Code(QC.Generation and QC.Generation.API_CONTRACT_VERSION or "?"))
     Add(lines, "- Zone debug export format: " .. Code(Zone.DEBUG_EXPORT_FORMAT))
     Add(lines, "- Zone affinity format: " .. Code(Zone.AFFINITY_FORMAT))
+    Add(lines, "- Zone anchor policy: " .. Code(Zone.ANCHOR_POLICY_ID or "None"))
+    Add(lines, "- Zone anchor authority: " .. Code(Zone.ANCHOR_POLICY_AUTHORITY or "None"))
+    Add(lines, "- Zone support policy: `LEGACY`")
     Add(lines, "- Dynamic value encoding: " .. Code(Zone.DIAGNOSTIC_VALUE_ENCODING or "DIAGNOSTIC_ESCAPE_V1"))
     Add(lines, "- Literal pipe representation: `\\u007C`")
     Add(lines, "")
@@ -125,6 +131,10 @@ local function AddFoundation(lines, foundation, compatibility)
     Add(lines, "- Starting-zone registry: " .. Code(foundation.startingZoneRegistryVersion or "?"))
     Add(lines, "- Era rules: " .. Code(foundation.eraRuleVersion or "?"))
     Add(lines, "- Affinity format: " .. Code(foundation.affinityFormat or "?"))
+    Add(lines, "- Anchor policy format: " .. Code(foundation.anchorPolicyFormat or Zone.ANCHOR_POLICY_FORMAT or "?"))
+    Add(lines, "- Anchor policy ID: " .. Code(foundation.anchorPolicyID or Zone.ANCHOR_POLICY_ID or "None"))
+    Add(lines, "- Anchor authority: " .. Code(foundation.anchorPolicyAuthority or Zone.ANCHOR_POLICY_AUTHORITY or "None"))
+    Add(lines, "- Support policy: `LEGACY`")
     Add(lines, "- Snapshot builds this session: " .. Code(Zone.snapshotBuildCount or 0))
     Add(lines, "- Compatibility parity: " .. Code(compatibility and compatibility.pass == true and "PASS" or "FAIL"))
     for _, difference in ipairs(compatibility and compatibility.differences or {}) do
@@ -248,6 +258,52 @@ local function AddAffinity(lines, affinity, snapshot)
     return affinity
 end
 
+local function AddZoneAnchorPolicy(lines, report)
+    Add(lines, "## Zone Anchor Policy")
+    Add(lines, "")
+    local policy = report and report.zoneFoundation and report.zoneFoundation.anchorPolicy
+    if type(policy) ~= "table" or not policy.policyID then
+        Add(lines, "No v1.11.3 Zone anchor-policy report is currently available.")
+        Add(lines, "")
+        return
+    end
+    Add(lines, "- Policy: " .. Code(policy.policyID) .. " • authority " .. Code(policy.authority or "Unknown"))
+    Add(lines, "- Snapshot: " .. Code(policy.snapshotFingerprint or "Unavailable"))
+    Add(lines, "- Context stale at commit: " .. Code(policy.contextStaleAtCommit and "YES" or "NO"))
+    Add(lines, "- Support policy: " .. Code(policy.supportPolicy or "LEGACY"))
+    Add(lines, "- Fallback: " .. Code(policy.fallback or "None") .. (policy.fallbackReason and (" • " .. Value(policy.fallbackReason)) or ""))
+    Add(lines, "")
+    Add(lines, "| Slot | Appearance | Legacy | Affinity | Confidence | Adjustment | Final | Flags |")
+    Add(lines, "|---|---|---:|---:|---:|---:|---:|---|")
+    for _, row in ipairs(policy.selected or {}) do
+        local flags = {}
+        if row.favorite then flags[#flags + 1] = "Favorite" end
+        if row.locked then flags[#flags + 1] = "Locked" end
+        Add(lines, string.format("| %s | %s | %.2f | %.3f | %.3f | %+.2f | %.2f | %s |",
+            Code(row.slotKey), Cell(row.name or row.sourceID), tonumber(row.legacyRelevance) or 0,
+            tonumber(row.affinity) or 0, tonumber(row.confidence) or 0,
+            tonumber(row.adjustment) or 0, tonumber(row.finalRelevance) or 0, Cell(#flags > 0 and table.concat(flags, ", ") or "None")))
+    end
+    Add(lines, "")
+    Add(lines, string.format("- Pair bonuses: visual armor `%.2f` • Zone armor `%.2f` • visual weapon `%.2f` • Zone weapon `%.2f`",
+        tonumber(policy.visualArmorRelationshipBonus) or 0, tonumber(policy.armorPairSupport) or 0,
+        tonumber(policy.visualWeaponRelationshipBonus) or 0, tonumber(policy.weaponPairSupport) or 0))
+    Add(lines, string.format("- Weapon bundle: %s • `%d` logical visual%s • linked deduplicated %s",
+        Code(policy.routeFamily or "Existing legal route"), #(policy.logicalWeapons or {}),
+        #(policy.logicalWeapons or {}) == 1 and "" or "s", Code(policy.linkedVisualDeduplicated and "YES" or "NO")))
+    Add(lines, "")
+    Add(lines, "| Pool | Prepared | Eligible | Retained | Unknown | Off-zone | Weak local | Supported local | Strong local | Mean affinity | Mean adjustment |")
+    Add(lines, "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    for _, key in ipairs({ "CHEST", "LEGS", "SHOULDER" }) do
+        local pool = policy.pools and policy.pools[key]
+        if pool then Add(lines, string.format("| %s | %d | %d | %d | %d | %d | %d | %d | %d | %.3f | %+.2f |",
+            Code(key), tonumber(pool.prepared) or 0, tonumber(pool.eligible) or 0, tonumber(pool.retained) or 0, tonumber(pool.unknown) or 0,
+            tonumber(pool.offZone) or 0, tonumber(pool.weakLocal) or 0, tonumber(pool.supportedLocal) or 0,
+            tonumber(pool.strongLocal) or 0, tonumber(pool.meanAffinity) or 0, tonumber(pool.meanAdjustment) or 0)) end
+    end
+    Add(lines, "")
+end
+
 local function AddLatestReport(lines, report)
     Add(lines, "## Latest Zone Native diagnostic report")
     Add(lines, "")
@@ -262,6 +318,9 @@ local function AddLatestReport(lines, report)
     Add(lines, "- Action: " .. Code(report.action or "Unknown") .. " • result: " .. Code(report.result or "Unknown"))
     Add(lines, "- Generation implementation: " .. Code(report.generationImplementation or "Unknown"))
     Add(lines, "- Zone foundation: " .. Code(foundation.foundation or "Not recorded"))
+    local policy = foundation.anchorPolicy or {}
+    Add(lines, "- Zone anchor policy: " .. Code(policy.policyID or "Not recorded") .. " • " .. Code(policy.authority or "Unknown"))
+    Add(lines, "- Zone support policy: " .. Code(policy.supportPolicy or "LEGACY"))
     Add(lines, "- Snapshot fingerprint: " .. Code(foundation.fingerprint or "Not recorded"))
     Add(lines, "- Compatibility parity: " .. Code(foundation.compatibility or "Not recorded"))
     local affinity = foundation.affinity or {}
@@ -291,7 +350,9 @@ function Zone.BuildZoneDebugExport(snapshot, affinity)
     AddStyle(lines, snapshot)
     AddEvidence(lines, snapshot)
     affinity = AddAffinity(lines, affinity, snapshot)
-    AddLatestReport(lines, LatestZoneReport())
+    local latestReport = LatestZoneReport()
+    AddZoneAnchorPolicy(lines, latestReport)
+    AddLatestReport(lines, latestReport)
     local text = table.concat(lines, "\n")
     return text, {
         format = Zone.DEBUG_EXPORT_FORMAT,

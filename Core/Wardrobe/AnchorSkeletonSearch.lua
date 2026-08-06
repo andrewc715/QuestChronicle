@@ -71,6 +71,8 @@ local function NewRootNode()
         sources = {},
         baseScore = 0,
         relationshipBonus = 0,
+        visualRelationshipBonus = 0,
+        zonePairSupportBonus = 0,
         pairScoreTotal = 0,
         pairCount = 0,
         hardClashes = 0,
@@ -79,12 +81,22 @@ local function NewRootNode()
     }
 end
 
-local function ExtendNode(node, candidate)
+
+local function ScoreRelationship(job, left, right)
+    if P.ScoreAnchorRelationshipForJob then
+        return P.ScoreAnchorRelationshipForJob(job, left, right)
+    end
+    return P.ScoreAnchorRelationship(left, right)
+end
+
+local function ExtendNode(job, node, candidate)
     local result = {
         sourceBySlot = CopyMap(node.sourceBySlot),
         sources = {},
         baseScore = (node.baseScore or 0) + (candidate.baseScore or 0),
         relationshipBonus = node.relationshipBonus or 0,
+        visualRelationshipBonus = node.visualRelationshipBonus or node.relationshipBonus or 0,
+        zonePairSupportBonus = node.zonePairSupportBonus or 0,
         pairScoreTotal = node.pairScoreTotal or 0,
         pairCount = node.pairCount or 0,
         hardClashes = node.hardClashes or 0,
@@ -92,8 +104,12 @@ local function ExtendNode(node, candidate)
     }
     for _, existing in ipairs(node.sources or {}) do result.sources[#result.sources + 1] = existing end
     for _, existing in ipairs(node.sources or {}) do
-        local bonus, pairScore, _, hardClash = P.ScoreAnchorRelationship(existing, candidate)
+        local bonus, pairScore, _, hardClash, details = ScoreRelationship(job, existing, candidate)
         result.relationshipBonus = result.relationshipBonus + bonus
+        result.visualRelationshipBonus = result.visualRelationshipBonus
+            + (details and tonumber(details.visualBonus) or bonus)
+        result.zonePairSupportBonus = result.zonePairSupportBonus
+            + (details and tonumber(details.zonePairBonus) or 0)
         result.pairScoreTotal = result.pairScoreTotal + pairScore
         result.pairCount = result.pairCount + 1
         if hardClash then result.hardClashes = result.hardClashes + 1 end
@@ -105,9 +121,12 @@ local function ExtendNode(node, candidate)
     return result
 end
 
-function P.CreateAnchorBeamWork(candidatePools)
+function P.CreateAnchorBeamWork(candidatePools, job, searchConfig, anchorSlots)
     return {
         candidatePools = candidatePools or {},
+        job = job,
+        anchorSlots = anchorSlots or P.ANCHOR_SLOT_ORDER,
+        beamWidth = searchConfig and searchConfig.beamWidth or P.ANCHOR_BEAM_WIDTH,
         stageIndex = 1,
         beam = { NewRootNode() },
         nextBeam = {},
@@ -128,7 +147,7 @@ local function FinishBeamStage(work, slotKey)
             return left.score > right.score
         end)
         work.beam = {}
-        for index = 1, math.min(P.ANCHOR_BEAM_WIDTH, #work.nextBeam) do
+        for index = 1, math.min(work.beamWidth or P.ANCHOR_BEAM_WIDTH, #work.nextBeam) do
             work.beam[index] = work.nextBeam[index]
         end
     end
@@ -137,17 +156,17 @@ local function FinishBeamStage(work, slotKey)
     work.stageIndex = work.stageIndex + 1
     work.nodeIndex = 1
     work.candidateIndex = 1
-    if work.stageIndex > #P.ANCHOR_SLOT_ORDER then work.done = true end
+    if work.stageIndex > #(work.anchorSlots or P.ANCHOR_SLOT_ORDER) then work.done = true end
 end
 
 function P.StepAnchorBeamWork(work)
     if not work or work.done then return true end
-    local slotKey = P.ANCHOR_SLOT_ORDER[work.stageIndex]
+    local slotKey = (work.anchorSlots or P.ANCHOR_SLOT_ORDER)[work.stageIndex]
     local pool = work.candidatePools[slotKey] or {}
     if #pool == 0 then
         work.retained[slotKey] = #work.beam
         work.stageIndex = work.stageIndex + 1
-        if work.stageIndex > #P.ANCHOR_SLOT_ORDER then work.done = true end
+        if work.stageIndex > #(work.anchorSlots or P.ANCHOR_SLOT_ORDER) then work.done = true end
         return work.done
     end
 
@@ -158,7 +177,7 @@ function P.StepAnchorBeamWork(work)
         return work.done
     end
 
-    work.nextBeam[#work.nextBeam + 1] = ExtendNode(node, candidate)
+    work.nextBeam[#work.nextBeam + 1] = ExtendNode(work.job, node, candidate)
     work.expansions[slotKey] = (work.expansions[slotKey] or 0) + 1
     work.candidateIndex = work.candidateIndex + 1
     if work.candidateIndex > #pool then
@@ -169,7 +188,7 @@ function P.StepAnchorBeamWork(work)
     return work.done
 end
 
-function P.ScoreWeaponBundleForAnchor(node, draft, styleMode, styleContext)
+function P.ScoreWeaponBundleForAnchor(node, draft, styleMode, styleContext, job)
     local mainSource, mainSlotKey
     for _, slotKey in ipairs(P.MAIN_WEAPON_SLOT_KEYS) do
         if draft.selections[slotKey] then
@@ -182,27 +201,36 @@ function P.ScoreWeaponBundleForAnchor(node, draft, styleMode, styleContext)
     if not mainSource then return nil end
 
     local style = QC.ZoneStyle
-    local mainCandidate = P.BuildAnchorCandidate(mainSource, P.slotByKey[mainSlotKey], styleMode, styleContext)
+    local mainCandidate = P.EvaluateAnchorCandidateForJob
+        and P.EvaluateAnchorCandidateForJob(job, mainSource, P.slotByKey[mainSlotKey], styleContext, false)
+        or P.BuildAnchorCandidate(mainSource, P.slotByKey[mainSlotKey], styleMode, styleContext)
     if not mainCandidate then return nil end
     local weaponCandidates = { mainCandidate }
     if offSource and tonumber(offSource.visualID) ~= tonumber(mainSource.visualID) then
-        local offCandidate = P.BuildAnchorCandidate(offSource, P.slotByKey.OFF_HAND, styleMode, styleContext)
+        local offCandidate = P.EvaluateAnchorCandidateForJob
+            and P.EvaluateAnchorCandidateForJob(job, offSource, P.slotByKey.OFF_HAND, styleContext, false)
+            or P.BuildAnchorCandidate(offSource, P.slotByKey.OFF_HAND, styleMode, styleContext)
         if offCandidate then weaponCandidates[#weaponCandidates + 1] = offCandidate end
     end
 
-    local relationshipBonus, pairTotal, pairCount, hardClashes = 0, 0, 0, 0
+    local relationshipBonus, visualRelationshipBonus, zonePairSupportBonus = 0, 0, 0
+    local pairTotal, pairCount, hardClashes = 0, 0, 0
     for _, weaponCandidate in ipairs(weaponCandidates) do
         for _, armorCandidate in ipairs(node.sources or {}) do
-            local bonus, pairScore, _, hardClash = P.ScoreAnchorRelationship(armorCandidate, weaponCandidate)
+            local bonus, pairScore, _, hardClash, details = ScoreRelationship(job, armorCandidate, weaponCandidate)
             relationshipBonus = relationshipBonus + bonus
+            visualRelationshipBonus = visualRelationshipBonus + (details and tonumber(details.visualBonus) or bonus)
+            zonePairSupportBonus = zonePairSupportBonus + (details and tonumber(details.zonePairBonus) or 0)
             pairTotal = pairTotal + pairScore
             pairCount = pairCount + 1
             if hardClash then hardClashes = hardClashes + 1 end
         end
     end
     if #weaponCandidates > 1 then
-        local bonus, pairScore, _, hardClash = P.ScoreAnchorRelationship(weaponCandidates[1], weaponCandidates[2])
+        local bonus, pairScore, _, hardClash, details = ScoreRelationship(job, weaponCandidates[1], weaponCandidates[2])
         relationshipBonus = relationshipBonus + bonus
+        visualRelationshipBonus = visualRelationshipBonus + (details and tonumber(details.visualBonus) or bonus)
+        zonePairSupportBonus = zonePairSupportBonus + (details and tonumber(details.zonePairBonus) or 0)
         pairTotal = pairTotal + pairScore
         pairCount = pairCount + 1
         if hardClash then hardClashes = hardClashes + 1 end
@@ -222,6 +250,9 @@ function P.ScoreWeaponBundleForAnchor(node, draft, styleMode, styleContext)
         weaponCount = offSource and 2 or 1,
         score = score,
         relationshipBonus = relationshipBonus,
+        visualRelationshipBonus = visualRelationshipBonus,
+        zonePairSupportBonus = zonePairSupportBonus,
+        linkedVisualDeduplicated = offSource ~= nil and tonumber(offSource.visualID) == tonumber(mainSource.visualID),
         meanPairCohesion = pairCount > 0 and pairTotal / pairCount or node.meanPairCohesion or 0.50,
         hardClashes = (node.hardClashes or 0) + hardClashes,
         activeComponents = (node.activeComponents or 0) + 1,
@@ -249,12 +280,16 @@ function P.BuildAnchorSkeletonChoices(finalists, options)
     table.sort(finalists, function(left, right) return (left.score or 0) > (right.score or 0) end)
     local quality = {}
     local bestScore = tonumber(finalists[1].score) or 0
-    for index = 1, math.min(P.ANCHOR_FINAL_SHORTLIST, #finalists) do
+    local finalShortlist = math.max(1, math.floor(tonumber(options.finalShortlist) or P.ANCHOR_FINAL_SHORTLIST))
+    local scoreWindow = math.max(0, tonumber(options.scoreWindow) or P.ANCHOR_FINAL_SCORE_WINDOW)
+    for index = 1, math.min(finalShortlist, #finalists) do
         local entry = finalists[index]
-        if index > 1 and (tonumber(entry.score) or 0) < bestScore - P.ANCHOR_FINAL_SCORE_WINDOW then break end
+        if index > 1 and (tonumber(entry.score) or 0) < bestScore - scoreWindow then break end
         local novelty
-        if options.action == "GENERATE_OUTFIT" and P.EvaluateAnchorNovelty then
-            novelty = P.EvaluateAnchorNovelty(entry, options.noveltyContext)
+        if options.action == "GENERATE_OUTFIT" and (P.ClassifyAnchorNoveltyForOptions or P.EvaluateAnchorNovelty) then
+            novelty = P.ClassifyAnchorNoveltyForOptions
+                and P.ClassifyAnchorNoveltyForOptions(entry, options.noveltyContext, options)
+                or P.EvaluateAnchorNovelty(entry, options.noveltyContext)
         else
             novelty = {
                 class = nil, classPriority = 0, baseScore = tonumber(entry.score) or 0,

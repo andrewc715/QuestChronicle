@@ -111,6 +111,13 @@ local function CommitDraft(job, weaponCount, weaponNotice)
     if P.BuildGenerationStateSignature(job.liveState) ~= job.startSignature then
         return FinishJob(job, false, "Outfit generation was cancelled because the workbench changed while Quest Chronicle was preparing the outfit.")
     end
+    if P.ValidateAnchorPolicyContextAtCommit then
+        local valid, reason = P.ValidateAnchorPolicyContextAtCommit(job)
+        if not valid then
+            job.resultOverride = "CANCELLED"
+            return FinishJob(job, false, reason)
+        end
+    end
     local commitStarted = NowMilliseconds()
     local generatedName = P.RefreshGeneratedOutfitName(job.draft, job.styleEngine, job.styleMode, job.styleContext)
     job.liveState.selections = job.draft.selections
@@ -339,7 +346,11 @@ function P.StepGenerationJob(token)
         return
     end
     if job.phase == "ANCHORS" then
-        P.AdvanceAnchorGenerationPhase(job, stepStarted)
+        local status, reason = P.AdvanceAnchorGenerationPhase(job, stepStarted)
+        if status == "FAILED" then
+            FinishJob(job, false, reason or job.anchorPolicyFatalError or "Zone anchor policy failed; the previous preview was preserved.")
+            return
+        end
         job.maxStepMs = math.max(job.maxStepMs, NowMilliseconds() - stepStarted)
         if P.AccumulateGenerationSliceDiagnostics then P.AccumulateGenerationSliceDiagnostics(job) end
         if not ScheduleNextStep(token) then FinishJob(job, false, "Quest Chronicle could not schedule the cooperative outfit generator. Try /reload.") end
@@ -435,9 +446,7 @@ end
 function Wardrobe.IsGenerating()
     return P.generationJob ~= nil or P.supportRerollJob ~= nil
 end
-function Wardrobe.GetLastGenerationPerformance()
-    return P.lastGenerationPerformance
-end
+function Wardrobe.GetLastGenerationPerformance() return P.lastGenerationPerformance end
 function Wardrobe.CancelGeneration(reason)
     if P.supportRerollJob and P.CancelSupportReroll then return P.CancelSupportReroll(reason) end
     local job = P.generationJob
@@ -472,22 +481,14 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode, sharedPolicy, 
     local startedAtMs = NowMilliseconds()
     local liveState = P.EnsurePreviewState()
     P.generationToken = P.generationToken + 1
-    local job = {
-        token = P.generationToken,
-        action = reroll and "REROLL_UNLOCKED" or "GENERATE_OUTFIT",
-        sharedFrameworkPolicy = sharedPolicy, sharedAction = sharedAction,
-        generationImplementation = sharedPolicy and "SHARED_FRAMEWORK" or "LEGACY",
-        reroll = reroll == true,
-        requestedStyleMode = requestedStyleMode,
-        liveState = liveState,
-        phase = "SETUP", setupPhase = "IDENTITY",
-        anchorWork = nil, anchorStats = nil, anchorFallbackReason = nil, weaponsPrepared = false,
-        supportWork = nil, supportStats = nil, supportFallbackReason = nil, armorWork = nil,
-        phaseDAlternateNoRepair = false, phaseDAlternateInfo = nil,
-        selectedArmor = 0, candidatesProcessed = 0, eraCandidatesProcessed = 0,
-        eraCacheHits = 0, eligibilityCacheHits = 0, weaponYields = 0,
-        steps = 0, maxStepMs = 0, phaseStats = {}, startedAtMs = startedAtMs,
-    }
+    local job = P.CreateWardrobeGenerationJob({
+        token = P.generationToken, reroll = reroll, requestedStyleMode = requestedStyleMode,
+        sharedPolicy = sharedPolicy, sharedAction = sharedAction, liveState = liveState, startedAtMs = startedAtMs,
+    })
+    if P.AttachGenerationModePolicy then P.AttachGenerationModePolicy(job) end
+    local policyOK, policyReason = true, nil
+    if P.ValidateAttachedAnchorPolicy then policyOK, policyReason = P.ValidateAttachedAnchorPolicy(job) end
+    if not policyOK then return false, policyReason end
     P.generationJob = job
     Notify("WARDROBE_GENERATION_STARTED", job.reroll, requestedStyleMode)
     if not ScheduleNextStep(job.token) then

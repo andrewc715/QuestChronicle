@@ -40,6 +40,22 @@ QC.Wardrobe.IsGenerating = function() return active end
 QC.Wardrobe.GetLastGenerationPerformance = function() return { maxStepMs = 3.1 } end
 QC.ZoneStyle.GetMode = function() return "TRAVELER" end
 
+
+local function ZoneAnchorPolicyStub()
+    return {
+        GetAnchorSlots = function() return { "CHEST", "LEGS", "SHOULDER", "WEAPON_BUNDLE" } end,
+        GetAnchorSearchConfiguration = function() return {} end,
+        EvaluateAnchorCandidate = function() return nil end,
+        ScoreAnchorPair = function() return 0, 0.5, nil, false end,
+        ScoreAnchorSkeleton = function() return nil end,
+        BuildNoveltyReference = function() return nil end,
+        ClassifyNovelty = function() return nil end,
+    }
+end
+
+QuestChronicle.Generation = QuestChronicle.Generation or {}
+QuestChronicle.Generation.ZoneAnchorPolicy = ZoneAnchorPolicyStub()
+
 local files = {
     "Core/Generation/ModePolicy.lua", "Core/Generation/ModeRegistry.lua",
     "Core/Generation/GenerationLifecycle.lua", "Core/Generation/SchedulerEngine.lua",

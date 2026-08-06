@@ -16,6 +16,22 @@ QuestChronicle = {
         GetLastGenerationPerformance = function() return {} end,
     },
 }
+
+local function ZoneAnchorPolicyStub()
+    return {
+        GetAnchorSlots = function() return { "CHEST", "LEGS", "SHOULDER", "WEAPON_BUNDLE" } end,
+        GetAnchorSearchConfiguration = function() return {} end,
+        EvaluateAnchorCandidate = function() return nil end,
+        ScoreAnchorPair = function() return 0, 0.5, nil, false end,
+        ScoreAnchorSkeleton = function() return nil end,
+        BuildNoveltyReference = function() return nil end,
+        ClassifyNovelty = function() return nil end,
+    }
+end
+
+QuestChronicle.Generation = QuestChronicle.Generation or {}
+QuestChronicle.Generation.ZoneAnchorPolicy = ZoneAnchorPolicyStub()
+
 local root = debug.getinfo(1, "S").source:sub(2):gsub("tools/test_zone_mode_adapter_v1110.lua$", "")
 local function Load(path) assert(loadfile(root .. path))() end
 Load("Core/Generation/ModePolicy.lua")
@@ -30,6 +46,6 @@ local caps = G.GetModeCapabilities("ZONE_NATIVE")
 assert(policy.implementation == "LEGACY", "Zone falsely claimed shared generation")
 assert(caps.zoneFoundation == "CONTEXT_EVIDENCE_V1", "Zone foundation capability missing")
 assert(caps.zoneContextFormat == 1 and caps.zoneEvidence and caps.zoneAffinityDiagnostics, "Zone evidence capabilities missing")
-assert(caps.zoneAnchorPolicy == false and caps.zoneSupportPolicy == false and caps.zoneFinalValidation == false, "future Zone policies were falsely enabled")
+assert(caps.zoneAnchorPolicy == true and caps.zoneAnchorAuthority == "ACTIVE" and caps.zoneSupportPolicy == false and caps.zoneFinalValidation == false, "Zone anchor authority or future policy boundary is incorrect")
 assert(type(policy.contextPolicy) == "table" and type(policy.diagnosticsPolicy) == "table" and type(policy.affinityPolicy) == "table", "read-only Zone providers missing")
 print("PASS v1.11.0 Zone adapter: LEGACY generation with CONTEXT_EVIDENCE_V1 read-only providers")

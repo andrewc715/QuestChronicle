@@ -57,6 +57,7 @@ dofile(base .. "Core/Workers/SliceBudget.lua")
 dofile(base .. "Core/Workers/AdaptiveBatch.lua")
 dofile(base .. "Core/Wardrobe/GenerationScheduling.lua")
 dofile(base .. "Core/Wardrobe/GenerationSetupWorker.lua")
+dofile(base .. "Core/Wardrobe/GenerationJobFactory.lua")
 dofile(base .. "Core/Wardrobe/GenerationWorker.lua")
 P.GENERATION_TIME_BUDGET_MS = 1000
 

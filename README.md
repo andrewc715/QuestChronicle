@@ -1,19 +1,48 @@
-# Quest Chronicle v1.11.2
+# Quest Chronicle v1.11.3
 
-> **Zone Context and Evidence Foundation:** Zone Native remains behaviorally unchanged behind its `LEGACY` adapter while gaining an immutable `CONTEXT_EVIDENCE_V1` snapshot, validated registries, evidence ancestry, and read-only Zone affinity diagnostics.
+> **Zone Anchor Policy v1:** Zone Native now uses the immutable Zone evidence foundation and Affinity v2 as an authoritative, bounded anchor preference while preserving shared visual cohesion, legal weapon routes, novelty, locks, hidden slots, and the existing legacy support pipeline.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.11.2 makes the Zone evidence dossier copy-safe and coverage-aware without changing Zone Native selection behavior.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.11.3 is the first behavior-changing release in the Zone implementation train.
 
-The release migrates the existing 25 broad style profiles, 134 provenance pools, and 30 starting-zone cases into validated registries. It resolves live location facts into a deterministic Zone Context Snapshot containing profile identity, expansion era, provenance, canonical style channels, restrictions, fallback status, confidence, and bounded evidence ancestry. A compatibility view reproduces the v1.10.0 context consumed by the existing generator.
-
-Zone Native continues to report:
+Zone Native now reports:
 
 ```text
 Generation implementation: LEGACY
 Zone foundation: CONTEXT_EVIDENCE_V1
+Zone anchor policy: ZONE_ANCHOR_POLICY_V1
+Zone anchor authority: ACTIVE
+Zone support policy: LEGACY
 ```
 
-Traveler remains `SHARED_FRAMEWORK`. Class Fantasy and Chronicle Echo remain `LEGACY`. No SavedVariables migration, cache reset, wardrobe rescan, scoring change, random-order change, UI redesign, or Courier update is required.
+The mode remains truthfully `LEGACY` overall because contextual support, completed-outfit validation, repair, and rerolls still use their existing behavior. Traveler remains `SHARED_FRAMEWORK`. Class Fantasy and Chronicle Echo remain `LEGACY`.
+
+The new policy captures one immutable Zone Context Snapshot per action, evaluates eligible anchor appearances with the existing legacy continuity score plus a bounded Affinity v2 adjustment, adds a small bounded local-support bonus to visually legal pairs, scores linked weapon visuals once, and cancels atomically if the Zone context fingerprint changes before commit.
+
+Unknown or zero-confidence evidence is neutral. Zone affinity never grants eligibility, clears a hard clash, overrides a lock, unhides a slot, changes legal weapon topology, or adds random calls. No SavedVariables migration, cache reset, wardrobe rescan, UI redesign, or Courier update is required.
+
+## Zone Anchor Policy v1
+
+The v1.11.3 authority transfer keeps the proven beam mechanics and moves Zone preference behind the registered policy seam:
+
+```text
+Shared anchor mechanics:
+Candidate pools, beam search, cohesion, hard clashes, legal weapons, novelty, atomic commit
+
+Zone anchor policy:
+Immutable context, Affinity v2, bounded local preference, policy diagnostics
+```
+
+New diagnostics include:
+
+- selected anchor legacy relevance, affinity, confidence, adjustment, and final relevance;
+- favorite and locked-state flags;
+- visual and Zone pair-support channels kept separate;
+- logical weapon deduplication and legal route identity;
+- bounded candidate-pool aggregates;
+- action snapshot and commit-time fingerprint state;
+- `Zone support policy: LEGACY` boundary markers;
+- Zone policy performance timing;
+- `/qc zone debug export` format 3.
 
 ## Zone context and evidence foundation
 

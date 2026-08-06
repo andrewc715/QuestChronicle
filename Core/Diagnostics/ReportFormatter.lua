@@ -18,7 +18,7 @@ local PHASE_ORDER = {
     "generationActionIdentity", "generationStateSnapshot", "generationModeContext", "generationContextSeed",
     "generationEligibilityContext", "generationNoveltyReference", "generationCacheScalarSnapshot",
     "generationWeaponIndexSnapshot", "setup", "validation", "eraEvidence", "eligibility", "coherence", "scoring",
-    "anchorCandidateScoring", "anchorBeamSearch", "anchorWeaponExpansion", "anchorSelection",
+    "anchorCandidateScoring", "zoneAnchorPolicy", "anchorBeamSearch", "anchorWeaponExpansion", "anchorSelection",
     "supportProfile", "supportLockedCommitments", "supportValidation", "supportEraEvidence", "supportEligibility",
     "supportCandidateScoring", "supportBeamExpansion", "supportSelection", "supportFinalValidation",
     "supportRepairTargeting", "supportRepairCandidateEvaluation", "supportRepairPass1", "supportRepairRevalidation",
@@ -40,7 +40,8 @@ local PHASE_LABELS = {
     generationCacheScalarSnapshot = "Generation cache scalar snapshot", generationWeaponIndexSnapshot = "Generation weapon-index snapshot",
     validation = "Source validation", eraEvidence = "Era evidence",
     eligibility = "Eligibility", coherence = "Outfit coherence", scoring = "Candidate scoring",
-    anchorCandidateScoring = "Anchor candidate scoring", anchorBeamSearch = "Anchor beam search",
+    anchorCandidateScoring = "Anchor candidate scoring", zoneAnchorPolicy = "Zone anchor policy",
+    anchorBeamSearch = "Anchor beam search",
     anchorWeaponExpansion = "Anchor weapon expansion", anchorSelection = "Anchor selection",
     supportProfile = "Support profile", supportLockedCommitments = "Locked support commitments",
     supportValidation = "Support validation", supportEraEvidence = "Support era evidence",
@@ -244,6 +245,43 @@ local function AddZoneFoundation(lines, report, rich)
     Add(lines, "Affinity classes: " .. (#classes > 0 and table.concat(classes, " • ") or "None"))
 end
 
+local function AddZoneAnchorPolicy(lines, report, rich)
+    local policy = report.zoneFoundation and report.zoneFoundation.anchorPolicy
+    if type(policy) ~= "table" or not policy.policyID then return end
+    AddHeading(lines, "Zone Anchor Policy", rich)
+    Add(lines, string.format("Policy: %s • %s", tostring(policy.policyID), tostring(policy.authority or "Unknown")))
+    Add(lines, "Snapshot: " .. tostring(policy.snapshotFingerprint or "Unavailable"))
+    Add(lines, "Context stale at commit: " .. tostring(policy.contextStaleAtCommit and "Yes" or "No"))
+    Add(lines, "Support policy: " .. tostring(policy.supportPolicy or "LEGACY"))
+    Add(lines, "Fallback: " .. tostring(policy.fallback or "None")
+        .. (policy.fallbackReason and (" • " .. tostring(policy.fallbackReason)) or ""))
+    Add(lines, "")
+    Add(lines, "Selected anchor evidence:")
+    Add(lines, "Slot             Legacy   Affinity   Confidence   Adjustment   Final   Flags")
+    for _, row in ipairs(policy.selected or {}) do
+        local flags = {}
+        if row.favorite then flags[#flags + 1] = "Favorite" end
+        if row.locked then flags[#flags + 1] = "Locked" end
+        Add(lines, string.format("%-16s %7.2f   %8.3f   %10.3f   %+10.2f   %7.2f   %s",
+            tostring(row.slotKey or "?"), tonumber(row.legacyRelevance) or 0, tonumber(row.affinity) or 0,
+            tonumber(row.confidence) or 0, tonumber(row.adjustment) or 0, tonumber(row.finalRelevance) or 0,
+            #flags > 0 and table.concat(flags, ", ") or "None"))
+    end
+    Add(lines, string.format("Pair interpretation: visual armor %.2f • Zone armor %.2f • visual weapon %.2f • Zone weapon %.2f",
+        tonumber(policy.visualArmorRelationshipBonus) or 0, tonumber(policy.armorPairSupport) or 0,
+        tonumber(policy.visualWeaponRelationshipBonus) or 0, tonumber(policy.weaponPairSupport) or 0))
+    Add(lines, string.format("Weapon bundle: %s • %d logical visual%s • linked deduplicated %s",
+        tostring(policy.routeFamily or "Existing legal route"), #(policy.logicalWeapons or {}),
+        #(policy.logicalWeapons or {}) == 1 and "" or "s", policy.linkedVisualDeduplicated and "Yes" or "No"))
+    Add(lines, "Candidate pools:")
+    for _, key in ipairs({ "CHEST", "LEGS", "SHOULDER" }) do
+        local pool = policy.pools and policy.pools[key]
+        if pool then Add(lines, string.format("  %s: %d prepared • %d eligible • %d retained • %d unknown • mean affinity %.3f • mean adjustment %+.2f",
+            key, tonumber(pool.prepared) or 0, tonumber(pool.eligible) or 0, tonumber(pool.retained) or 0, tonumber(pool.unknown) or 0,
+            tonumber(pool.meanAffinity) or 0, tonumber(pool.meanAdjustment) or 0)) end
+    end
+end
+
 local function AddSkeleton(lines, report, rawIDs, rich)
     AddHeading(lines, "Anchor Skeleton", rich)
     local skeleton = report.skeleton or {}
@@ -402,6 +440,7 @@ local function Format(report, options)
     local lines = {}
     AddOverview(lines, report, options.rich)
     AddZoneFoundation(lines, report, options.rich)
+    AddZoneAnchorPolicy(lines, report, options.rich)
     AddSkeleton(lines, report, options.rawIDs, options.rich)
     if P.AddSupportSection then P.AddSupportSection(lines, report, options.rawIDs, options.rich) end
     AddBeam(lines, report, options.verbose, options.rich)

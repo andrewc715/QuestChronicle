@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.11.3 - 2026-08-06
+
+### Zone Anchor Policy v1
+
+- Added the authoritative `ZONE_ANCHOR_POLICY_V1` registered policy while keeping Zone Native truthfully marked `LEGACY` overall.
+- Hardened the shared anchor-policy bridge for candidate, pair, skeleton, novelty, and search-configuration callbacks.
+- Captured one immutable Zone Context Snapshot per Zone action and cancelled stale work atomically before commit.
+- Added bounded Affinity v2 candidate adjustments with neutral handling for unknown and zero-confidence evidence.
+- Added bounded local-support pair bonuses without changing visual cohesion or hard-clash sovereignty.
+- Preserved existing eligibility, provenance, era, promotion, Heritage, favorite, exclusion, lock, hidden-slot, novelty, and legal weapon-route rules.
+- Deduplicated linked and two-handed visuals for Zone affinity while preserving physical hand presentation.
+- Added selected anchor score decomposition, bounded pool summaries, context fingerprints, policy timing, and support-boundary diagnostics.
+- Bumped Zone debug export from format 2 to format 3 while retaining `DIAGNOSTIC_ESCAPE_V1` and Zone Affinity format 2.
+- Kept Zone contextual support, final validation, repair, rerolls, SavedVariables, Courier, and cache formats unchanged.
+
+
 ## 1.11.2 - 2026-08-05
 
 - Added `DIAGNOSTIC_ESCAPE_V1` for reversible copy-safe Zone diagnostic values.

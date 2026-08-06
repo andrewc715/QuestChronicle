@@ -117,6 +117,13 @@ function P.AttachWarningsAndComparison(report)
         AddWarning(report, "UNKNOWN_WEAPON_INDEX_INVALIDATION", "WARNING", "The weapon candidate index was invalidated without a recognized lifecycle reason.")
     end
     local skeleton = report.skeleton or {}
+    local zoneAnchorPolicy = report.zoneFoundation and report.zoneFoundation.anchorPolicy
+    if zoneAnchorPolicy and zoneAnchorPolicy.fallback then
+        AddWarning(report, "ZONE_ANCHOR_POLICY_FALLBACK", "WARNING", "Zone anchor policy used the legacy relevance score: " .. tostring(zoneAnchorPolicy.fallbackReason or zoneAnchorPolicy.fallback))
+    end
+    if zoneAnchorPolicy and zoneAnchorPolicy.contextStaleAtCommit then
+        AddWarning(report, "ZONE_CONTEXT_STALE", "WARNING", "Zone context changed before commit; the previous preview was preserved.")
+    end
     if skeleton.fallbackReason then AddWarning(report, "LEGACY_FALLBACK", "WARNING", "Anchor search used the legacy generator: " .. tostring(skeleton.fallbackReason)) end
     if report.supportFallbackReason then AddWarning(report, "SUPPORT_LEGACY_FALLBACK", "WARNING", "Contextual support used the legacy selector: " .. tostring(report.supportFallbackReason)) end
     if report.action == "GENERATE_OUTFIT" and skeleton.noveltyClass == "EXACT_REPEAT" then

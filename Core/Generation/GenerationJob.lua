@@ -43,7 +43,11 @@ function JobEngine.Step(job, policy, runtime)
     end
 
     if job.phase == "ANCHORS" then
-        Generation.AnchorEngine.Step(policy, job, stepStarted)
+        local status, reason = Generation.AnchorEngine.Step(policy, job, stepStarted)
+        if status == "FAILED" then
+            Finish(policy, job, false, reason or job.anchorPolicyFatalError or "Anchor policy failed; the previous preview was preserved.")
+            return
+        end
         UpdateSlice(policy, runtime, job, stepStarted)
         ScheduleOrFail(policy, runtime, job, token, "Quest Chronicle could not schedule the cooperative outfit generator. Try /reload.")
         return

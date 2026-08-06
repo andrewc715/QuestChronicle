@@ -89,7 +89,15 @@ local function CompactReportToLimit(report)
     -- Preserve the user-facing score ledger and Phase D result before trimming
     -- lower-value duplicated/raw diagnostic payloads.
     if type(report.skeleton) == "table" then
-        for _, component in ipairs(report.skeleton.components or {}) do component.scoreReasons = nil end
+        for _, component in ipairs(report.skeleton.components or {}) do
+            component.scoreReasons = nil
+            if type(component.anchorPolicy) == "table" then
+                component.anchorPolicy.reasons = nil
+                component.anchorPolicy.rawAdjustment = nil
+                component.anchorPolicy.boundedAdjustment = nil
+                component.anchorPolicy.confidenceFactor = nil
+            end
+        end
     end
     bytes = ApproximateBytes(report)
     if bytes <= D.MAX_REPORT_BYTES then return bytes, true end

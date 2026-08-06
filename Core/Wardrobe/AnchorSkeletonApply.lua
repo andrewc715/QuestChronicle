@@ -16,12 +16,18 @@ local function RestoreAnchorBase(job)
 end
 
 local function SelectionOptions(job)
+    local config = P.GetAnchorSearchConfigurationForJob and P.GetAnchorSearchConfigurationForJob(job) or {}
     return {
         action = job.action,
+        job = job,
+        anchorPolicy = job.anchorPolicy,
         noveltyContext = job.currentAnchorNovelty
+            or (P.BuildAnchorNoveltyReferenceForJob and P.BuildAnchorNoveltyReferenceForJob(job, job.liveState or job.draft))
             or (P.BuildAnchorNoveltyContext and P.BuildAnchorNoveltyContext(job.liveState or job.draft)),
         previousSignature = job.anchorBaseDraft and job.anchorBaseDraft.lastAnchorSkeletonSignature
             or job.draft.lastAnchorSkeletonSignature,
+        finalShortlist = config.finalShortlist,
+        scoreWindow = config.scoreWindow,
     }
 end
 
@@ -44,6 +50,10 @@ local function ApplySelectedSkeleton(job, work, selected, chosenRank, shortlistS
     P.RebuildSelectedStyleContext(job, selected)
     local pairSnapshot = P.GetAnchorPairCacheSnapshot()
     local selectedDiagnostics = P.BuildSelectedAnchorDiagnostics(selected, selectionDetails)
+    local Zone = QC.ZoneStyle and QC.ZoneStyle.Zone
+    local zonePolicyDiagnostics = Zone and Zone.BuildSelectedAnchorPolicySummary
+        and Zone.BuildSelectedAnchorPolicySummary(selected, work.policyPoolSummaries, job) or nil
+    job.zoneAnchorPolicyDiagnostics = zonePolicyDiagnostics
     job.anchorStats = {
         poolSizes = work.poolSizes, expansions = work.beamWork.expansions, retained = work.beamWork.retained,
         weaponBundles = #work.finalists, chosenRank = chosenRank, shortlistSize = shortlistSize,
@@ -62,6 +72,8 @@ local function ApplySelectedSkeleton(job, work, selected, chosenRank, shortlistS
         fallbackReason = nil, alternateSkeleton = alternate == true,
         initialChosenRank = alternate and job.initialAnchorRank or nil,
         initialSignature = alternate and job.initialAnchorSignature or nil,
+        zoneAnchorPolicy = zonePolicyDiagnostics,
+        policyPoolSummaries = work.policyPoolSummaries,
     }
     local sources = {}
     for slotKey, candidate in pairs(selected.armorNode.sourceBySlot or {}) do sources[slotKey] = candidate.source end
@@ -87,6 +99,8 @@ local function ApplySelectedSkeleton(job, work, selected, chosenRank, shortlistS
         scoreBreakdown = selectedDiagnostics.scoreBreakdown, poolSizes = work.poolSizes,
         alternateSkeleton = alternate == true, initialChosenRank = alternate and job.initialAnchorRank or nil,
         initialSignature = alternate and job.initialAnchorSignature or nil,
+        zoneAnchorPolicy = zonePolicyDiagnostics,
+        policyPoolSummaries = work.policyPoolSummaries,
         generatedAt = time and time() or 0,
     }
     job.anchorDiagnostics = P.lastAnchorSkeletonDiagnostics

@@ -1,5 +1,5 @@
 QuestChronicle = {
-    version = "1.11.2",
+    version = "1.11.3",
     ZoneStyle = {
         MODE_TRAVELER = "TRAVELER", MODE_ZONE_NATIVE = "ZONE_NATIVE",
         MODE_CLASS_FANTASY = "CLASS_FANTASY", MODE_CHRONICLE_ECHO = "CHRONICLE_ECHO",
@@ -83,7 +83,7 @@ assert(loadfile(root .. "Core/ZoneStyle/Zone/Affinity.lua"))()
 assert(loadfile(root .. "Core/ZoneStyle/Zone/DebugExport.lua"))()
 local text, status = Zone.BuildZoneDebugExport(snapshot, affinity)
 for _, expected in ipairs({
-    "Quest Chronicle version: `1.11.2`", "Zone debug export format: `2`", "Zone affinity format: `2`",
+    "Quest Chronicle version: `1.11.3`", "Zone debug export format: `3`", "Zone affinity format: `2`",
     "Dynamic value encoding: `DIAGNOSTIC_ESCAPE_V1`", "Literal pipe representation: `\\u007C`",
     "Mean affinity: `0.291`", "Mean confidence: `0.536`",
     "OFF_ZONE_SIGNAL=5.000 • PARTIAL_EVIDENCE=2.000 • WEAK_LOCAL_SIGNAL=5.000",
@@ -93,6 +93,6 @@ for _, expected in ipairs({
 }) do assert(text:find(expected, 1, true), "missing v1.11.2 export text: " .. expected) end
 assert(not text:find("HEADemplar", 1, true), "descriptor was corrupted at the export boundary")
 assert(not Zone.ContainsUnsafeWoWControl(text), "serialized export retained an unsafe WoW control prefix")
-assert(status.format == 2 and status.affinityFormat == 2 and status.encoding == "DIAGNOSTIC_ESCAPE_V1", "format metadata is incorrect")
+assert(status.format == 3 and status.affinityFormat == 2 and status.encoding == "DIAGNOSTIC_ESCAPE_V1", "format metadata is incorrect")
 assert(status.unsafeControlDetected == false, "export status detected an unsafe control token")
 print("PASS v1.11.2 Zone debug export: Retail fixture is lossless, coverage-aware, and numerically unchanged")

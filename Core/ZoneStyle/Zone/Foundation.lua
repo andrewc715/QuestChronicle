@@ -11,6 +11,9 @@ Zone.STARTING_ZONE_REGISTRY_VERSION = 1
 Zone.ERA_RULE_VERSION = 1
 Zone.AFFINITY_FORMAT = 2
 Zone.FOUNDATION_ID = "CONTEXT_EVIDENCE_V1"
+Zone.ANCHOR_POLICY_FORMAT = 1
+Zone.ANCHOR_POLICY_ID = "ZONE_ANCHOR_POLICY_V1"
+Zone.ANCHOR_POLICY_AUTHORITY = "ACTIVE"
 Zone.AFFINITY_COMPONENT_STATUS = {
     VALUE = "VALUE",
     MISSING = "MISSING",
@@ -129,6 +132,9 @@ function Zone.GetFoundationStatus()
         startingZoneRegistryVersion = Zone.STARTING_ZONE_REGISTRY_VERSION,
         eraRuleVersion = Zone.ERA_RULE_VERSION,
         affinityFormat = Zone.AFFINITY_FORMAT,
+        anchorPolicyFormat = Zone.ANCHOR_POLICY_FORMAT,
+        anchorPolicyID = Zone.ANCHOR_POLICY_ID,
+        anchorPolicyAuthority = Zone.ANCHOR_POLICY_AUTHORITY,
     }
 end
 

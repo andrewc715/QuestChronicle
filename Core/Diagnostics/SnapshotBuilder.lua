@@ -45,6 +45,7 @@ local function SourceSnapshot(source, slotKey, state, candidate)
         hidden = state and state.hidden and state.hidden[slotKey] == true or false,
         baseScore = candidate and tonumber(candidate.baseScore) or nil,
         scoreReasons = candidate and CopyTable(candidate.scoreReasons) or nil,
+        anchorPolicy = candidate and CopyTable(candidate.anchorPolicy) or nil,
         curatedFields = curatedFields,
         curatedTuningVersion = curated and curated.version or nil,
         curatedKeyType = curated and curated.keyType or nil,
@@ -192,7 +193,7 @@ local function BuildZoneFoundation(state, job)
     if not ZoneStyle or mode ~= ZoneStyle.MODE_ZONE_NATIVE then return nil end
     local Zone = ZoneStyle.Zone
     if not Zone or not ZoneStyle.GetZoneContextSnapshot then return nil end
-    local snapshot = ZoneStyle.GetZoneContextSnapshot()
+    local snapshot = job and job.modeContext or ZoneStyle.GetZoneContextSnapshot()
     local affinity = Zone.BuildSelectedOutfitAffinity and Zone.BuildSelectedOutfitAffinity(state, snapshot) or {}
     local pieces = {}
     for _, piece in ipairs(affinity.pieces or {}) do
@@ -232,6 +233,7 @@ local function BuildZoneFoundation(state, job)
             classifications = CopyTable(affinity.classifications),
             pieces = pieces,
         },
+        anchorPolicy = CopyTable(job and job.zoneAnchorPolicyDiagnostics),
     }
 end
 

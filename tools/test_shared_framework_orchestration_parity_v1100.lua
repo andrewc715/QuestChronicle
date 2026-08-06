@@ -100,6 +100,22 @@ math.randomseed(seed)
 local expectedChest = ExpectedSource(sources.CHEST)
 local expectedLegs = ExpectedSource(sources.LEGS)
 
+
+local function ZoneAnchorPolicyStub()
+    return {
+        GetAnchorSlots = function() return { "CHEST", "LEGS", "SHOULDER", "WEAPON_BUNDLE" } end,
+        GetAnchorSearchConfiguration = function() return {} end,
+        EvaluateAnchorCandidate = function() return nil end,
+        ScoreAnchorPair = function() return 0, 0.5, nil, false end,
+        ScoreAnchorSkeleton = function() return nil end,
+        BuildNoveltyReference = function() return nil end,
+        ClassifyNovelty = function() return nil end,
+    }
+end
+
+QuestChronicle.Generation = QuestChronicle.Generation or {}
+QuestChronicle.Generation.ZoneAnchorPolicy = ZoneAnchorPolicyStub()
+
 local root = (... and (...):match("^(.*)[/\\]") or "")
 local base = root ~= "" and root .. "/../" or ""
 dofile(base .. "Core/Wardrobe/GenerationPerformance.lua")
@@ -107,6 +123,7 @@ dofile(base .. "Core/Workers/SliceBudget.lua")
 dofile(base .. "Core/Workers/AdaptiveBatch.lua")
 dofile(base .. "Core/Wardrobe/GenerationScheduling.lua")
 dofile(base .. "Core/Wardrobe/GenerationSetupWorker.lua")
+dofile(base .. "Core/Wardrobe/GenerationJobFactory.lua")
 dofile(base .. "Core/Wardrobe/GenerationWorker.lua")
 local generationFiles = {
     "Core/Generation/ModePolicy.lua", "Core/Generation/ModeRegistry.lua",

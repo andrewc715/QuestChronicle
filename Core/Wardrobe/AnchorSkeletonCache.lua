@@ -127,6 +127,7 @@ function P.BuildAnchorCandidate(source, definition, styleMode, styleContext, fix
         baseScore = tonumber(score) or 0,
         scoreReasons = scoreReasons,
         weight = weight,
+        poolRandomValue = randomValue,
         poolPriority = math.log(randomValue) / weight,
         descriptor = descriptor,
         diversityKey = descriptor and ((descriptor.setIDs and descriptor.setIDs[1] and ("SET:" .. tostring(descriptor.setIDs[1])))

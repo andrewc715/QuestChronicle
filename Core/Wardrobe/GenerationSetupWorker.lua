@@ -78,6 +78,8 @@ local function StartContext(job)
         local base = style.GetCurrentContext and style.GetCurrentContext() or nil
         job.styleContext = style.CreateGenerationContext and style.CreateGenerationContext(base) or base
     end
+    if P.AttachGenerationModePolicy then P.AttachGenerationModePolicy(job) end
+    if P.CaptureAnchorPolicyContext then P.CaptureAnchorPolicyContext(job) end
     job.setupSeedIndex = 1
     Record(job, "generationModeContext", started)
 end
@@ -131,7 +133,9 @@ function P.StepGenerationSetup(job)
             job.setupPhase = "NOVELTY"
         elseif job.setupPhase == "NOVELTY" then
             local started = NowMilliseconds()
-            job.currentAnchorNovelty = P.BuildAnchorNoveltyContext and P.BuildAnchorNoveltyContext(job.liveState) or nil
+            job.currentAnchorNovelty = P.BuildAnchorNoveltyReferenceForJob
+                and P.BuildAnchorNoveltyReferenceForJob(job, job.liveState)
+                or (P.BuildAnchorNoveltyContext and P.BuildAnchorNoveltyContext(job.liveState) or nil)
             Record(job, "generationNoveltyReference", started)
             job.setupPhase = "CACHE"
         elseif job.setupPhase == "CACHE" then

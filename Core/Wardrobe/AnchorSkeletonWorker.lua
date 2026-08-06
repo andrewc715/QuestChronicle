@@ -55,6 +55,7 @@ local function CreatePoolWork(job, slotKey)
         locked = job.draft.locks[slotKey] == true,
         requiredMissing = requiredMissing,
         missingReason = missingReason,
+        policyStats = P.NewAnchorPolicyPoolStats and P.NewAnchorPolicyPoolStats(slotKey) or nil,
         done = false,
     }
 end
@@ -70,9 +71,15 @@ local function ContinuePoolCandidate(job, work)
         if not candidate.valid then return true end
         if work.locked then
             local scoringStarted = NowMilliseconds()
-            local fixedCandidate = P.BuildAnchorCandidate(source, work.definition, job.styleMode, job.styleContext, true)
+            local fixedCandidate = P.EvaluateAnchorCandidateForJob
+                and P.EvaluateAnchorCandidateForJob(job, source, work.definition, job.styleContext, true)
+                or P.BuildAnchorCandidate(source, work.definition, job.styleMode, job.styleContext, true)
             RecordPhase(job, "anchorCandidateScoring", scoringStarted)
-            if fixedCandidate then fixedCandidate.locked = true P.AddAnchorPoolCandidate(work, fixedCandidate) end
+            if fixedCandidate then
+                fixedCandidate.locked = true
+                if P.RecordAnchorPolicyCandidate then P.RecordAnchorPolicyCandidate(work, fixedCandidate) end
+                P.AddAnchorPoolCandidate(work, fixedCandidate)
+            end
             return true
         end
         if job.styleEngine and job.styleEngine.GetSourcePreEraEligibility then
@@ -118,10 +125,13 @@ local function ContinuePoolCandidate(job, work)
         if not eligible then return true end
     end
     local scoringStarted = NowMilliseconds()
-    local anchorCandidate = P.BuildAnchorCandidate(candidate.source, work.definition, job.styleMode, job.styleContext)
+    local anchorCandidate = P.EvaluateAnchorCandidateForJob
+        and P.EvaluateAnchorCandidateForJob(job, candidate.source, work.definition, job.styleContext, false)
+        or P.BuildAnchorCandidate(candidate.source, work.definition, job.styleMode, job.styleContext)
     RecordPhase(job, "anchorCandidateScoring", scoringStarted)
     if anchorCandidate then
         anchorCandidate.locked = work.locked
+        if P.RecordAnchorPolicyCandidate then P.RecordAnchorPolicyCandidate(work, anchorCandidate) end
         P.AddAnchorPoolCandidate(work, anchorCandidate)
     end
     return true
@@ -130,6 +140,7 @@ local function StepPoolWork(job, work)
     if work.done then return true end
     if work.sourceIndex > #work.sources then
         P.FinalizeAnchorPool(work)
+        work.policySummary = P.FinalizeAnchorPolicyPoolStats and P.FinalizeAnchorPolicyPoolStats(work) or nil
         if work.locked and #work.pool == 0 then
             work.requiredMissing = true
             work.missingReason = work.missingReason or string.format("locked %s source is not generation-eligible", work.definition.label or work.slotKey)
@@ -187,7 +198,9 @@ local function FinishWeaponExpansion(job, work, expansion, ok, value, notice)
         return
     end
     local scoreStarted = NowMilliseconds()
-    local finalist = P.ScoreWeaponBundleForAnchor(expansion.node, expansion.draft, job.styleMode, expansion.styleContext)
+    local finalist = P.ScoreAnchorSkeletonForJob
+        and P.ScoreAnchorSkeletonForJob(job, expansion.node, expansion.draft, expansion.styleContext)
+        or P.ScoreWeaponBundleForAnchor(expansion.node, expansion.draft, job.styleMode, expansion.styleContext, job)
     RecordPhase(job, "weaponBundleCohesion", scoreStarted)
     if finalist then
         finalist.weaponNotice = notice
@@ -285,6 +298,10 @@ local function BuildSelectedDiagnostics(selected, selectionDetails)
             weaponBase = weaponBase,
             armorRelationships = armorNode.relationshipBonus or 0,
             weaponRelationships = selected.relationshipBonus or 0,
+            visualArmorRelationships = armorNode.visualRelationshipBonus or armorNode.relationshipBonus or 0,
+            zoneArmorPairSupport = armorNode.zonePairSupportBonus or 0,
+            visualWeaponRelationships = selected.visualRelationshipBonus or selected.relationshipBonus or 0,
+            zoneWeaponPairSupport = selected.zonePairSupportBonus or 0,
             hardClashPenalty = -((selected.hardClashes or 0) * 18),
             repeatPenalty = selectionDetails and selectionDetails.repeatPenalty or 0,
         },
@@ -301,8 +318,13 @@ local function CommitSelectedSkeleton(job, work)
 end
 
 function P.CreateAnchorSkeletonWork(job)
+    local anchorSlots = P.GetAnchorSlotsForJob and P.GetAnchorSlotsForJob(job) or P.ANCHOR_SLOT_ORDER
+    local searchConfig = P.GetAnchorSearchConfigurationForJob and P.GetAnchorSearchConfigurationForJob(job) or {}
     return {
         stage = "POOLS",
+        anchorSlots = anchorSlots,
+        searchConfig = searchConfig,
+        policyPoolSummaries = {},
         poolSlotIndex = 1,
         poolWork = nil,
         candidatePools = {},
@@ -320,14 +342,15 @@ function P.StepAnchorSkeletonJob(job, stepStarted)
     if not work then work = P.CreateAnchorSkeletonWork(job) job.anchorWork = work end
     local operations = 0
     while operations < P.GENERATION_OPERATION_SAFETY_CAP do
+        if job.anchorPolicyFatalError then return "FAILED", job.anchorPolicyFatalError end
         if P.ShouldYieldGenerationWorker and P.ShouldYieldGenerationWorker(job, 0.5) then return "RUNNING" end
         if work.stage == "POOLS" then
-            if work.poolSlotIndex > #P.ANCHOR_SLOT_ORDER then
-                work.beamWork = P.CreateAnchorBeamWork(work.candidatePools)
+            if work.poolSlotIndex > #(work.anchorSlots or P.ANCHOR_SLOT_ORDER) then
+                work.beamWork = P.CreateAnchorBeamWork(work.candidatePools, job, work.searchConfig, work.anchorSlots)
                 work.stage = "BEAM"
                 return "RUNNING"
             else
-                local slotKey = P.ANCHOR_SLOT_ORDER[work.poolSlotIndex]
+                local slotKey = (work.anchorSlots or P.ANCHOR_SLOT_ORDER)[work.poolSlotIndex]
                 if not work.poolWork then work.poolWork = CreatePoolWork(job, slotKey) end
                 if StepPoolWork(job, work.poolWork) then
                     if work.poolWork.requiredMissing then
@@ -336,6 +359,7 @@ function P.StepAnchorSkeletonJob(job, stepStarted)
                     end
                     work.candidatePools[slotKey] = work.poolWork.pool
                     work.poolSizes[slotKey] = #work.poolWork.pool
+                    if work.poolWork.policySummary then work.policyPoolSummaries[slotKey] = work.poolWork.policySummary end
                     work.poolSlotIndex = work.poolSlotIndex + 1
                     work.poolWork = nil
                 end
@@ -375,7 +399,9 @@ function P.StepAnchorSkeletonJob(job, stepStarted)
 end
 function P.AdvanceAnchorGenerationPhase(job, stepStarted)
     local status, reason = P.StepAnchorSkeletonJob(job, stepStarted)
-    if status == "READY" then
+    if status == "FAILED" then
+        return status, reason
+    elseif status == "READY" then
         job.phase = P.StepSupportGenerationJob and "SUPPORT" or "ARMOR"
         job.armorOrder = P.SUPPORTING_ARMOR_GENERATION_ORDER
         job.armorIndex, job.armorWork = 1, nil
