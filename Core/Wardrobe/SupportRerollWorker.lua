@@ -150,6 +150,9 @@ Finish = function(job, success, message, resultOverride)
         steps = job.steps or 0, maxStepMs = job.maxStepMs or 0, phaseStats = job.phaseStats or {},
     }
     P.lastGenerationPerformance = performance
+    if job.sharedAction and QC.Generation and QC.Generation.CompleteAction then
+        QC.Generation.CompleteAction(job.sharedAction, success == true, message, performance)
+    end
     P.supportRerollJob = nil
     job.resultOverride = resultOverride
     Notify("WARDROBE_GENERATION_COMPLETE", success == true, message, performance)

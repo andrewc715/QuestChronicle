@@ -12,7 +12,7 @@ local function CountSelectedArmor(state)
     return count
 end
 
-local function StartSupportReroll(slotKey, styleMode)
+local function StartSupportReroll(slotKey, styleMode, sharedPolicy, sharedAction)
     if Wardrobe.IsGenerating and Wardrobe.IsGenerating() then return false, "Quest Chronicle is already preparing an outfit." end
     if Wardrobe.IsScanning and Wardrobe.IsScanning() then return false, "Wait for the wardrobe scan to finish before rerolling an appearance." end
     if not C_Timer or type(C_Timer.After) ~= "function" then return false, "Quest Chronicle could not schedule the cooperative support-slot reroll. Try /reload." end
@@ -26,6 +26,8 @@ local function StartSupportReroll(slotKey, styleMode)
     local manifest = P.CreateSupportRerollManifest(liveState, slotKey, styleMode, token)
     local job = {
         token = token, manifest = manifest, liveState = liveState,
+        sharedFrameworkPolicy = sharedPolicy, sharedAction = sharedAction,
+        generationImplementation = sharedPolicy and "SHARED_FRAMEWORK" or "LEGACY",
         action = "REROLL_SLOT", actionSlotKey = slotKey, performedAnchorSelection = false,
         supportReroll = true, reuseAnchorSnapshot = true, styleMode = styleMode,
         slotLabel = P.slotByKey[slotKey] and P.slotByKey[slotKey].label or slotKey,
@@ -43,14 +45,14 @@ local function StartSupportReroll(slotKey, styleMode)
     return true, "Rerolling " .. tostring(job.slotLabel) .. " contextually...", true
 end
 
-Wardrobe.RerollSlot = function(slotKey)
+Wardrobe.RerollSlot = function(slotKey, sharedPolicy, sharedAction)
     local definition = P.slotByKey[slotKey]
     if not definition then return false, "Unknown equipment slot." end
     if Wardrobe.IsSlotLocked(slotKey) then return false, "Unlock this slot before rerolling it." end
     local state = P.EnsurePreviewState()
     local style = QC.ZoneStyle
     local styleMode = style and style.NormalizeMode(state.styleMode) or state.styleMode
-    if P.IsSupportSlotKey(slotKey) then return StartSupportReroll(slotKey, styleMode) end
+    if P.IsSupportSlotKey(slotKey) then return StartSupportReroll(slotKey, styleMode, sharedPolicy, sharedAction) end
 
     local ok, message = originalRerollSlot(slotKey)
     if ok then

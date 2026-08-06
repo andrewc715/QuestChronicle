@@ -15,25 +15,23 @@
         "~\\.vscode\\extensions\\ketho.wow-api-0.22.3\\Annotations\\Core"
     ],
     "Lua.diagnostics.globals": [
-        "TRANSMOG_SOURCE_BOSS_DROP",
+        "UIErrorsFrame",
+        "DEFAULT_CHAT_FRAME",
+        "SlashCmdList",
+        "INVSLOT_LAST_EQUIPPED",
+        "ItemUtil",
         "TransmogUtil",
         "WardrobeCollectionFrame",
         "CollectionWardrobeUtil",
-        "Settings",
-        "ITEM_QUALITY_COLORS",
-        "UIErrorsFrame",
+        "TRANSMOG_SOURCE_BOSS_DROP",
+        "UISpecialFrames",
+        "PanelTemplates_SelectTab",
+        "PanelTemplates_DeselectTab",
         "StaticPopupDialogs",
         "YES",
         "NO",
         "StaticPopup_Show",
-        "UISpecialFrames",
-        "PanelTemplates_SelectTab",
-        "PanelTemplates_DeselectTab",
-        "DEFAULT_CHAT_FRAME",
-        "SlashCmdList",
-        "SAVE",
-        "CANCEL",
-        "ItemUtil",
-        "INVSLOT_LAST_EQUIPPED"
+        "ITEM_QUALITY_COLORS",
+        "Settings"
     ]
 }

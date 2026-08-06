@@ -49,7 +49,7 @@ P.builders[#P.builders + 1] = function(C)
 
     C.rerollSlot:SetScript("OnClick", function()
         local slotKey = P.GetCurrentSlot()
-        local ok, message = Wardrobe.RerollSlot(slotKey)
+        local ok, message = QC.Generation.RerollCurrentModeSlot(slotKey, { modeID = ZoneStyle.GetMode() })
         if ok and not Wardrobe.IsGenerating() then Wardrobe.ApplyPreview(C.model) end
         C.pane:Refresh(message)
     end)

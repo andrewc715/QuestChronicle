@@ -166,6 +166,7 @@ local function AddOverview(lines, report, rich)
     if report.actionSlotKey then action = action .. " • " .. tostring(report.actionSlotKey) end
     Add(lines, "Action: " .. action)
     Add(lines, "Mode: " .. tostring(MODE_LABELS[report.mode] or report.mode or "Unknown"))
+    if report.generationImplementation then Add(lines, "Generation implementation: " .. tostring(report.generationImplementation)) end
     Add(lines, "Result: " .. tostring(RESULT_LABELS[report.result] or report.result or "Unknown"))
     if report.anchorPhase == "REUSED" then
         Add(lines, "Anchor phase: Reused from parent report")

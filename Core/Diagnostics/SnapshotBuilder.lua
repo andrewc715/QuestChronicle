@@ -211,6 +211,7 @@ local function BuildGenerationSeed(job, success, message)
         action = action,
         actionSlotKey = job and job.actionSlotKey or nil,
         mode = job and job.styleMode or state.styleMode,
+        generationImplementation = job and job.generationImplementation or nil,
         result = ResolveResult(success, message, job and (job.anchorFallbackReason or job.supportFallbackReason), job and job.resultOverride),
         success = success == true,
         message = tostring(message or ""),
@@ -315,11 +316,11 @@ end
 function D.InstallRerollSlotWrapper()
     if DP.rerollSlotWrapped or not Wardrobe or type(Wardrobe.RerollSlot) ~= "function" then return false end
     local original = Wardrobe.RerollSlot
-    Wardrobe.RerollSlot = function(slotKey)
-        if WP and WP.IsSupportSlotKey and WP.IsSupportSlotKey(slotKey) then return original(slotKey) end
+    Wardrobe.RerollSlot = function(slotKey, ...)
+        if WP and WP.IsSupportSlotKey and WP.IsSupportSlotKey(slotKey) then return original(slotKey, ...) end
         local identity = D.BeginGenerationAttempt and D.BeginGenerationAttempt("REROLL_SLOT", slotKey) or nil
         local started = DP.NowMilliseconds()
-        local ok, message, asynchronous = original(slotKey)
+        local ok, message, asynchronous = original(slotKey, ...)
         if asynchronous then return ok, message, asynchronous end
         local elapsed = math.max(0, DP.NowMilliseconds() - started)
         local state = WP and WP.EnsurePreviewState and WP.EnsurePreviewState() or nil

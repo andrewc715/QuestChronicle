@@ -51,6 +51,7 @@ local function FinishJob(job, success, message)
             selectedArmor = job.selectedArmor or 0,
         }
     P.lastGenerationPerformance = performance
+    if job.sharedAction and QC.Generation and QC.Generation.CompleteAction then QC.Generation.CompleteAction(job.sharedAction, success == true, message, performance) end
     P.generationJob = nil
     local notifyStarted = NowMilliseconds()
     Notify("WARDROBE_GENERATION_COMPLETE", success == true, message, performance)
@@ -308,9 +309,18 @@ local function ProcessArmor(job, stepStarted, slice)
     end
     return true
 end
+
+P.ProcessLegacyArmorGeneration, P.CommitSharedGenerationDraft = ProcessArmor, CommitDraft
+function P.GetSharedGenerationRuntime()
+    return { NowMilliseconds = NowMilliseconds, BeginWorkerSlice = BeginWorkerSlice,
+        WorkerShouldYield = WorkerShouldYield, RecordPhase = RecordPhase, ScheduleNextStep = ScheduleNextStep,
+        FinishJob = FinishJob, AccumulateSliceDiagnostics = P.AccumulateGenerationSliceDiagnostics,
+        CanStartPhase = function(job, reserveMs) return not P.CanStartGenerationPhase or P.CanStartGenerationPhase(job, reserveMs) end }
+end
 function P.StepGenerationJob(token)
     local job = P.generationJob
     if not job or job.token ~= token then return end
+    if job.sharedFrameworkPolicy and QC.Generation and QC.Generation.StepSharedGenerationJob then return QC.Generation.StepSharedGenerationJob(job, job.sharedFrameworkPolicy, job.sharedFrameworkPolicy.runtime) end
     job.steps = job.steps + 1
     local stepStarted = NowMilliseconds()
     local slice = BeginWorkerSlice()
@@ -436,7 +446,7 @@ function Wardrobe.CancelGeneration(reason)
     FinishJob(job, false, reason or "Outfit generation was cancelled.")
     return true
 end
-function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
+function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode, sharedPolicy, sharedAction)
     if Wardrobe.IsGenerating() then return false, "Quest Chronicle is already generating an outfit." end
     if Wardrobe.IsScanning() then return false, "Wait for the wardrobe scan to finish before generating an outfit." end
     local cache = P.EnsureCache()
@@ -454,6 +464,7 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
                 and P.BuildGenerationCachePerformance(nil) or nil,
         }
         P.lastGenerationPerformance = performance
+        if sharedAction and QC.Generation and QC.Generation.CompleteAction then QC.Generation.CompleteAction(sharedAction, ok == true, message, performance) end
         Notify("WARDROBE_GENERATION_COMPLETE", ok == true, message, performance)
         if QC.Diagnostics and QC.Diagnostics.RecordImmediateAttempt then QC.Diagnostics.RecordImmediateAttempt({ action = reroll and "REROLL_UNLOCKED" or "GENERATE_OUTFIT", reroll = reroll == true, liveState = P.EnsurePreviewState(), draft = P.EnsurePreviewState(), styleMode = requestedStyleMode, diagnosticIdentity = diagnosticIdentity }, ok == true, message, performance) end
         return ok, message
@@ -464,6 +475,8 @@ function Wardrobe.StartGenerateOutfit(reroll, requestedStyleMode)
     local job = {
         token = P.generationToken,
         action = reroll and "REROLL_UNLOCKED" or "GENERATE_OUTFIT",
+        sharedFrameworkPolicy = sharedPolicy, sharedAction = sharedAction,
+        generationImplementation = sharedPolicy and "SHARED_FRAMEWORK" or "LEGACY",
         reroll = reroll == true,
         requestedStyleMode = requestedStyleMode,
         liveState = liveState,

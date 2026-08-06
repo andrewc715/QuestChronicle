@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.10.0 - 2026-08-05
+
+### Shared generation framework extraction
+
+- Added the authoritative generation mode registry, mode policy contract, and mode-neutral action API.
+- Routed Traveler Generate Outfit, Reroll Unlocked, contextual support rerolls, cancellation, and action state through the shared framework.
+- Extracted cooperative phase routing for setup, anchors, support validation, alternate-skeleton repair, fallback candidates, weapons, and atomic commit.
+- Added shared visual-language access and explicit Traveler context, anchor, support, validation, and diagnostics policies.
+- Kept Zone Native, Class Fantasy, and Chronicle Echo unchanged behind explicit legacy adapters.
+
+### Parity and compatibility
+
+- Preserved all v1.9.0.15 Traveler scoring, selection, repair, reroll, weapon-route, cache, scheduler, and report providers.
+- Preserved all six curated descriptor corrections, including dark/blue/steel Orcish Scout Boots with no green classification.
+- Added additive `SHARED_FRAMEWORK` and `LEGACY` implementation identity to immutable diagnostics.
+- Retained every SavedVariables, Courier, wardrobe-cache, generation-cache, diagnostic, weapon-index, tuning-audit, and curated-tuning format.
+- Added no UI redesign, mode rename, cache reset, Courier change, or legacy individual anchor/weapon-reroll rewrite.
+
 ## 1.9.0.15 - 2026-08-05
 
 ### Traveler Phase E promotion

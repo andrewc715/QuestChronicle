@@ -2,7 +2,7 @@
 ## Title: Quest Chronicle
 ## Notes: Records quest lifecycle, objective progress, completions, and roleplay notes, with a native-styled Chronicle window.
 ## Author: OpenAI & Andrew
-## Version: 1.9.0.15
+## Version: 1.10.0
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## AddonCompartmentFunc: QuestChronicle_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: QuestChronicle_OnAddonCompartmentEnter
@@ -91,6 +91,32 @@ Core\Diagnostics\SnapshotBuilder.lua
 Core\Diagnostics\SupportReportFormatter.lua
 Core\Diagnostics\ReportFormatter.lua
 Core\ZoneStyle\Traveler\Debug.lua
+Core\Generation\ModePolicy.lua
+Core\Generation\ModeRegistry.lua
+Core\Generation\GenerationLifecycle.lua
+Core\Generation\SchedulerEngine.lua
+Core\Generation\ContextProvider.lua
+Core\Generation\AnchorEngine.lua
+Core\Generation\ValidationEngine.lua
+Core\Generation\RepairEngine.lua
+Core\Generation\SupportEngine.lua
+Core\Generation\CandidateEngine.lua
+Core\Generation\WeaponEngine.lua
+Core\Generation\CommitEngine.lua
+Core\Generation\DiagnosticsEngine.lua
+Core\Generation\RerollEngine.lua
+Core\Generation\VisualLanguage.lua
+Core\Generation\GenerationJob.lua
+Core\Generation\Modes\Traveler\Context.lua
+Core\Generation\Modes\Traveler\AnchorPolicy.lua
+Core\Generation\Modes\Traveler\SupportPolicy.lua
+Core\Generation\Modes\Traveler\ValidationPolicy.lua
+Core\Generation\Modes\Traveler\Diagnostics.lua
+Core\Generation\Modes\Traveler\Policy.lua
+Core\Generation\Modes\ZoneLegacyAdapter.lua
+Core\Generation\Modes\ClassLegacyAdapter.lua
+Core\Generation\Modes\EchoLegacyAdapter.lua
+Core\Generation\GenerationAPI.lua
 UI\ChronicleTab.lua
 UI\ActiveQuestsTab.lua
 UI\NoteTab.lua

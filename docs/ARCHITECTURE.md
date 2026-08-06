@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.9.0.15 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.10.0 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -10,8 +10,18 @@ The TOC is the dependency manifest. Modules must remain in the listed order.
 2. UI Shared initializes the callback bus and common widget helpers.
 3. Wardrobe modules build the collection, generation, concepts, Custom Set, and preview APIs.
 4. ZoneStyle modules build context, source metadata, and scoring APIs.
-5. Tab modules register their constructors.
-6. MainWindow and MinimapButton connect the assembled interface.
+5. Shared-generation modules register the framework, Traveler policy, and legacy mode adapters.
+6. Tab modules register their constructors and route generation actions through `QuestChronicle.Generation`.
+7. MainWindow and MinimapButton connect the assembled interface.
+
+
+## Shared generation framework
+
+`Core/Generation` owns mode registration, action lifecycle, cooperative phase routing, validation and repair routing, legal weapon-phase routing, atomic commit routing, modern reroll lifecycle, and implementation diagnostics.
+
+Traveler supplies mode policy through `Core/Generation/Modes/Traveler`. Its calibrated v1.9.0.15 scoring and selection implementations remain in the established Wardrobe and ZoneStyle modules behind explicit callbacks. Zone Native, Class Fantasy, and Chronicle Echo use explicit legacy adapters until their dedicated rewrite trains.
+
+Shared root modules must not import Traveler mode constants or encode Traveler-specific scoring rules. Chronicle-specific quest and journey data reaches a mode through the context-policy boundary rather than direct imports from the shared engine.
 
 ## Private implementation namespaces
 

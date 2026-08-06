@@ -1,8 +1,12 @@
-# Quest Chronicle v1.9.0.15
+# Quest Chronicle v1.10.0
 
-> **Traveler Cohesion Rewrite complete:** Phase E promotes the Retail-validated curated descriptor set and preserves the full Phase B, Phase C, and Phase D pipeline.
+> **Shared Generation Framework:** Traveler now runs through a mode-neutral orchestration layer while Zone Native, Class Fantasy, and Chronicle Echo remain behaviorally unchanged behind explicit legacy adapters.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.9.0.15 finalizes the Traveler Cohesion Rewrite with six reviewed visual-ID descriptor corrections, a bounded local tuning audit, completed-outfit validation, deterministic outlier repair, cooperative generation, and stable equipped-weapon-safe routes.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.10.0 extracts the live-validated Traveler action lifecycle, cooperative phase routing, candidate orchestration, final-validation routing, repair routing, legal weapon handling, atomic commit, contextual support rerolls, and implementation diagnostics behind a shared generation API.
+
+The release preserves the complete v1.9.0.15 Traveler result contract: selections, scores, mismatch ledgers, repairs, novelty, weapon routes, locks, hidden slots, random consumption, scheduler counters, reports, caches, and tuning observations. The six curated visual corrections remain exact, including dark/blue/steel Orcish Scout Boots with no green classification.
+
+Zone Native, Class Fantasy, and Chronicle Echo retain their existing generation behavior through explicit `LEGACY` adapters. Their policy rewrites begin in the v1.11.x, v1.12.x, and v1.13.x release trains respectively.
 
 ## Traveler Phase E: curated tuning
 

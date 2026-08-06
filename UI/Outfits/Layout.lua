@@ -397,11 +397,18 @@ P.builders[#P.builders + 1] = function(C)
     UI.SetTooltip(C.clearAll, "Reset Outfit", "Clear selections, locks, and hidden-slot choices, returning the preview to currently equipped gear.")
 
     local function StartGeneration(reroll)
-        local starter = Wardrobe.StartGenerateOutfit or Wardrobe.GenerateOutfit
-        local ok, message = starter(reroll == true, ZoneStyle.GetMode())
+        local generation = QC.Generation
+        local starter = reroll and generation and generation.RerollUnlockedCurrentMode
+            or generation and generation.GenerateCurrentMode
+        local ok, message, deferred
+        if starter then
+            ok, message, deferred = starter({ modeID = ZoneStyle.GetMode() })
+        else
+            ok, message, deferred = false, "Quest Chronicle generation routing is unavailable. Try /reload."
+        end
         if not ok then
             C.pane:Refresh(message)
-        elseif not Wardrobe.StartGenerateOutfit then
+        elseif not deferred then
             Wardrobe.ApplyPreview(C.model)
             C.pane:Refresh(message)
         end
