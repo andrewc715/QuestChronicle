@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.10.0 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.11.0 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -22,6 +22,36 @@ The TOC is the dependency manifest. Modules must remain in the listed order.
 Traveler supplies mode policy through `Core/Generation/Modes/Traveler`. Its calibrated v1.9.0.15 scoring and selection implementations remain in the established Wardrobe and ZoneStyle modules behind explicit callbacks. Zone Native, Class Fantasy, and Chronicle Echo use explicit legacy adapters until their dedicated rewrite trains.
 
 Shared root modules must not import Traveler mode constants or encode Traveler-specific scoring rules. Chronicle-specific quest and journey data reaches a mode through the context-policy boundary rather than direct imports from the shared engine.
+
+## Zone context and evidence foundation
+
+`Core/ZoneStyle/Zone` owns the v1.11.0 Zone Context Snapshot, ordered registries, evidence ledger, compatibility compiler, canonical style evidence, selected-look affinity, and on-demand diagnostics.
+
+The boundary is intentionally selection-neutral:
+
+```text
+World location APIs
+    → immutable Zone Context Snapshot v1
+        → legacy compatibility view → existing Zone Native generator
+        → evidence ledger → /qc zone debug and Debug History
+        → shared visual language → selected-look Zone affinity
+        → future v1.11.x Zone policy
+```
+
+`ProfileRegistry.lua` preserves the 25 broad style profiles and their original resolution order. `ProvenanceRegistry.lua` separately preserves 134 local source-pool definitions. `StartingZoneRegistry.lua` preserves 30 racial and hero-class opening cases. Registry validation rejects malformed keys, duplicate registration, invalid aliases, missing canonical style definitions, and count drift while preserving intentional cross-profile alias overlap and legacy precedence.
+
+`ContextResolver.lua` captures map ID, map name, zone, subzone, and parent-map trail, then resolves profile identity, expansion ceiling, provenance, restrictions, and fallback state. The snapshot includes registry versions, explicit confidence, evidence ancestry, coverage states, and a deterministic fingerprint. It is cached only for the current session and public access returns primitive copies.
+
+`Compatibility.lua` compiles the snapshot back into the exact v1.10.0 context shape. The existing Zone Native scoring and generation modules remain authoritative in v1.11.0 and do not read canonical style evidence.
+
+`Affinity.lua` observes only already selected visible pieces. It combines the shared descriptor language with Zone palette, material, finish, motif, culture, magic, provenance, and avoid evidence. It does not enumerate candidate pools, alter scores, or consume random values.
+
+Zone Native therefore reports:
+
+```text
+Generation implementation: LEGACY
+Zone foundation: CONTEXT_EVIDENCE_V1
+```
 
 ## Private implementation namespaces
 

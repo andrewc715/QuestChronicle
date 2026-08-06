@@ -1,12 +1,46 @@
-# Quest Chronicle v1.10.0
+# Quest Chronicle v1.11.0
 
-> **Shared Generation Framework:** Traveler now runs through a mode-neutral orchestration layer while Zone Native, Class Fantasy, and Chronicle Echo remain behaviorally unchanged behind explicit legacy adapters.
+> **Zone Context and Evidence Foundation:** Zone Native remains behaviorally unchanged behind its `LEGACY` adapter while gaining an immutable `CONTEXT_EVIDENCE_V1` snapshot, validated registries, evidence ancestry, and read-only Zone affinity diagnostics.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.10.0 extracts the live-validated Traveler action lifecycle, cooperative phase routing, candidate orchestration, final-validation routing, repair routing, legal weapon handling, atomic commit, contextual support rerolls, and implementation diagnostics behind a shared generation API.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.11.0 begins the Zone implementation train without changing Zone Native selection behavior.
 
-The release preserves the complete v1.9.0.15 Traveler result contract: selections, scores, mismatch ledgers, repairs, novelty, weapon routes, locks, hidden slots, random consumption, scheduler counters, reports, caches, and tuning observations. The six curated visual corrections remain exact, including dark/blue/steel Orcish Scout Boots with no green classification.
+The release migrates the existing 25 broad style profiles, 134 provenance pools, and 30 starting-zone cases into validated registries. It resolves live location facts into a deterministic Zone Context Snapshot containing profile identity, expansion era, provenance, canonical style channels, restrictions, fallback status, confidence, and bounded evidence ancestry. A compatibility view reproduces the v1.10.0 context consumed by the existing generator.
 
-Zone Native, Class Fantasy, and Chronicle Echo retain their existing generation behavior through explicit `LEGACY` adapters. Their policy rewrites begin in the v1.11.x, v1.12.x, and v1.13.x release trains respectively.
+Zone Native continues to report:
+
+```text
+Generation implementation: LEGACY
+Zone foundation: CONTEXT_EVIDENCE_V1
+```
+
+Traveler remains `SHARED_FRAMEWORK`. Class Fantasy and Chronicle Echo remain `LEGACY`. No SavedVariables migration, cache reset, wardrobe rescan, scoring change, random-order change, UI redesign, or Courier update is required.
+
+## Zone context and evidence foundation
+
+The new Zone foundation separates three responsibilities:
+
+```text
+Location facts   What WoW reports
+Zone evidence    What those facts imply about the place
+Mode preference  Why a future Zone policy should prefer an appearance
+```
+
+v1.11.0 implements the first two and deliberately leaves the third on the existing legacy path.
+
+New capabilities include:
+
+- immutable Zone Context Snapshot format 1;
+- deterministic evidence ledger with resolution level and confidence;
+- validated profile, provenance, and starting-zone registries;
+- explicit separation of broad style identity from local source provenance;
+- canonical culture, climate, terrain, palette, material, finish, motif, magic, silhouette, and avoid channels;
+- deterministic snapshot fingerprints and session-only cache identity;
+- a compatibility compiler that preserves every legacy context field;
+- selected-outfit-only Zone affinity analysis through the shared visual language;
+- `/qc zone debug` output for identity, era, provenance, fallback, coverage, affinity, and evidence ancestry;
+- compact additive Zone sections in immutable Debug History reports.
+
+The new foundation consumes no random values and does not scan candidate pools. It observes only the already selected visible outfit when producing affinity diagnostics.
 
 ## Traveler Phase E: curated tuning
 

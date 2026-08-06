@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.11.0 - 2026-08-05
+
+### Zone context and evidence foundation
+
+- Added immutable Zone Context Snapshot format 1 with deterministic identity, era, provenance, restrictions, fallback, canonical style channels, confidence, and evidence ancestry.
+- Migrated all 25 broad style profiles, 134 provenance profiles, and 30 starting-zone cases into validated ordered registries while preserving exact legacy fields and precedence.
+- Added explicit separation between broad style identity and local source provenance.
+- Added canonical culture, climate, terrain, palette, material, finish, motif, magic, silhouette, and avoid evidence for every broad Zone profile.
+- Added a compatibility compiler that reproduces the v1.10.0 context consumed by the existing Zone Native generator.
+
+### Diagnostics and parity
+
+- Added read-only selected-outfit Zone affinity through the shared visual language.
+- Added `/qc zone debug` and compact additive Zone foundation sections in Debug History.
+- Kept Zone Native truthfully marked `LEGACY` with secondary foundation identity `CONTEXT_EVIDENCE_V1`.
+- Preserved Zone scoring, eligibility, random consumption, generation, suggestions, favorites, exclusions, legal weapon routes, locks, and hidden state.
+- Preserved Traveler as `SHARED_FRAMEWORK` and Class Fantasy and Chronicle Echo as `LEGACY`.
+- Added no SavedVariables migration, cache reset, UI redesign, or Courier change.
+
 ## 1.10.0 - 2026-08-05
 
 ### Shared generation framework extraction

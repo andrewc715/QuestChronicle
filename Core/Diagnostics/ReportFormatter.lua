@@ -167,6 +167,7 @@ local function AddOverview(lines, report, rich)
     Add(lines, "Action: " .. action)
     Add(lines, "Mode: " .. tostring(MODE_LABELS[report.mode] or report.mode or "Unknown"))
     if report.generationImplementation then Add(lines, "Generation implementation: " .. tostring(report.generationImplementation)) end
+    if report.zoneFoundation and report.zoneFoundation.foundation then Add(lines, "Zone foundation: " .. tostring(report.zoneFoundation.foundation)) end
     Add(lines, "Result: " .. tostring(RESULT_LABELS[report.result] or report.result or "Unknown"))
     if report.anchorPhase == "REUSED" then
         Add(lines, "Anchor phase: Reused from parent report")
@@ -191,6 +192,56 @@ local function AddOverview(lines, report, rich)
         Add(lines, string.format("Largest instrumented call: %s %.1f ms", PHASE_LABELS[performance.largestInstrumentedCallPhase or performance.slowestPhase] or tostring(performance.largestInstrumentedCallPhase or performance.slowestPhase or "Unknown"), tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0))
     end
     Add(lines, "Fallback: " .. tostring((report.skeleton and report.skeleton.fallbackReason) or report.supportFallbackReason or "None"))
+end
+
+local function AddZoneFoundation(lines, report, rich)
+    local foundation = report.zoneFoundation
+    if type(foundation) ~= "table" then return end
+    AddHeading(lines, "Zone Context and Evidence", rich)
+    Add(lines, string.format(
+        "Foundation: %s • context format %s • profile registry %s • provenance registry %s",
+        tostring(foundation.foundation or "Unknown"), tostring(foundation.contextFormat or "?"),
+        tostring(foundation.profileRegistryVersion or "?"), tostring(foundation.provenanceRegistryVersion or "?")
+    ))
+    local identity = foundation.identity or {}
+    Add(lines, string.format(
+        "Profile: %s (%s) • %s • confidence %.2f",
+        tostring(identity.label or "Unknown"), tostring(identity.profileKey or "unknown"),
+        tostring(identity.resolutionLevel or "UNRESOLVED"), tonumber(identity.confidence) or 0
+    ))
+    local era = foundation.era or {}
+    Add(lines, string.format(
+        "Era: Through %s • %s • confidence %.2f",
+        tostring(era.shortLabel or era.label or "Unknown"), tostring(era.resolutionLevel or "UNRESOLVED"),
+        tonumber(era.confidence) or 0
+    ))
+    local provenance = foundation.provenance or {}
+    Add(lines, string.format(
+        "Provenance: %s%s • %s • confidence %.2f",
+        tostring(provenance.label or "Unresolved"), provenance.key and (" (" .. tostring(provenance.key) .. ")") or "",
+        tostring(provenance.resolutionLevel or "UNRESOLVED"), tonumber(provenance.confidence) or 0
+    ))
+    local fallback = foundation.fallback or {}
+    Add(lines, "Fallback: " .. (fallback.used and (tostring(fallback.level or "Used") .. (fallback.reason and (" • " .. tostring(fallback.reason)) or "")) or "None"))
+    Add(lines, "Compatibility parity: " .. tostring(foundation.compatibility or "Unknown"))
+    Add(lines, string.format("Evidence ancestry: %d entries • snapshot %s", tonumber(foundation.evidenceCount) or 0, tostring(foundation.fingerprint or "Unknown")))
+    local known, missing = {}, {}
+    for key, value in pairs(foundation.coverage or {}) do
+        if value == "KNOWN" then known[#known + 1] = key else missing[#missing + 1] = key .. "=" .. tostring(value) end
+    end
+    table.sort(known)
+    table.sort(missing)
+    Add(lines, "Known style channels: " .. (#known > 0 and table.concat(known, ", ") or "None"))
+    Add(lines, "Missing style channels: " .. (#missing > 0 and table.concat(missing, ", ") or "None"))
+    local affinity = foundation.affinity or {}
+    Add(lines, string.format(
+        "Selected-outfit Zone affinity: %.3f • confidence %.3f • %d pieces",
+        tonumber(affinity.score) or 0, tonumber(affinity.confidence) or 0, tonumber(affinity.selected) or 0
+    ))
+    local classes = {}
+    for key, value in pairs(affinity.classifications or {}) do classes[#classes + 1] = tostring(key) .. "=" .. tostring(value) end
+    table.sort(classes)
+    Add(lines, "Affinity classes: " .. (#classes > 0 and table.concat(classes, " • ") or "None"))
 end
 
 local function AddSkeleton(lines, report, rawIDs, rich)
@@ -350,6 +401,7 @@ local function Format(report, options)
     options = options or {}
     local lines = {}
     AddOverview(lines, report, options.rich)
+    AddZoneFoundation(lines, report, options.rich)
     AddSkeleton(lines, report, options.rawIDs, options.rich)
     if P.AddSupportSection then P.AddSupportSection(lines, report, options.rawIDs, options.rich) end
     AddBeam(lines, report, options.verbose, options.rich)

@@ -185,6 +185,53 @@ local function ResolveResult(success, message, fallbackReason, resultOverride)
     return "FAILED"
 end
 
+
+local function BuildZoneFoundation(state, job)
+    local ZoneStyle = QC.ZoneStyle
+    local mode = job and job.styleMode or state and state.styleMode
+    if not ZoneStyle or mode ~= ZoneStyle.MODE_ZONE_NATIVE then return nil end
+    local Zone = ZoneStyle.Zone
+    if not Zone or not ZoneStyle.GetZoneContextSnapshot then return nil end
+    local snapshot = ZoneStyle.GetZoneContextSnapshot()
+    local affinity = Zone.BuildSelectedOutfitAffinity and Zone.BuildSelectedOutfitAffinity(state, snapshot) or {}
+    local pieces = {}
+    for _, piece in ipairs(affinity.pieces or {}) do
+        pieces[#pieces + 1] = {
+            slotKey = piece.slotKey,
+            sourceID = piece.sourceID,
+            visualID = piece.visualID,
+            score = tonumber(piece.score) or 0,
+            confidence = tonumber(piece.confidence) or 0,
+            classification = piece.classification,
+            missingChannels = CopyTable(piece.missingChannels),
+        }
+    end
+    local compatibility = ZoneStyle.GetZoneCompatibilityStatus and ZoneStyle.GetZoneCompatibilityStatus() or { pass = true }
+    return {
+        foundation = Zone.FOUNDATION_ID,
+        contextFormat = snapshot.format,
+        profileRegistryVersion = snapshot.registryVersion,
+        provenanceRegistryVersion = snapshot.provenanceRegistryVersion,
+        affinityFormat = Zone.AFFINITY_FORMAT,
+        fingerprint = snapshot.fingerprint,
+        identity = CopyTable(snapshot.identity),
+        era = CopyTable(snapshot.era),
+        provenance = CopyTable(snapshot.provenance),
+        fallback = CopyTable(snapshot.fallback),
+        coverage = CopyTable(snapshot.style and snapshot.style.coverage),
+        evidenceCount = #(snapshot.evidence and snapshot.evidence.entries or {}),
+        compatibility = compatibility.pass == true and "PASS" or "FAIL",
+        compatibilityDifferences = CopyTable(compatibility.differences),
+        affinity = {
+            selected = tonumber(affinity.selected) or 0,
+            score = tonumber(affinity.score) or 0,
+            confidence = tonumber(affinity.confidence) or 0,
+            classifications = CopyTable(affinity.classifications),
+            pieces = pieces,
+        },
+    }
+end
+
 local function BuildGenerationSeed(job, success, message)
     local state = job and (job.liveState or job.draft) or (WP and WP.EnsurePreviewState and WP.EnsurePreviewState()) or {}
     local action = job and job.action
@@ -212,6 +259,7 @@ local function BuildGenerationSeed(job, success, message)
         actionSlotKey = job and job.actionSlotKey or nil,
         mode = job and job.styleMode or state.styleMode,
         generationImplementation = job and job.generationImplementation or nil,
+        zoneFoundation = BuildZoneFoundation(state, job),
         result = ResolveResult(success, message, job and (job.anchorFallbackReason or job.supportFallbackReason), job and job.resultOverride),
         success = success == true,
         message = tostring(message or ""),

@@ -1,58 +1,62 @@
-# Quest Chronicle v1.10.0
+# Quest Chronicle v1.11.0
 
-## Shared Generation Framework extraction
+## Zone context and evidence foundation
 
-Quest Chronicle v1.10.0 extracts the live-validated Traveler generation orchestration into a shared, mode-neutral framework without changing Traveler's semantic results.
+Quest Chronicle v1.11.0 begins the Zone implementation train with a deterministic, immutable, versioned context and evidence model. Zone Native selection remains unchanged behind its existing legacy generator.
 
-### Shared framework
-
-- Adds one authoritative mode registry and policy contract.
-- Routes Generate Outfit, Reroll Unlocked, contextual support rerolls, cancellation, and generation-state queries through `QuestChronicle.Generation`.
-- Gives the shared layer ownership of action identity, lifecycle state, cooperative phase routing, candidate-phase routing, validation and alternate-skeleton routing, weapon-phase routing, atomic commit routing, contextual reroll lifecycle, and implementation diagnostics.
-- Keeps the calibrated selection and scoring implementations behind explicit Traveler policy callbacks to preserve exact v1.9.0.15 behavior.
-- Adds shared visual-language access for descriptors, pair cohesion, and curated metadata.
-
-### Mode implementations
+### Runtime identity
 
 ```text
 Traveler        SHARED_FRAMEWORK
-Zone Native     LEGACY
+Zone Native     LEGACY • CONTEXT_EVIDENCE_V1
 Class Fantasy   LEGACY
 Chronicle Echo  LEGACY
 ```
 
-The three legacy adapters preserve their existing results and controls. Missing or unsupported policies fail clearly rather than falling back to Traveler.
+### Zone registries
 
-### Traveler parity
+- Migrates all 25 broad style profiles into a validated ordered registry.
+- Migrates all 134 provenance and local source-pool profiles into a separate validated registry.
+- Migrates all 30 deterministic starting-zone cases into a validated registry.
+- Preserves exact keys, labels, seeds, aliases, keyword order, avoid lists, descriptions, origins, expansion bounds, and starting-zone fields.
+- Preserves legacy precedence where aliases overlap across different profiles.
 
-- Preserves anchor candidate identity, beam results, novelty, quality windows, and weighted choice.
-- Preserves contextual support profiles, role scoring, beam search, mismatch budgets, and target-isolated support rerolls.
-- Preserves final validation, two-pass deterministic repair, and one alternate-skeleton limit.
-- Preserves legal weapon bundles, linked-hand rules, locks, hidden slots, and atomic preview commit.
-- Preserves scheduler budgets: 5.5 ms preferred, 7.5 ms soft ceiling, and 2.0 ms expensive-call force-yield threshold.
-- Preserves all six curated descriptor corrections. Orcish Scout Boots remain dark 70%, blue 20%, steel 10%, and never green.
+### Immutable Zone Context Snapshot
 
-### Compatibility
+- Captures map ID, map name, zone, subzone, parent-map trail, normalized identity, and stable zone keys.
+- Resolves broad style identity, expansion ceiling, local provenance, restrictions, favorites and exclusions scope, and explicit fallback state.
+- Records deterministic evidence ancestry, resolution level, confidence, registry versions, and a stable fingerprint.
+- Separates broad visual identity from local source provenance.
+- Keeps missing evidence visible through explicit coverage states rather than manufacturing neutral evidence.
+- Uses a session-only cache and returns primitive copies so consumers cannot mutate cached state.
 
-No SavedVariables migration, cache reset, wardrobe rescan, or Courier update is required.
+### Canonical Zone evidence
 
-Retained formats:
+Each broad profile now exposes explicit observational channels for:
 
 ```text
-SavedVariables schema: 2
-Courier format: 1
-Wardrobe cache format: 7
-Generation cache: 2
-Diagnostic format: 1
-Weapon-index format: 1
-Traveler tuning audit format: 1
-Curated tuning version: 1
+culture • climate • terrain • palette • material
+finish • motif • magic • silhouette • avoids
 ```
 
-### Deferred work
+These channels are diagnostic only in v1.11.0. The legacy generator does not read them.
 
-- Zone generation policy rewrite begins in v1.11.0.
-- Class generation policy rewrite begins in v1.12.0.
-- Echo generation policy rewrite begins in v1.13.0.
-- Legacy individual anchor and weapon-slot rerolls remain outside the extracted modern path.
-- Moving Outfits into the Transmog window remains a later project.
+### Diagnostics
+
+- Adds `/qc zone debug` for location facts, profile resolution, era, provenance, restrictions, fallback, evidence coverage, selected-look affinity, registry counts, and bounded evidence ancestry.
+- Adds read-only descriptor-based Zone affinity for already selected visible pieces.
+- Adds compact Zone foundation sections to immutable Debug History reports.
+- Adds `Zone foundation: CONTEXT_EVIDENCE_V1` without falsely promoting Zone Native to the shared framework.
+
+### Selection neutrality and compatibility
+
+- Preserves every v1.10.0 Zone context field through a compatibility compiler.
+- Preserves Zone Native candidate weights, eligibility, random consumption, independent slot selection, outfit coherence, weapon generation, suggestions, favorites, exclusions, locks, and hidden slots.
+- Preserves Traveler, Class Fantasy, and Chronicle Echo behavior.
+- Adds no SavedVariables migration, cache reset, wardrobe rescan, UI redesign, or Courier change.
+
+### Deferred to later v1.11.x releases
+
+- Zone anchor policy and descriptor-driven candidate relevance.
+- Shared-framework Zone anchor search.
+- Zone contextual support, mismatch budgeting, final validation, repair, rerolls, tuning, and promotion.

@@ -4,21 +4,17 @@ function P.SyncQuestLog(sourceEvent, suppressLifecycleEvents)
     if not P.currentCharacter then
         return
     end
-
     local character = P.EnsureCharacter()
     local previousMap = character.activeQuests or {}
     local currentMap = P.EnumerateActiveQuests(previousMap)
     local now = time()
-
     for key, current in pairs(currentMap) do
         local previous = previousMap[key]
-
         if previous then
             current.acceptedAt = previous.acceptedAt
             current.acceptedAtText = previous.acceptedAtText
             current.firstSeenAt = previous.firstSeenAt or current.firstSeenAt
             current.firstSeenAtText = previous.firstSeenAtText or current.firstSeenAtText
-
             if not suppressLifecycleEvents and previous.fingerprint ~= current.fingerprint then
                 P.RecordObjectiveChanges(previous, current, sourceEvent)
                 P.RecordStateChange(previous, current, sourceEvent)
@@ -30,7 +26,6 @@ function P.SyncQuestLog(sourceEvent, suppressLifecycleEvents)
                 payload.changeReason = current.isTask or current.isWorldQuest
                     and "BECAME_ACTIVE_WITHOUT_ACCEPT_EVENT"
                     or "DISCOVERED_BY_QUEST_LOG_DIFF"
-
                 if current.isTask or current.isWorldQuest then
                     P.AddEvent("QUEST_BECAME_ACTIVE", payload)
                 else
@@ -44,7 +39,6 @@ function P.SyncQuestLog(sourceEvent, suppressLifecycleEvents)
             end
         end
     end
-
     if not suppressLifecycleEvents then
         for key, previous in pairs(previousMap) do
             if not currentMap[key] then
@@ -52,11 +46,9 @@ function P.SyncQuestLog(sourceEvent, suppressLifecycleEvents)
             end
         end
     end
-
     character.activeQuests = currentMap
     character.lastQuestSyncAt = now
     character.lastQuestSyncAtText = P.TimestampText(now)
-
     if QC.Notify then
         QC.Notify("ACTIVE_QUESTS_UPDATED", sourceEvent)
     end
@@ -367,6 +359,7 @@ function P.PrintHelp()
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc minimap show|hide|toggle|reset|r - manage the minimap button")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc weapon debug|r - print weapon slot, option, and selection diagnostics")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc traveler debug|r - explain Traveler cohesion, mismatch budget, and outliers")
+    DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc zone debug|r - explain Zone identity, evidence ancestry, and current-look affinity")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc traveler tuning start|status|stop|export|clear confirm|r - collect a local curated-tuning batch")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc skeleton debug|r - print the latest anchor beam and chosen skeleton")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc debug|r - open the Diagnostics Workbench")
@@ -437,6 +430,13 @@ function P.HandleSlashCommand(message)
             P.HandleTravelerTuningCommand(remainder)
         else
             P.Print("Usage: /qc traveler debug or /qc traveler tuning start|status|stop|export|clear confirm")
+        end
+    elseif command == "zone" then
+        local subcommand = string.lower(rest:match("^(%S*)") or "")
+        if subcommand == "debug" and QC.ZoneStyle and QC.ZoneStyle.PrintZoneDiagnostics then
+            QC.ZoneStyle.PrintZoneDiagnostics()
+        else
+            P.Print("Usage: /qc zone debug")
         end
     elseif command == "weapon" then
         local subcommand = string.lower(rest:match("^(%S*)") or "")
