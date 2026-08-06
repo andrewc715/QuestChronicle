@@ -1,8 +1,8 @@
-# Quest Chronicle v1.11.1
+# Quest Chronicle v1.11.2
 
 > **Zone Context and Evidence Foundation:** Zone Native remains behaviorally unchanged behind its `LEGACY` adapter while gaining an immutable `CONTEXT_EVIDENCE_V1` snapshot, validated registries, evidence ancestry, and read-only Zone affinity diagnostics.
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.11.1 begins the Zone implementation train without changing Zone Native selection behavior.
+Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Custom Sets. Version 1.11.2 makes the Zone evidence dossier copy-safe and coverage-aware without changing Zone Native selection behavior.
 
 The release migrates the existing 25 broad style profiles, 134 provenance pools, and 30 starting-zone cases into validated registries. It resolves live location facts into a deterministic Zone Context Snapshot containing profile identity, expansion era, provenance, canonical style channels, restrictions, fallback status, confidence, and bounded evidence ancestry. A compatibility view reproduces the v1.10.0 context consumed by the existing generator.
 
@@ -25,7 +25,7 @@ Zone evidence    What those facts imply about the place
 Mode preference  Why a future Zone policy should prefer an appearance
 ```
 
-v1.11.1 implements the first two and deliberately leaves the third on the existing legacy path.
+v1.11.2 preserves the first two and deliberately leaves the third on the existing legacy path.
 
 New capabilities include:
 
@@ -39,6 +39,8 @@ New capabilities include:
 - selected-outfit-only Zone affinity analysis through the shared visual language;
 - `/qc zone debug` output for identity, era, provenance, fallback, coverage, affinity, and evidence ancestry;
 - `/qc zone debug export` for a complete copy-ready Markdown snapshot with untruncated evidence and per-piece affinity;
+- `DIAGNOSTIC_ESCAPE_V1` transport encoding for lossless pipes, backticks, backslashes, and line breaks;
+- explicit `VALUE`, `MISSING`, and `NOT_APPLICABLE` Zone affinity component states;
 - compact additive Zone sections in immutable Debug History reports.
 
 The new foundation consumes no random values and does not scan candidate pools. It observes only the already selected visible outfit when producing affinity diagnostics.

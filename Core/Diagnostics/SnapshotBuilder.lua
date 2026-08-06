@@ -203,7 +203,10 @@ local function BuildZoneFoundation(state, job)
             score = tonumber(piece.score) or 0,
             confidence = tonumber(piece.confidence) or 0,
             classification = piece.classification,
+            components = CopyTable(piece.components),
+            componentStatus = CopyTable(piece.componentStatus),
             missingChannels = CopyTable(piece.missingChannels),
+            notApplicableChannels = CopyTable(piece.notApplicableChannels),
         }
     end
     local compatibility = ZoneStyle.GetZoneCompatibilityStatus and ZoneStyle.GetZoneCompatibilityStatus() or { pass = true }

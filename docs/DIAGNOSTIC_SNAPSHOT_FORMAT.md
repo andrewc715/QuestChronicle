@@ -387,3 +387,20 @@ protectedByLock
 ```
 
 `phaseDInitial` and `phaseDFinal` are compact aggregate snapshots. They do not contain candidate pools, trial configurations, mutable analysis entries, or transient repair state. Diagnostic format remains 1.
+
+## v1.11.2 Zone affinity and export compatibility
+
+Diagnostic format 1 remains unchanged. New Zone Native reports may add Zone affinity format 2 fields inside `zoneFoundation.affinity.pieces`:
+
+```lua
+{
+    components = {},
+    componentStatus = { avoids = "NOT_APPLICABLE" },
+    missingChannels = {},
+    notApplicableChannels = { "avoids" },
+}
+```
+
+Each component status is `VALUE`, `MISSING`, or `NOT_APPLICABLE`. Not-applicable channels contribute no affinity score weight, confidence weight, or missing-channel warning. Retained format-1 reports remain readable through display-time normalization and are not migrated in place.
+
+Zone debug export format 2 serializes arbitrary dynamic values with `DIAGNOSTIC_ESCAPE_V1`. Literal pipes use `\u007C`; literal backticks use `\u0060`; backslashes and line breaks use deterministic escaped representations. Markdown structure remains formatter-owned and readable.

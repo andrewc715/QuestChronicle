@@ -1,5 +1,5 @@
 QuestChronicle = {
-    version = "1.11.1",
+    version = "1.11.2",
     ZoneStyle = {
         MODE_TRAVELER = "TRAVELER",
         MODE_ZONE_NATIVE = "ZONE_NATIVE",
@@ -18,7 +18,7 @@ local QC = QuestChronicle
 local Zone = QC.ZoneStyle.Zone
 Zone.FOUNDATION_ID = "CONTEXT_EVIDENCE_V1"
 Zone.CONTEXT_FORMAT = 1
-Zone.AFFINITY_FORMAT = 1
+Zone.AFFINITY_FORMAT = 2
 Zone.ProfileRegistry = { order = { "azeroth", "outland" }, collisions = { storm = { "one", "two" } } }
 Zone.ProvenanceRegistry = { list = { {}, {}, {} } }
 Zone.StartingZoneRegistry = { list = { {} } }
@@ -27,7 +27,7 @@ Zone.GetFoundationStatus = function()
     return {
         foundation = "CONTEXT_EVIDENCE_V1", contextFormat = 1,
         profileRegistryVersion = 1, provenanceRegistryVersion = 1,
-        startingZoneRegistryVersion = 1, eraRuleVersion = 1, affinityFormat = 1,
+        startingZoneRegistryVersion = 1, eraRuleVersion = 1, affinityFormat = 2,
     }
 end
 QC.ZoneStyle.GetZoneCompatibilityStatus = function() return { pass = true, differences = {} } end
@@ -99,11 +99,12 @@ QC.ZoneStyle.GetZoneContextSnapshot = function() return snapshot end
 Zone.BuildSelectedOutfitAffinity = function() return affinity end
 
 local root = debug.getinfo(1, "S").source:sub(2):gsub("tools/test_zone_debug_export_v1111.lua$", "")
+assert(loadfile(root .. "Core/ZoneStyle/Zone/ExportEncoding.lua"))()
 assert(loadfile(root .. "Core/ZoneStyle/Zone/DebugExport.lua"))()
 local text, status = Zone.BuildZoneDebugExport(snapshot, affinity)
 for _, expected in ipairs({
     "# Quest Chronicle Zone Debug Export",
-    "Quest Chronicle version: `1.11.1`",
+    "Quest Chronicle version: `1.11.2`",
     "| Traveler | `TRAVELER` | `SHARED_FRAMEWORK`",
     "| Zone Native | `ZONE_NATIVE` | `LEGACY` | 1 | `CONTEXT_EVIDENCE_V1` |",
     "## Complete evidence ancestry",
@@ -119,4 +120,4 @@ for _, expected in ipairs({
 end
 assert(not text:find("additional entries omitted", 1, true), "export truncated evidence ancestry")
 assert(status.evidenceEntries == 12 and status.selectedPieces == 1, "export status counters are incorrect")
-print("PASS v1.11.1 Zone debug export: complete architecture, evidence, affinity, and report snapshot")
+print("PASS inherited Zone debug export: complete architecture, evidence, affinity, and report snapshot")

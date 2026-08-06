@@ -7,6 +7,17 @@ local COMPONENT_WEIGHTS = {
     palette = 0.24, material = 0.18, finish = 0.14, motif = 0.14,
     culture = 0.08, magic = 0.08, provenance = 0.10, avoids = 0.04,
 }
+local COMPONENT_ORDER = {
+    "palette", "material", "finish", "motif",
+    "culture", "magic", "avoids", "provenance",
+}
+local CANONICAL_COMPONENTS = {
+    palette = true, material = true, finish = true, motif = true,
+    culture = true, magic = true, avoids = true,
+}
+local STATUS = Zone.AFFINITY_COMPONENT_STATUS or {
+    VALUE = "VALUE", MISSING = "MISSING", NOT_APPLICABLE = "NOT_APPLICABLE",
+}
 
 local function WeightedOverlap(descriptorValues, zoneValues)
     if type(descriptorValues) ~= "table" or type(zoneValues) ~= "table" then return nil end
@@ -62,14 +73,90 @@ local function Classification(score, confidence)
     return "OFF_ZONE_SIGNAL"
 end
 
+local function Contains(values, expected)
+    for _, value in ipairs(type(values) == "table" and values or {}) do
+        if value == expected then return true end
+    end
+    return false
+end
+
+local function ResolveComponentStatus(key, value, snapshot, explicitNotApplicable)
+    if explicitNotApplicable then return STATUS.NOT_APPLICABLE end
+    if CANONICAL_COMPONENTS[key] then
+        local coverage = snapshot and snapshot.style and snapshot.style.coverage and snapshot.style.coverage[key]
+        if coverage == "NOT_APPLICABLE" then return STATUS.NOT_APPLICABLE end
+        if coverage ~= "KNOWN" and coverage ~= "PARTIAL" then return STATUS.MISSING end
+    elseif key == "provenance" then
+        local provenance = snapshot and snapshot.provenance
+        if provenance and provenance.applicability == "NOT_APPLICABLE" then return STATUS.NOT_APPLICABLE end
+    end
+    return value == nil and STATUS.MISSING or STATUS.VALUE
+end
+
+local function BuildComponentStatuses(components, snapshot, priorStatus, priorNotApplicable)
+    local statuses, missing, notApplicable = {}, {}, {}
+    for _, key in ipairs(COMPONENT_ORDER) do
+        local explicit = priorStatus and priorStatus[key]
+        local isNotApplicable = explicit == STATUS.NOT_APPLICABLE or Contains(priorNotApplicable, key)
+        local status = explicit
+        if status ~= STATUS.VALUE and status ~= STATUS.MISSING and status ~= STATUS.NOT_APPLICABLE then
+            status = ResolveComponentStatus(key, components and components[key], snapshot, isNotApplicable)
+        end
+        statuses[key] = status
+        if status == STATUS.NOT_APPLICABLE then
+            notApplicable[#notApplicable + 1] = key
+        elseif status == STATUS.MISSING then
+            missing[#missing + 1] = key
+        end
+    end
+    return statuses, missing, notApplicable
+end
+
+local function EmptyAffinity(missing)
+    return {
+        format = Zone.AFFINITY_FORMAT,
+        score = 0,
+        confidence = 0,
+        components = {},
+        componentStatus = {},
+        evidence = {},
+        missingChannels = missing,
+        notApplicableChannels = {},
+        classification = "UNKNOWN",
+    }
+end
+
+function Zone.NormalizeZoneAffinityPiece(piece, snapshot)
+    local normalized = Zone.CopyPrimitive and Zone.CopyPrimitive(piece or {}) or {}
+    normalized.components = normalized.components or {}
+    local statuses, missing, notApplicable = BuildComponentStatuses(
+        normalized.components, snapshot, normalized.componentStatus, normalized.notApplicableChannels
+    )
+    normalized.format = Zone.AFFINITY_FORMAT
+    normalized.componentStatus = statuses
+    normalized.missingChannels = missing
+    normalized.notApplicableChannels = notApplicable
+    return normalized
+end
+
+function Zone.NormalizeSelectedOutfitAffinity(affinity, snapshot)
+    local normalized = Zone.CopyPrimitive and Zone.CopyPrimitive(affinity or {}) or {}
+    normalized.format = Zone.AFFINITY_FORMAT
+    normalized.pieces = {}
+    for _, piece in ipairs(type(affinity) == "table" and affinity.pieces or {}) do
+        normalized.pieces[#normalized.pieces + 1] = Zone.NormalizeZoneAffinityPiece(piece, snapshot)
+    end
+    return normalized
+end
+
 function Zone.GetZoneAffinity(source, definition, snapshot)
     snapshot = snapshot or (ZoneStyle.GetZoneContextSnapshot and ZoneStyle.GetZoneContextSnapshot())
     if not source or not snapshot then
-        return { format = Zone.AFFINITY_FORMAT, score = 0, confidence = 0, components = {}, evidence = {}, missingChannels = { "source", "snapshot" }, classification = "UNKNOWN" }
+        return EmptyAffinity({ "source", "snapshot" })
     end
     local descriptor = ZoneStyle.GetTravelerDescriptor and ZoneStyle.GetTravelerDescriptor(source, definition)
     if not descriptor then
-        return { format = Zone.AFFINITY_FORMAT, score = 0, confidence = 0, components = {}, evidence = {}, missingChannels = { "visual_descriptor" }, classification = "UNKNOWN" }
+        return EmptyAffinity({ "visual_descriptor" })
     end
     local style = snapshot.style or {}
     local components = {
@@ -83,13 +170,14 @@ function Zone.GetZoneAffinity(source, definition, snapshot)
     }
     local provenance, origin = ProvenanceAffinity(source, snapshot)
     components.provenance = provenance
+    local componentStatus, missing, notApplicable = BuildComponentStatuses(components, snapshot)
+    for _, key in ipairs(COMPONENT_ORDER) do
+        if componentStatus[key] ~= STATUS.VALUE then components[key] = nil end
+    end
     local score, weightTotal, confidenceTotal = 0, 0, 0
-    local missing = {}
     for key, weight in pairs(COMPONENT_WEIGHTS) do
         local value = components[key]
-        if value == nil then
-            missing[#missing + 1] = key
-        else
+        if value ~= nil then
             score = score + value * weight
             weightTotal = weightTotal + weight
             local descriptorConfidence = descriptor.confidence and (descriptor.confidence[key] or descriptor.confidence.motifs or descriptor.confidence.provenance) or 0.5
@@ -110,8 +198,10 @@ function Zone.GetZoneAffinity(source, definition, snapshot)
         score = score,
         confidence = confidence,
         components = components,
+        componentStatus = componentStatus,
         evidence = evidence,
         missingChannels = missing,
+        notApplicableChannels = notApplicable,
         classification = Classification(score, confidence),
         descriptorFingerprint = descriptor.fingerprint,
         profileKey = snapshot.identity.profileKey,

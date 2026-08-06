@@ -18,7 +18,7 @@ performance = read("Core/Wardrobe/GenerationPerformance.lua")
 formatter = read("Core/Diagnostics/ReportFormatter.lua")
 
 checks = {
-    "v1.11.1 metadata": version == "1.11.1" and "## Version: 1.11.1" in toc,
+    "v1.11.2 metadata": version == "1.11.2" and "## Version: 1.11.2" in toc,
     "shared worker helpers loaded": all(x in toc for x in (
         r"Core\Workers\SliceBudget.lua", r"Core\Workers\AdaptiveBatch.lua")),
     "support scheduling helper loaded": r"Core\Wardrobe\SupportRerollScheduling.lua" in toc,
@@ -54,4 +54,4 @@ if failed:
     for name in failed:
         print("FAIL:", name)
     raise SystemExit(1)
-print(f"PASS: v1.11.1 Phase C performance closure verification: {len(checks)} checks")
+print(f"PASS: v1.11.2 Phase C performance closure verification: {len(checks)} checks")

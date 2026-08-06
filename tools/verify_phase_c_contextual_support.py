@@ -16,7 +16,7 @@ checks={
  'generation worker advances SUPPORT cooperatively': 'P.StepSupportGenerationJob(job, stepStarted)' in worker,
  'diagnostic snapshot records support': 'DP.BuildSupportSnapshot' in snapshot,
  'debug formatter renders support': 'P.AddSupportSection' in report,
- 'version is v1.11.1': '## Version: 1.11.1' in toc and (root/'VERSION.txt').read_text().strip()=='1.11.1',
+ 'version is v1.11.2': '## Version: 1.11.2' in toc and (root/'VERSION.txt').read_text().strip()=='1.11.2',
 }
 failed=[name for name,ok in checks.items() if not ok]
 if failed:

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.2 - 2026-08-05
+
+- Added `DIAGNOSTIC_ESCAPE_V1` for reversible copy-safe Zone diagnostic values.
+- Encoded literal pipes as `\u007C` so WoW formatting tokens cannot consume descriptor characters.
+- Bumped Zone debug export format from 1 to 2.
+- Bumped Zone affinity format from 1 to 2.
+- Added explicit `VALUE`, `MISSING`, and `NOT_APPLICABLE` per-component states.
+- Separated missing and not-applicable channel lists in current-look and per-piece exports.
+- Preserved all v1.11.1 Zone affinity scores, confidence values, classifications, context resolution, generation behavior, and random consumption.
+- Kept Zone Native `LEGACY` behind `CONTEXT_EVIDENCE_V1` with no SavedVariables, Courier, cache, weapon-route, or selection changes.
+
 ## 1.11.1 - 2026-08-05
 
 - Added `/qc zone debug export` with a copy-ready Markdown snapshot in the Debug Workbench.
