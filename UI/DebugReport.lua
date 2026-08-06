@@ -144,3 +144,21 @@ function QC.ShowTravelerTuningExport(text)
     end
     return OpenExport()
 end
+
+function QC.ShowZoneDebugExport(text)
+    if type(text) ~= "string" or text == "" then return false end
+    if QC.ShowWindow then QC.ShowWindow("debug") end
+    local function OpenExport()
+        local pane = QC.mainWindow and QC.mainWindow.panes and QC.mainWindow.panes.debug
+        return P.ShowCopyText(
+            pane, text, "Copy Zone Debug Export",
+            "The complete Markdown snapshot is selected. Press Ctrl+C, then close this window."
+        )
+    end
+    if C_Timer and type(C_Timer.After) == "function" then
+        C_Timer.After(0, OpenExport)
+        return true
+    end
+    return OpenExport()
+end
+

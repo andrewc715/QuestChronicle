@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the v1.11.0 Zone context and evidence foundation contract."""
+"""Verify the v1.11.1 Zone context and evidence foundation contract."""
 from pathlib import Path
 import re
 
@@ -33,7 +33,7 @@ required_modules = [
 ]
 
 checks = {
-    "clean v1.11.0 metadata": "## Version: 1.11.0" in toc and (root / "VERSION.txt").read_text().strip() == "1.11.0",
+    "clean v1.11.1 metadata": "## Version: 1.11.1" in toc and (root / "VERSION.txt").read_text().strip() == "1.11.1",
     "all Zone foundation modules are listed exactly once": all(toc.count(path) == 1 for path in required_modules),
     "Zone remains truthful LEGACY generation": 'implementationGeneration = 1' in adapter and 'sharedFramework = false' in adapter and 'legacy = true' in adapter,
     "Zone foundation marker is exposed": 'zoneFoundation = "CONTEXT_EVIDENCE_V1"' in adapter,
@@ -43,7 +43,7 @@ checks = {
     "validated starting-zone registry exists": all(token in starting_registry for token in ['ValidateStartingZoneCase', 'RegisterStartingZoneCase', 'BootstrapStartingZoneRegistry']),
     "immutable-copy snapshot API exists": all(token in snapshot for token in ['BuildZoneContextSnapshot', 'CopyPrimitive', 'snapshotCache', 'fingerprint']),
     "compatibility parity is measured": all(token in compat for token in ['BuildLegacyReference', 'CompareCompatibility', 'compatibilityStatus']),
-    "Zone debug command is wired": '/qc zone debug' in commands and 'PrintZoneDiagnostics' in commands,
+    "Zone debug command is wired": '/qc zone debug [export]' in commands and 'HandleZoneDebugCommand' in commands,
     "read-only affinity exists": all(token in affinity for token in ['GetZoneAffinity', 'BuildSelectedOutfitAffinity', 'classification']),
     "Zone report snapshot is additive": 'zoneFoundation = BuildZoneFoundation' in report_builder,
     "Zone report formatting is additive": 'Zone Context and Evidence' in report_formatter and 'Compatibility parity:' in report_formatter,
@@ -54,8 +54,8 @@ checks = {
 
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
-    print("FAIL: v1.11.0 Zone context foundation guard failed:")
+    print("FAIL: v1.11.1 Zone context foundation guard failed:")
     for name in failed:
         print("  -", name)
     raise SystemExit(1)
-print(f"PASS: v1.11.0 Zone context foundation verification: {len(checks)} checks")
+print(f"PASS: v1.11.1 Zone context foundation verification: {len(checks)} checks")

@@ -359,7 +359,7 @@ function P.PrintHelp()
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc minimap show|hide|toggle|reset|r - manage the minimap button")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc weapon debug|r - print weapon slot, option, and selection diagnostics")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc traveler debug|r - explain Traveler cohesion, mismatch budget, and outliers")
-    DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc zone debug|r - explain Zone identity, evidence ancestry, and current-look affinity")
+    DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc zone debug [export]|r - explain or copy Zone identity, evidence, and affinity")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc traveler tuning start|status|stop|export|clear confirm|r - collect a local curated-tuning batch")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc skeleton debug|r - print the latest anchor beam and chosen skeleton")
     DEFAULT_CHAT_FRAME:AddMessage("  |cffd9b36c/qc debug|r - open the Diagnostics Workbench")
@@ -432,12 +432,8 @@ function P.HandleSlashCommand(message)
             P.Print("Usage: /qc traveler debug or /qc traveler tuning start|status|stop|export|clear confirm")
         end
     elseif command == "zone" then
-        local subcommand = string.lower(rest:match("^(%S*)") or "")
-        if subcommand == "debug" and QC.ZoneStyle and QC.ZoneStyle.PrintZoneDiagnostics then
-            QC.ZoneStyle.PrintZoneDiagnostics()
-        else
-            P.Print("Usage: /qc zone debug")
-        end
+        if P.HandleZoneDebugCommand then P.HandleZoneDebugCommand(rest)
+        else P.Print("Usage: /qc zone debug [export]") end
     elseif command == "weapon" then
         local subcommand = string.lower(rest:match("^(%S*)") or "")
         if subcommand == "debug" and QC.Wardrobe and QC.Wardrobe.PrintWeaponRuleDiagnostics then

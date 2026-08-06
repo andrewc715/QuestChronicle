@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.1 - 2026-08-05
+
+- Added `/qc zone debug export` with a copy-ready Markdown snapshot in the Debug Workbench.
+- Added generation architecture identities for Traveler, Zone Native, Class Fantasy, and Chronicle Echo.
+- Exported the complete Zone evidence ledger without chat truncation.
+- Exported canonical Zone style channels, registry versions and counts, compatibility parity, and snapshot identity.
+- Exported current-look Zone affinity with per-piece component and evidence details.
+- Exported the latest Zone Native diagnostic-report summary.
+- Preserved the compact `/qc zone debug` chat command and all v1.11.0 Zone selection behavior.
+- Kept the export observational, session-only, random-free, and outside SavedVariables and Courier output.
+
 ## 1.11.0 - 2026-08-05
 
 ### Zone context and evidence foundation

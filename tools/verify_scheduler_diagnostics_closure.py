@@ -17,7 +17,7 @@ performance = read("Core/Wardrobe/GenerationPerformance.lua")
 formatter = read("Core/Diagnostics/ReportFormatter.lua")
 
 checks = {
-    "v1.11.0 metadata": version == "1.11.0" and "## Version: 1.11.0" in toc,
+    "v1.11.1 metadata": version == "1.11.1" and "## Version: 1.11.1" in toc,
     "scheduler modules loaded": all(x in toc for x in (
         r"Core\Workers\SliceBudget.lua", r"Core\Workers\AdaptiveBatch.lua",
         r"Core\Wardrobe\GenerationScheduling.lua", r"Core\Wardrobe\GenerationSetupWorker.lua",
@@ -46,4 +46,4 @@ failed = [name for name, ok in checks.items() if not ok]
 if failed:
     for name in failed: print("FAIL:", name)
     raise SystemExit(1)
-print(f"PASS: v1.11.0 scheduler and diagnostics closure verification: {len(checks)} checks")
+print(f"PASS: v1.11.1 scheduler and diagnostics closure verification: {len(checks)} checks")

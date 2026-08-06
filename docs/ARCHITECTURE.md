@@ -1,6 +1,6 @@
 # Quest Chronicle Architecture
 
-Quest Chronicle v1.11.0 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
+Quest Chronicle v1.11.1 enforces a maximum of 500 physical lines per runtime Lua file. The public subsystem namespaces remain stable while implementation helpers and shared private state live behind internal namespace tables.
 
 ## Load order
 
@@ -25,7 +25,7 @@ Shared root modules must not import Traveler mode constants or encode Traveler-s
 
 ## Zone context and evidence foundation
 
-`Core/ZoneStyle/Zone` owns the v1.11.0 Zone Context Snapshot, ordered registries, evidence ledger, compatibility compiler, canonical style evidence, selected-look affinity, and on-demand diagnostics.
+`Core/ZoneStyle/Zone` owns the v1.11.1 Zone Context Snapshot, ordered registries, evidence ledger, compatibility compiler, canonical style evidence, selected-look affinity, and on-demand diagnostics.
 
 The boundary is intentionally selection-neutral:
 
@@ -42,9 +42,11 @@ World location APIs
 
 `ContextResolver.lua` captures map ID, map name, zone, subzone, and parent-map trail, then resolves profile identity, expansion ceiling, provenance, restrictions, and fallback state. The snapshot includes registry versions, explicit confidence, evidence ancestry, coverage states, and a deterministic fingerprint. It is cached only for the current session and public access returns primitive copies.
 
-`Compatibility.lua` compiles the snapshot back into the exact v1.10.0 context shape. The existing Zone Native scoring and generation modules remain authoritative in v1.11.0 and do not read canonical style evidence.
+`Compatibility.lua` compiles the snapshot back into the exact v1.10.0 context shape. The existing Zone Native scoring and generation modules remain authoritative in v1.11.1 and do not read canonical style evidence.
 
 `Affinity.lua` observes only already selected visible pieces. It combines the shared descriptor language with Zone palette, material, finish, motif, culture, magic, provenance, and avoid evidence. It does not enumerate candidate pools, alter scores, or consume random values.
+
+`DebugExport.lua` assembles a session-only Markdown snapshot for `/qc zone debug export`. It reads the immutable context, complete evidence ledger, selected-look affinity, generation-mode registry, and latest Zone Native report summary. It does not persist an export, invoke generation, enumerate candidates, alter the preview, or consume random values. `UI/DebugReport.lua` reuses the existing copy dialog used by Traveler tuning exports.
 
 Zone Native therefore reports:
 
