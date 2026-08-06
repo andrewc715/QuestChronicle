@@ -6,10 +6,12 @@ QuestChronicle.Notify = function(eventName, ...) notified[#notified + 1] = { eve
 QuestChronicle.GetCurrentCharacter = function() return { key = "Tester-Realm", name = "Tester", realm = "Realm" } end
 
 dofile("Core/Diagnostics/Foundation.lua")
+dofile("Core/Diagnostics/ReportEmergencyStub.lua")
 dofile("Core/Diagnostics/ReportCompaction.lua")
 dofile("Core/Diagnostics/History.lua")
 
 local D = QuestChronicle.Diagnostics
+D.MAX_REPORT_BYTES = 128
 local report, message = D.AddReport({
     formatVersion = D.FORMAT_VERSION, id = "QCDBG-REJECT-1", sequence = 1,
     timestamp = 1785981100, action = "GENERATE_OUTFIT", result = "COMPLETED",
@@ -24,4 +26,4 @@ assert(#printed == 1 and printed[1]:find("Debug report could not be saved", 1, t
 assert(#notified == 1 and notified[1][1] == "DIAGNOSTIC_REPORT_REJECTED", "report rejection event was not emitted")
 assert(D.GetHistoryCounters().malformedReportsDiscarded == 1, "discard counter did not record the failure")
 
-print("PASS v1.11.5 diagnostic persistence rejection is visible in chat and callback events")
+print("PASS v1.11.6 impossible diagnostic ceiling rejection is visible in chat and callback events")

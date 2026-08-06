@@ -1,5 +1,5 @@
 QuestChronicle = {
-    version = "1.11.5",
+    version = "1.11.6",
     ZoneStyle = {
         MODE_TRAVELER = "TRAVELER", MODE_ZONE_NATIVE = "ZONE_NATIVE",
         MODE_CLASS_FANTASY = "CLASS_FANTASY", MODE_CHRONICLE_ECHO = "CHRONICLE_ECHO",
@@ -83,7 +83,7 @@ assert(loadfile(root .. "Core/ZoneStyle/Zone/Affinity.lua"))()
 assert(loadfile(root .. "Core/ZoneStyle/Zone/DebugExport.lua"))()
 local text, status = Zone.BuildZoneDebugExport(snapshot, affinity)
 for _, expected in ipairs({
-    "Quest Chronicle version: `1.11.5`", "Zone debug export format: `4`", "Zone affinity format: `2`",
+    "Quest Chronicle version: `1.11.6`", "Zone debug export format: `4`", "Zone affinity format: `2`",
     "Dynamic value encoding: `DIAGNOSTIC_ESCAPE_V1`", "Literal pipe representation: `\\u007C`",
     "Mean affinity: `0.291`", "Mean confidence: `0.536`",
     "OFF_ZONE_SIGNAL=5.000 • PARTIAL_EVIDENCE=2.000 • WEAK_LOCAL_SIGNAL=5.000",

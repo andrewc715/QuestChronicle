@@ -1,5 +1,5 @@
 QuestChronicle = {
-    version = "1.11.5",
+    version = "1.11.6",
     ZoneStyle = {
         MODE_TRAVELER = "TRAVELER", MODE_ZONE_NATIVE = "ZONE_NATIVE",
         MODE_CLASS_FANTASY = "CLASS_FANTASY", MODE_CHRONICLE_ECHO = "CHRONICLE_ECHO",
@@ -75,4 +75,4 @@ QC.Diagnostics.GetReports = function() return {} end
 local empty = Zone.BuildZoneDebugExport(snapshot, affinity)
 assert(empty:find("No Zone anchor-policy report is currently available.",1,true), "empty policy history message missing")
 assert(empty:find("No Zone Native generation report is currently available.",1,true), "empty Zone history message missing")
-print("PASS v1.11.5 Zone export lineage: newest Zone and newest valid policy report are selected independently")
+print("PASS v1.11.6 Zone export lineage: newest Zone and newest valid policy report are selected independently")

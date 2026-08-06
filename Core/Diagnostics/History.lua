@@ -57,9 +57,9 @@ local function PruneStore(store)
         if IsValidReport(report) then
             local fingerprint = P.ReportFingerprint(report)
             if not seenIDs[report.id] and not seenFingerprints[fingerprint] then
-                report.approximateBytes = math.floor(tonumber(report.approximateBytes) or ApproximateBytes(report))
-                if report.approximateBytes > D.MAX_REPORT_BYTES then
-                    report.approximateBytes = CompactReportToLimit(report)
+                report.approximateBytes = CompactReportToLimit(report)
+                if report.approximateBytes > D.MAX_REPORT_BYTES and P.BuildEmergencyReportStub then
+                    report.approximateBytes = P.BuildEmergencyReportStub(report, report.compaction and report.compaction.originalBytes or report.approximateBytes)
                 end
                 if report.approximateBytes <= D.MAX_REPORT_BYTES then
                     valid[#valid + 1] = report
@@ -190,6 +190,9 @@ function D.AddReport(report)
         end
     end
     report.approximateBytes = CompactReportToLimit(report)
+    if report.approximateBytes > D.MAX_REPORT_BYTES and P.BuildEmergencyReportStub then
+        report.approximateBytes = P.BuildEmergencyReportStub(report, report.compaction and report.compaction.originalBytes or report.approximateBytes)
+    end
     if report.approximateBytes > D.MAX_REPORT_BYTES then
         local message = "Diagnostic report remained above the persistence limit after compaction."
         store.counters.malformedReportsDiscarded = store.counters.malformedReportsDiscarded + 1

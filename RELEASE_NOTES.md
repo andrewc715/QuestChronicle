@@ -1,32 +1,34 @@
-# Quest Chronicle v1.11.5
+# Quest Chronicle v1.11.6
 
-## Zone anchor-policy closure
+## Adaptive diagnostic-budget guarantee
 
-Retail validation of v1.11.4 confirmed that oversized Zone reports persist correctly. It also showed that the final Zone export could hide an earlier valid anchor-policy report when the newest Zone report was a legacy individual reroll, and that cooperative weapon work still produced oversized worker slices.
-
-v1.11.5 closes both gaps without changing Zone selection semantics.
+The first Retail v1.11.5 Zone generation completed successfully but its diagnostic report still exceeded the 20,480-byte persistence ceiling after fixed compaction. v1.11.6 replaces that brittle boundary with deterministic adaptive tiers.
 
 ### Fixed
 
-- `/qc zone debug export` independently selects the latest Zone Native report and the latest structurally valid Zone anchor-policy report.
-- A newer legacy reroll no longer causes the policy section to claim that no current policy report exists.
-- Malformed or partial policy payloads are skipped rather than blended with live state.
-- Weapon-style eligibility now advances through bounded provenance-marker batches of four instead of synchronously draining a candidate.
-- Weapon capabilities are built or reused once per action and shared by every anchor finalist.
-- Explicit route invalidation marks an active capability snapshot stale and blocks atomic commit.
+- Reports are measured with the same serialized representation used by persistence.
+- Compaction advances through duplicate removal, reconstructible-detail removal, summary-table collapse, mandatory-core rebuilding, and an emergency stub only as needed.
+- Valid generation reports no longer vanish merely because optional diagnostic detail is large.
+- The emergency stub retains action identity, Zone policy, selected anchors, weapon capability and scheduler summaries, support and Phase D outcomes, warnings, and the final message.
+- Existing compacted reports are stabilized and remeasured when Debug History is pruned.
 
 ### Diagnostics
 
-- Zone debug export advances from format 3 to format 4.
-- Policy lineage reports its source report, action, result, parent, anchor source, and snapshot.
-- Performance diagnostics report capability build/reuse state, generation, invalidation reason, bounded eligibility steps and yields, scheduler debt, and post-expensive-call continuations.
-- Older policy-bearing reports render unavailable v1.11.5 performance fields as `Not recorded`.
+Every compacted report records:
+
+```text
+compaction format
+compaction tier and label
+original serialized bytes
+final serialized bytes
+emergency-stub state
+```
+
+The copy report displays the same persistence summary in **Warnings and Fallback**.
 
 ### Preserved
 
-- `ZONE_ANCHOR_POLICY_V1` coefficients and authority;
-- Zone candidate eligibility and retained order;
-- one random draw per retained weapon candidate in the original order;
-- style priorities, sorting, legal routes, and linked-visual behavior;
-- contextual support, Phase D validation and repair, rerolls, locks, and hidden state;
-- Traveler, Class Fantasy, Chronicle Echo, SavedVariables, cache formats, and Courier behavior.
+- diagnostic format 1 and the 20,480-byte per-report ceiling;
+- `ZONE_ANCHOR_POLICY_V1` authority and coefficients;
+- weapon capability, cooperative ordering, and stale-commit behavior from v1.11.5;
+- all generation, support, repair, reroll, lock, hidden-slot, cache, SavedVariables, and Courier behavior.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.11.6 - 2026-08-06
+
+- Replaced fixed diagnostic trimming with exact-size adaptive compaction tiers.
+- Added a mandatory-core tier preserving Zone policy, selected anchors, capability and scheduler summaries, support outcome, and Phase D state.
+- Added an emergency persistence stub so valid oversized actions remain visible in Debug History.
+- Added original-byte, final-byte, tier-label, and emergency-state diagnostics.
+- Added worst-case and pathological report fixtures proving retained reports remain below the 20,480-byte ceiling.
+- Preserved all v1.11.5 generation, scoring, ordering, random, support, repair, reroll, cache, and data behavior.
+
 ## 1.11.5 - 2026-08-06
 
 - Advanced Zone debug export to format 4 with independent latest-Zone and latest-policy report lineage.

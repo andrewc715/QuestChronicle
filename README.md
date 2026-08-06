@@ -1,17 +1,17 @@
-# Quest Chronicle v1.11.5
+# Quest Chronicle v1.11.6
 
 Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Blizzard Custom Sets.
 
-Version 1.11.5 closes the first authoritative Zone anchor-policy slice. `/qc zone debug export` now distinguishes the newest Zone Native report from the newest report carrying a structurally valid `ZONE_ANCHOR_POLICY_V1` payload, while the cooperative weapon path performs bounded eligibility work and reuses one capability snapshot throughout each generation action.
+Version 1.11.6 guarantees that valid diagnostic actions leave a retained Debug History record even when their full payload exceeds the fixed persistence ceiling. It replaces fixed one-pass trimming with exact-size adaptive compaction tiers and an emergency mandatory-core stub.
 
-## v1.11.5 focus
+## v1.11.6 focus
 
-- advance Zone debug export to format 4 with independent latest-report and policy-report lineage;
-- preserve the newest valid Zone policy report when a newer legacy individual reroll has no policy payload;
-- replace synchronous weapon-style eligibility draining with bounded marker batches of four;
-- preserve the exact retained-candidate order, random-call count, style priorities, and selected weapon routes;
-- build or reuse one weapon capability snapshot per action and cancel atomically if explicit route invalidation makes it stale;
-- expose capability builds, reuses, eligibility steps, eligibility yields, scheduler debt, and post-expensive-call continuations.
+- measure the exact serialized report size after every compaction tier;
+- continue deterministically from duplicate trimming through mandatory-core compaction until the report fits;
+- retain action identity, Zone context and policy, selected anchors, capability and scheduler summaries, support outcome, Phase D state, warnings, and final message;
+- preserve a compact emergency report rather than discarding a valid generation action;
+- record original bytes, final bytes, compaction tier, and emergency-stub state in every compacted report;
+- keep visible rejection handling only as an impossible-ceiling final guard.
 
 ## Architecture boundary
 
@@ -21,9 +21,9 @@ Zone Native implementation:    LEGACY
 Zone foundation:               CONTEXT_EVIDENCE_V1
 Zone anchor policy:            ZONE_ANCHOR_POLICY_V1 / ACTIVE
 Zone support policy:           LEGACY
-Class Fantasy implementation:  LEGACY
-Chronicle Echo implementation: LEGACY
-Zone debug export:             4
+Diagnostic format:             1
+Report persistence ceiling:    20,480 bytes
+Adaptive compaction format:    1
 ```
 
-v1.11.5 changes report selection and cooperative scheduling only. Zone policy coefficients, candidate eligibility results, random consumption, selected anchors, legal weapon routes, support behavior, validation, repair, rerolls, locks, hidden slots, SavedVariables, cache formats, and Courier output remain unchanged.
+v1.11.6 changes diagnostic storage only. Zone scoring, candidate order, random consumption, anchor selection, weapon routes, support, validation, repair, rerolls, locks, hidden state, SavedVariables, cache formats, and Courier output remain unchanged.

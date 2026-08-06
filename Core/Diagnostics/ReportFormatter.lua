@@ -441,6 +441,12 @@ end
 
 local function AddWarnings(lines, report, rich)
     AddHeading(lines, "Warnings and Fallback", rich)
+    local compaction = report.compaction
+    if type(compaction) == "table" and (tonumber(compaction.tier) or 0) > 0 then
+        Add(lines, string.format("Diagnostic persistence: %s • %s → %s bytes • emergency stub %s",
+            tostring(compaction.tierLabel or compaction.tier or "Unknown"), N(compaction.originalBytes),
+            N(compaction.finalBytes or report.approximateBytes), compaction.emergencyStub and "Yes" or "No"))
+    end
     if #(report.warnings or {}) == 0 then Add(lines, "None") return end
     for _, warning in ipairs(report.warnings or {}) do
         Add(lines, string.format("[%s] %s", tostring(warning.severity or "INFO"), tostring(warning.text or warning.key or "Warning")))

@@ -6,6 +6,7 @@ QuestChronicle.GetCurrentCharacter = function()
 end
 
 dofile("Core/Diagnostics/Foundation.lua")
+dofile("Core/Diagnostics/ReportEmergencyStub.lua")
 dofile("Core/Diagnostics/ReportCompaction.lua")
 dofile("Core/Diagnostics/History.lua")
 

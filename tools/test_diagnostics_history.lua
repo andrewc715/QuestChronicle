@@ -5,6 +5,7 @@ QC.Notify = function() end
 QC._Core = {}
 
 dofile("Core/Diagnostics/Foundation.lua")
+dofile("Core/Diagnostics/ReportEmergencyStub.lua")
 dofile("Core/Diagnostics/ReportCompaction.lua")
 dofile("Core/Diagnostics/History.lua")
 local D = QC.Diagnostics

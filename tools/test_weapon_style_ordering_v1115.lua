@@ -38,4 +38,4 @@ assert(math.abs(candidates[2].stylePriority-(math.log(.73)/6))<1e-12, "source 4 
 for _, batch in ipairs(markerBatches) do assert(batch==4,"eligibility marker batch is not bounded at 4") end
 assert(job.weaponStyleEligibilitySteps==8 and job.weaponStyleEligibilityYields==4, "eligibility diagnostics changed")
 assert(job.weaponStyleCoherenceCalls==4 and job.weaponStyleScoringCalls==2, "coherence/scoring diagnostics changed")
-print("PASS v1.11.5 weapon style ordering: bounded eligibility preserves retention, RNG count, priorities, and order")
+print("PASS v1.11.6 weapon style ordering: bounded eligibility preserves retention, RNG count, priorities, and order")

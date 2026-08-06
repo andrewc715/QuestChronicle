@@ -44,6 +44,7 @@ W.RerollSlot = function(slotKey)
 end
 
 dofile("Core/Diagnostics/Foundation.lua")
+dofile("Core/Diagnostics/ReportEmergencyStub.lua")
 dofile("Core/Diagnostics/ReportCompaction.lua")
 dofile("Core/Diagnostics/History.lua")
 dofile("Core/Diagnostics/Comparison.lua")

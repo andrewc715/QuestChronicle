@@ -2,7 +2,7 @@ QuestChronicle = { Diagnostics = { _Private = {} } }
 local root = debug.getinfo(1, "S").source:sub(2):gsub("tools/test_zone_anchor_report_v1113.lua$", "")
 assert(loadfile(root .. "Core/Diagnostics/ReportFormatter.lua"))()
 local report = {
-    version = "1.11.5", timestamp = 1, timestampText = "2026-08-06 08:00:00",
+    version = "1.11.6", timestamp = 1, timestampText = "2026-08-06 08:00:00",
     character = { name = "Xyrkian", realm = "MoonGuard", className = "WARRIOR" },
     action = "GENERATE_OUTFIT", mode = "ZONE_NATIVE", generationImplementation = "LEGACY",
     result = "COMPLETED", message = "Generated a Zone Native outfit.", context = { profileLabel = "Outland" },
@@ -27,5 +27,5 @@ for _, expected in ipairs({
     "== Zone Anchor Policy ==", "Policy: ZONE_ANCHOR_POLICY_V1 • ACTIVE", "Support policy: LEGACY",
     "CHEST", "Pair interpretation: visual armor 10.00 • Zone armor 2.00",
     "Weapon bundle: TWO_HAND • 1 logical visual • linked deduplicated Yes", "Zone anchor policy",
-}) do assert(text:find(expected, 1, true), "missing v1.11.5 Zone policy report text: " .. expected) end
-print("PASS v1.11.5 Zone report: policy decomposition, legacy support boundary, weapon dedup, and performance")
+}) do assert(text:find(expected, 1, true), "missing v1.11.6 Zone policy report text: " .. expected) end
+print("PASS v1.11.6 Zone report: policy decomposition, legacy support boundary, weapon dedup, and performance")

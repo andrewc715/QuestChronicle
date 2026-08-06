@@ -27,6 +27,7 @@ end
 
 dofile("Core/ZoneStyle/Traveler/TuningAudit.lua")
 dofile("Core/Diagnostics/Foundation.lua")
+dofile("Core/Diagnostics/ReportEmergencyStub.lua")
 dofile("Core/Diagnostics/ReportCompaction.lua")
 dofile("Core/Diagnostics/History.lua")
 

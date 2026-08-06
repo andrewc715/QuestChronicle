@@ -22,4 +22,4 @@ local nextJob={}
 local third,status3,generation3=P.GetWeaponCapabilitySnapshotForJob(nextJob)
 assert(third~=nil and status3=="BUILT" and builds==2,"invalidated session snapshot was not rebuilt")
 assert(generation3==generation1+1 and nextJob.weaponCapabilityInvalidationReason=="CHARACTER_CAPABILITY_CHANGED","capability generation lineage changed")
-print("PASS v1.11.5 weapon capability snapshot: one build per action and explicit invalidation cancels stale commit")
+print("PASS v1.11.6 weapon capability snapshot: one build per action and explicit invalidation cancels stale commit")

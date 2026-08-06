@@ -17,6 +17,7 @@ WP.SUPPORT_SLOT_ORDER = { "WAIST", "HANDS", "FEET", "HEAD", "BACK", "WRIST", "SH
 
 dofile("Core/Wardrobe/SupportProfileIdentity.lua")
 dofile("Core/Diagnostics/Foundation.lua")
+dofile("Core/Diagnostics/ReportEmergencyStub.lua")
 dofile("Core/Diagnostics/ReportCompaction.lua")
 dofile("Core/Diagnostics/History.lua")
 dofile("Core/Diagnostics/SupportSnapshot.lua")
