@@ -396,7 +396,7 @@ function P.StepGenerationJob(token)
     end
     if job.phase == "WEAPONS" then
         if not job.weaponWork and P.CreateWeaponGenerationWork then
-            job.weaponWork = P.CreateWeaponGenerationWork(job.draft, job.reroll, job.styleMode, job.styleContext)
+            job.weaponWork = P.CreateWeaponGenerationWork(job.draft, job.reroll, job.styleMode, job.styleContext, job)
         end
         local operations = 0
         while operations < P.GENERATION_OPERATION_SAFETY_CAP do
@@ -406,7 +406,7 @@ function P.StepGenerationJob(token)
                 done, ok, countOrMessage, notice = P.StepWeaponGenerationWork(job.weaponWork)
             else
                 done = true
-                ok, countOrMessage, notice = P.GenerateWeapons(job.draft, job.reroll, job.styleMode, job.styleContext)
+                ok, countOrMessage, notice = P.GenerateWeapons(job.draft, job.reroll, job.styleMode, job.styleContext, job)
             end
             RecordPhase(job, "weaponRouting", weaponStarted)
             operations = operations + 1

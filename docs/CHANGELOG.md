@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.11.5 - 2026-08-06
+
+- Advanced Zone debug export to format 4 with independent latest-Zone and latest-policy report lineage.
+- Preserved valid `ZONE_ANCHOR_POLICY_V1` evidence when a newer legacy individual reroll lacks a policy payload.
+- Added bounded weapon-style eligibility work using provenance-marker batches of four.
+- Added one reusable weapon capability snapshot per action with explicit invalidation and stale-commit cancellation.
+- Added capability build/reuse, eligibility-step, eligibility-yield, and scheduler-closure diagnostics.
+- Preserved weapon candidate decisions, random-call order, style priorities, legal routes, Zone policy coefficients, support, and repair behavior.
+
 ## 1.11.4 - 2026-08-06
 
 - Repaired oversized Zone anchor-policy report persistence.

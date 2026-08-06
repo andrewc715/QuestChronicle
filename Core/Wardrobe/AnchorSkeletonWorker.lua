@@ -184,7 +184,7 @@ local function BeginWeaponExpansion(job, work, node)
     local draft = CopyDraftState(job.draft)
     ApplyArmorNodeToDraft(draft, node, job.reroll)
     local styleContext = BuildNodeStyleContext(job, draft, node)
-    local weaponWork = P.CreateWeaponGenerationWork and P.CreateWeaponGenerationWork(draft, job.reroll, job.styleMode, styleContext)
+    local weaponWork = P.CreateWeaponGenerationWork and P.CreateWeaponGenerationWork(draft, job.reroll, job.styleMode, styleContext, job)
     return {
         node = node,
         draft = draft,
@@ -220,7 +220,7 @@ local function StepWeaponExpansions(job, work)
         done, ok, value, notice = P.StepWeaponGenerationWork(expansion.weaponWork)
     else
         done = true
-        ok, value, notice = P.GenerateWeapons(expansion.draft, job.reroll, job.styleMode, expansion.styleContext)
+        ok, value, notice = P.GenerateWeapons(expansion.draft, job.reroll, job.styleMode, expansion.styleContext, job)
     end
     RecordPhase(job, "anchorWeaponExpansion", weaponStarted)
     work.weaponCallExceededBudget = NowMilliseconds() - weaponStarted >= P.GENERATION_TIME_BUDGET_MS

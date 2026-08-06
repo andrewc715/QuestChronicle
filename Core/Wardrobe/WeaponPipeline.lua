@@ -3,6 +3,7 @@ local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
 
 P.activeWeaponCoroutine = nil
+P.activeWeaponGenerationJob = nil
 
 local function NowMilliseconds()
     if type(debugprofilestop) == "function" then return debugprofilestop() end
@@ -19,11 +20,11 @@ function P.MaybeYieldWeaponGeneration(phaseKey)
     end
 end
 
-function P.CreateWeaponGenerationWork(state, reroll, styleMode, styleContext)
+function P.CreateWeaponGenerationWork(state, reroll, styleMode, styleContext, job)
     if not coroutine or type(coroutine.create) ~= "function" then return nil end
-    local work = { done = false, yields = 0, lastYieldPhase = nil }
+    local work = { done = false, yields = 0, lastYieldPhase = nil, job = job }
     work.thread = coroutine.create(function()
-        return P.GenerateWeapons(state, reroll, styleMode, styleContext)
+        return P.GenerateWeapons(state, reroll, styleMode, styleContext, job)
     end)
     return work
 end
@@ -32,16 +33,18 @@ function P.StepWeaponGenerationWork(work)
     if not work then return true, false, "Weapon generation work was not initialized." end
     if work.done then return true, work.ok, work.value, work.notice end
     if not work.thread then
-        local ok, value, notice = P.GenerateWeapons(work.state, work.reroll, work.styleMode, work.styleContext)
+        local ok, value, notice = P.GenerateWeapons(work.state, work.reroll, work.styleMode, work.styleContext, work.job)
         work.done, work.ok, work.value, work.notice = true, ok, value, notice
         return true, ok, value, notice
     end
 
     P.activeWeaponCoroutine = work.thread
+    P.activeWeaponGenerationJob = work.job
     local started = NowMilliseconds()
     local resumed, first, second, third = coroutine.resume(work.thread)
     local elapsed = math.max(0, NowMilliseconds() - started)
     P.activeWeaponCoroutine = nil
+    P.activeWeaponGenerationJob = nil
     work.lastResumeMs = elapsed
     if elapsed > (tonumber(work.maxResumeMs) or 0) then
         work.maxResumeMs = elapsed

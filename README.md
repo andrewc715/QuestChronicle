@@ -1,16 +1,17 @@
-# Quest Chronicle v1.11.4
+# Quest Chronicle v1.11.5
 
 Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Blizzard Custom Sets.
 
-Version 1.11.4 repairs the diagnostic-persistence regression discovered during v1.11.3 Retail validation. Zone Native generation and `ZONE_ANCHOR_POLICY_V1` remain behaviorally unchanged, while oversized Zone reports now compact policy duplicates before the 20,480-byte persistence gate.
+Version 1.11.5 closes the first authoritative Zone anchor-policy slice. `/qc zone debug export` now distinguishes the newest Zone Native report from the newest report carrying a structurally valid `ZONE_ANCHOR_POLICY_V1` payload, while the cooperative weapon path performs bounded eligibility work and reuses one capability snapshot throughout each generation action.
 
-## v1.11.4 focus
+## v1.11.5 focus
 
-- retain Generate Outfit, Reroll Unlocked, support reroll, and individual-reroll reports in Debug History;
-- store the authoritative Zone anchor-policy summary once;
-- remove duplicated component policy calculations and persisted per-piece affinity details only when compaction is required;
-- preserve selected anchors, policy adjustments, pair channels, weapon deduplication, ancestry, Phase D, warnings, and headline performance;
-- print a visible warning and emit `DIAGNOSTIC_REPORT_REJECTED` if a report still cannot be saved.
+- advance Zone debug export to format 4 with independent latest-report and policy-report lineage;
+- preserve the newest valid Zone policy report when a newer legacy individual reroll has no policy payload;
+- replace synchronous weapon-style eligibility draining with bounded marker batches of four;
+- preserve the exact retained-candidate order, random-call count, style priorities, and selected weapon routes;
+- build or reuse one weapon capability snapshot per action and cancel atomically if explicit route invalidation makes it stale;
+- expose capability builds, reuses, eligibility steps, eligibility yields, scheduler debt, and post-expensive-call continuations.
 
 ## Architecture boundary
 
@@ -22,6 +23,7 @@ Zone anchor policy:            ZONE_ANCHOR_POLICY_V1 / ACTIVE
 Zone support policy:           LEGACY
 Class Fantasy implementation:  LEGACY
 Chronicle Echo implementation: LEGACY
+Zone debug export:             4
 ```
 
-v1.11.4 changes diagnostics only. Zone scoring, candidate order, random consumption, legal weapon routes, support behavior, validation, repair, rerolls, locks, hidden slots, caches, SavedVariables, and Courier output remain unchanged.
+v1.11.5 changes report selection and cooperative scheduling only. Zone policy coefficients, candidate eligibility results, random consumption, selected anchors, legal weapon routes, support behavior, validation, repair, rerolls, locks, hidden slots, SavedVariables, cache formats, and Courier output remain unchanged.

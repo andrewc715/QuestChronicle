@@ -70,6 +70,10 @@ local PHASE_LABELS = {
     rerollShortlistSelection = "Reroll shortlist selection", rerollFinalValidation = "Reroll final validation",
     rerollFinalAlternative = "Reroll final alternative", rerollStateCommit = "Reroll state commit",
     weaponContext = "Weapon context", weaponCapabilities = "Weapon capabilities", weaponRoute = "Weapon route",
+    weaponCapabilitiesBuild = "Weapon capabilities build", weaponCapabilitiesReuse = "Weapon capabilities reuse",
+    weaponContextMutableState = "Weapon context mutable state",
+    weaponStyleEligibilityStep = "Weapon style eligibility step", weaponStyleCoherence = "Weapon style coherence",
+    weaponStyleScoring = "Weapon style scoring",
     weaponCandidateBuild = "Weapon candidate build", weaponCandidateValidate = "Weapon candidate validation",
     weaponValidation = "Weapon source validation", weaponPermission = "Weapon permission",
     weaponAppearance = "Weapon appearance lookup", weaponSourceInfo = "Weapon source metadata",
@@ -394,6 +398,15 @@ local function AddCache(lines, report, verbose, rich)
             Add(lines, string.format("Weapon index: %s • %s • %s buckets • %s examined • %s cooperative yields", tostring(weaponIndex.state or "Unknown"), tostring(weaponIndex.use or "None"), N(weaponIndex.buckets), N(weaponIndex.examined), N(weaponIndex.yields)))
         end
         if weaponIndex.invalidationReason then Add(lines, "Weapon index invalidation: " .. tostring(weaponIndex.invalidationReason)) end
+    end
+    local capabilities = perf.weaponCapabilities
+    if capabilities then
+        Add(lines, string.format("Weapon capabilities: %s • generation %s • %s built • %s reused • stale at commit %s",
+            tostring(capabilities.status or "Unknown"), N(capabilities.generation), N(capabilities.buildsThisAction),
+            N(capabilities.reusesThisAction), capabilities.staleAtCommit and "Yes" or "No"))
+        Add(lines, string.format("Weapon style ordering: %s eligibility steps • %s eligibility yields • %s coherence calls • %s scoring calls",
+            N(capabilities.eligibilitySteps), N(capabilities.eligibilityYields), N(capabilities.coherenceCalls), N(capabilities.scoringCalls)))
+        if capabilities.invalidationReason then Add(lines, "Weapon capability invalidation: " .. tostring(capabilities.invalidationReason)) end
     end
     local history = D.GetHistoryCounters and D.GetHistoryCounters() or nil
     if history then Add(lines, string.format("Reports: %s recorded • %s duplicates ignored • %s malformed discarded", N(history.reportsRecorded), N(history.duplicateInsertionsIgnored), N(history.malformedReportsDiscarded))) end

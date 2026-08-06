@@ -24,4 +24,4 @@ assert(#printed == 1 and printed[1]:find("Debug report could not be saved", 1, t
 assert(#notified == 1 and notified[1][1] == "DIAGNOSTIC_REPORT_REJECTED", "report rejection event was not emitted")
 assert(D.GetHistoryCounters().malformedReportsDiscarded == 1, "discard counter did not record the failure")
 
-print("PASS v1.11.4 diagnostic persistence rejection is visible in chat and callback events")
+print("PASS v1.11.5 diagnostic persistence rejection is visible in chat and callback events")

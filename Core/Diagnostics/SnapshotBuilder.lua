@@ -307,6 +307,7 @@ local function PerformanceSnapshot(performance)
         weaponSlowYieldMs = tonumber(performance.weaponSlowYieldMs) or 0,
         weaponIndex = CopyTable(performance.weaponIndex),
         schedulerDiagnostics = CopyTable(performance.schedulerDiagnostics),
+        weaponCapabilities = CopyTable(performance.weaponCapabilities),
         phaseStats = CopyTable(performance.phaseStats),
     }
     return result

@@ -58,6 +58,10 @@ P.GENERATION_PHASE_LABELS = {
     rerollBridgeScoring = "Reroll bridge scoring", rerollBudgetEvaluation = "Reroll budget evaluation",
     rerollShortlistSelection = "Reroll shortlist selection", rerollStateCommit = "Reroll state commit",
     weaponContext = "Weapon context", weaponCapabilities = "Weapon capabilities", weaponRoute = "Weapon route",
+    weaponCapabilitiesBuild = "Weapon capabilities build", weaponCapabilitiesReuse = "Weapon capabilities reuse",
+    weaponContextMutableState = "Weapon context mutable state",
+    weaponStyleEligibilityStep = "Weapon style eligibility step", weaponStyleCoherence = "Weapon style coherence",
+    weaponStyleScoring = "Weapon style scoring",
     weaponCandidateBuild = "Weapon candidate build", weaponCandidateValidate = "Weapon candidate validation",
     weaponValidation = "Weapon source validation", weaponPermission = "Weapon permission",
     weaponAppearance = "Weapon appearance lookup", weaponSourceInfo = "Weapon source metadata",
@@ -203,6 +207,19 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         synchronousLaunchPreparationMs = job and (job.synchronousLaunchPreparationMs or job.preWorkerPreparationMs) or 0,
         preWorkerPreparationMs = job and (job.synchronousLaunchPreparationMs or job.preWorkerPreparationMs) or 0,
         schedulerDiagnostics = job and job.schedulerDiagnostics or nil,
+        weaponCapabilities = job and {
+            status = job.weaponCapabilitySnapshotStatus,
+            generation = job.weaponCapabilityGeneration,
+            buildsThisAction = tonumber(job.weaponCapabilityBuildsThisAction) or 0,
+            reusesThisAction = tonumber(job.weaponCapabilityReusesThisAction) or 0,
+            staleAtCommit = job.weaponCapabilityStaleAtCommit == true,
+            currentGeneration = job.weaponCapabilityCurrentGeneration,
+            invalidationReason = job.weaponCapabilityInvalidationReason,
+            eligibilitySteps = tonumber(job.weaponStyleEligibilitySteps) or 0,
+            eligibilityYields = tonumber(job.weaponStyleEligibilityYields) or 0,
+            coherenceCalls = tonumber(job.weaponStyleCoherenceCalls) or 0,
+            scoringCalls = tonumber(job.weaponStyleScoringCalls) or 0,
+        } or nil,
     }
     ApplyTimingDomains(result)
     return result

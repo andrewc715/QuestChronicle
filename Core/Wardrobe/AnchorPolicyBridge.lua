@@ -179,6 +179,10 @@ function P.CaptureAnchorPolicyContext(job)
 end
 
 function P.ValidateAnchorPolicyContextAtCommit(job)
+    if P.ValidateWeaponCapabilitySnapshotAtCommit then
+        local weaponValid, weaponReason = P.ValidateWeaponCapabilitySnapshotAtCommit(job)
+        if not weaponValid then return false, weaponReason end
+    end
     if not job or not job.modePolicy then return true end
     local capabilities = job.modePolicy.capabilities or {}
     if capabilities.zoneAnchorPolicy ~= true or job.zoneAnchorPolicyFallback then return true end

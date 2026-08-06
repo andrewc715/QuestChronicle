@@ -2,7 +2,7 @@ local QC = QuestChronicle
 local ZoneStyle = QC.ZoneStyle
 local Zone = ZoneStyle.Zone
 
-Zone.DEBUG_EXPORT_FORMAT = 3
+Zone.DEBUG_EXPORT_FORMAT = 4
 
 local STYLE_CHANNELS = {
     "culture", "climate", "terrain", "palette", "material",
@@ -79,13 +79,31 @@ local function ModeRows()
     return rows
 end
 
-local function LatestZoneReport()
+local function ZoneReports()
     local D = QC.Diagnostics
-    if not D then return nil end
-    local reports = type(D.PeekReports) == "function" and D.PeekReports()
+    if not D then return {} end
+    return type(D.PeekReports) == "function" and D.PeekReports()
         or (type(D.GetReports) == "function" and D.GetReports()) or {}
-    for _, report in ipairs(reports) do
+end
+
+local function LatestZoneNativeReport(reports)
+    for _, report in ipairs(reports or ZoneReports()) do
         if report.mode == (ZoneStyle.MODE_ZONE_NATIVE or "ZONE_NATIVE") then return report end
+    end
+    return nil
+end
+
+local function ValidAnchorPolicy(report)
+    local foundation = type(report) == "table" and report.zoneFoundation or nil
+    local policy = type(foundation) == "table" and foundation.anchorPolicy or nil
+    return report and report.mode == (ZoneStyle.MODE_ZONE_NATIVE or "ZONE_NATIVE")
+        and type(policy) == "table" and policy.policyID ~= nil and policy.authority ~= nil
+        and (policy.snapshotFingerprint ~= nil or policy.fallbackReason ~= nil)
+end
+
+local function LatestZoneAnchorPolicyReport(reports)
+    for _, report in ipairs(reports or ZoneReports()) do
+        if ValidAnchorPolicy(report) then return report end
     end
     return nil
 end
@@ -258,15 +276,28 @@ local function AddAffinity(lines, affinity, snapshot)
     return affinity
 end
 
-local function AddZoneAnchorPolicy(lines, report)
+local function AddZoneAnchorPolicy(lines, report, latestReport)
     Add(lines, "## Zone Anchor Policy")
     Add(lines, "")
-    local policy = report and report.zoneFoundation and report.zoneFoundation.anchorPolicy
-    if type(policy) ~= "table" or not policy.policyID then
-        Add(lines, "No current Zone anchor-policy report is available.")
+    if not report then
+        if latestReport then
+            Add(lines, "Zone Native reports are available, but none contains a valid Zone anchor-policy payload.")
+        else
+            Add(lines, "No Zone anchor-policy report is currently available.")
+        end
         Add(lines, "")
         return
     end
+    local policy = report.zoneFoundation.anchorPolicy
+    local isLatest = latestReport and tostring(latestReport.id) == tostring(report.id)
+    Add(lines, string.format("- Source report: %s • %s • %s • %s", Code(report.id or "Unknown"),
+        Code(report.timestampText or report.timestamp or "Unknown"), Code(report.action or "Unknown"), Code(report.result or "Unknown")))
+    Add(lines, "- Latest Zone report carries policy: " .. Code(isLatest and "YES" or "NO"))
+    if latestReport and not isLatest then
+        Add(lines, "- The latest Zone Native report is a legacy action without an anchor-policy payload. Showing the most recent policy-bearing Zone report instead.")
+    end
+    if report.parentCompletedReportID then Add(lines, "- Parent report: " .. Code(report.parentCompletedReportID)) end
+    if report.anchorSourceReportID then Add(lines, "- Anchor source report: " .. Code(report.anchorSourceReportID)) end
     Add(lines, "- Policy: " .. Code(policy.policyID) .. " • authority " .. Code(policy.authority or "Unknown"))
     Add(lines, "- Snapshot: " .. Code(policy.snapshotFingerprint or "Unavailable"))
     Add(lines, "- Context stale at commit: " .. Code(policy.contextStaleAtCommit and "YES" or "NO"))
@@ -300,6 +331,39 @@ local function AddZoneAnchorPolicy(lines, report)
             Code(key), tonumber(pool.prepared) or 0, tonumber(pool.eligible) or 0, tonumber(pool.retained) or 0, tonumber(pool.unknown) or 0,
             tonumber(pool.offZone) or 0, tonumber(pool.weakLocal) or 0, tonumber(pool.supportedLocal) or 0,
             tonumber(pool.strongLocal) or 0, tonumber(pool.meanAffinity) or 0, tonumber(pool.meanAdjustment) or 0)) end
+    end
+    Add(lines, "")
+
+    local perf = report.performance or {}
+    local capabilities = perf.weaponCapabilities
+    local scheduler = perf.schedulerDiagnostics
+    Add(lines, "## Zone Anchor Policy Performance")
+    Add(lines, "")
+    Add(lines, "- Source report: " .. Code(report.id or "Unknown"))
+    local workerSlice = tonumber(perf.longestWorkerSliceMs or perf.maxStepMs)
+    local largestCall = tonumber(perf.largestInstrumentedCallMs)
+    Add(lines, "- Worker slice: " .. (workerSlice and string.format("`%.2f ms`", workerSlice) or Code("Not recorded")))
+    Add(lines, "- Largest call: " .. (largestCall and (Code(perf.largestInstrumentedCallPhase or "Unknown")
+        .. string.format(" `%.2f ms`", largestCall)) or Code("Not recorded")))
+    Add(lines, "- Capability snapshot: " .. Code(capabilities and capabilities.status or "Not recorded"))
+    Add(lines, "- Capability generation: " .. Code(capabilities and capabilities.generation or "Not recorded"))
+    if capabilities then
+        Add(lines, string.format("- Capability builds this action: `%d` • reuses: `%d` • stale at commit: %s",
+            tonumber(capabilities.buildsThisAction) or 0, tonumber(capabilities.reusesThisAction) or 0,
+            Code(capabilities.staleAtCommit and "YES" or "NO")))
+        Add(lines, string.format("- Eligibility steps: `%d` • eligibility yields: `%d`",
+            tonumber(capabilities.eligibilitySteps) or 0, tonumber(capabilities.eligibilityYields) or 0))
+    else
+        Add(lines, "- Capability builds this action: " .. Code("Not recorded") .. " • reuses: " .. Code("Not recorded")
+            .. " • stale at commit: " .. Code("Not recorded"))
+        Add(lines, "- Eligibility steps: " .. Code("Not recorded") .. " • eligibility yields: " .. Code("Not recorded"))
+    end
+    if scheduler then
+        Add(lines, string.format("- Maximum slice debt: `%.2f ms` • post-expensive continuations: `%d`",
+            tonumber(scheduler.maximumSliceDebtMs) or 0, tonumber(scheduler.postExpensiveCallContinuations) or 0))
+    else
+        Add(lines, "- Maximum slice debt: " .. Code("Not recorded")
+            .. " • post-expensive continuations: " .. Code("Not recorded"))
     end
     Add(lines, "")
 end
@@ -350,8 +414,10 @@ function Zone.BuildZoneDebugExport(snapshot, affinity)
     AddStyle(lines, snapshot)
     AddEvidence(lines, snapshot)
     affinity = AddAffinity(lines, affinity, snapshot)
-    local latestReport = LatestZoneReport()
-    AddZoneAnchorPolicy(lines, latestReport)
+    local reports = ZoneReports()
+    local latestReport = LatestZoneNativeReport(reports)
+    local latestPolicyReport = LatestZoneAnchorPolicyReport(reports)
+    AddZoneAnchorPolicy(lines, latestPolicyReport, latestReport)
     AddLatestReport(lines, latestReport)
     local text = table.concat(lines, "\n")
     return text, {
@@ -363,6 +429,8 @@ function Zone.BuildZoneDebugExport(snapshot, affinity)
         selectedPieces = tonumber(affinity.selected) or 0,
         profileKey = snapshot.identity and snapshot.identity.profileKey or nil,
         fingerprint = snapshot.fingerprint,
+        latestZoneReportID = latestReport and latestReport.id or nil,
+        latestPolicyReportID = latestPolicyReport and latestPolicyReport.id or nil,
     }
 end
 

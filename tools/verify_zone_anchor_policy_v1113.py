@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the v1.11.4 Zone anchor-policy authority transfer and parity boundary."""
+"""Verify the v1.11.5 Zone anchor-policy authority transfer and parity boundary."""
 from pathlib import Path
 import re
 
@@ -32,7 +32,7 @@ required_callbacks = [
     "ScoreAnchorPair", "ScoreAnchorSkeleton", "BuildNoveltyReference", "ClassifyNovelty",
 ]
 checks = {
-    "clean numeric v1.11.4 metadata": version == "1.11.4" and "## Version: 1.11.4" in toc,
+    "clean numeric v1.11.5 metadata": version == "1.11.5" and "## Version: 1.11.5" in toc,
     "new modules listed once": all(toc.count(path) == 1 for path in required_modules),
     "bridge precedes anchor search": toc.index(required_modules[0]) < toc.index(r"Core\Wardrobe\AnchorSkeletonSearch.lua"),
     "Zone scoring precedes Zone policy": toc.index(required_modules[2]) < toc.index(required_modules[3]),
@@ -66,7 +66,7 @@ checks = {
     "unknown evidence remains neutral": "classification == \"UNKNOWN\"" in scoring and "return 0" in scoring,
     "policy adds no random calls": all("math.random" not in value for value in [bridge, policy, scoring]),
     "shared orchestration contains no Zone mode branch": all("ZONE_NATIVE" not in value for value in [bridge, worker, search]),
-    "debug export format advances to 3": "Zone.DEBUG_EXPORT_FORMAT = 3" in exporter and "Zone Anchor Policy" in exporter,
+    "debug export format advances through 4": "Zone.DEBUG_EXPORT_FORMAT = 4" in exporter and "Zone Anchor Policy" in exporter,
     "reports persist policy decomposition": "zoneAnchorPolicyDiagnostics" in snapshot and "Zone Anchor Policy" in formatter,
     "policy performance is visible": "zoneAnchorPolicy" in policy and "Zone anchor policy" in formatter,
     "no prerelease suffix": not re.search(r"1\.11\.3(?:a|b|rc|alpha|beta)", "\n".join(
@@ -75,7 +75,7 @@ checks = {
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
-    print("FAIL: v1.11.4 Zone anchor-policy guard failed:")
+    print("FAIL: v1.11.5 Zone anchor-policy guard failed:")
     for name in failed: print("  -", name)
     raise SystemExit(1)
-print(f"PASS: v1.11.4 Zone anchor-policy verification: {len(checks)} checks")
+print(f"PASS: v1.11.5 Zone anchor-policy verification: {len(checks)} checks")

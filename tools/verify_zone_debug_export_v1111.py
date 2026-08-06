@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the v1.11.4 copy-ready Zone debug export contract."""
+"""Verify the v1.11.5 copy-ready Zone debug export contract."""
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
@@ -10,7 +10,7 @@ ui = (root / "UI/DebugReport.lua").read_text()
 toc = (root / "QuestChronicle.toc").read_text()
 
 checks = {
-    "numeric v1.11.4 metadata": "## Version: 1.11.4" in toc and (root / "VERSION.txt").read_text().strip() == "1.11.4",
+    "numeric v1.11.5 metadata": "## Version: 1.11.5" in toc and (root / "VERSION.txt").read_text().strip() == "1.11.5",
     "command module listed once": toc.count(r"Core\Chronicle\ZoneDebugCommands.lua") == 1,
     "export module listed once": toc.count(r"Core\ZoneStyle\Zone\DebugExport.lua") == 1,
     "help advertises export": "/qc zone debug [export]" in commands,
@@ -20,15 +20,15 @@ checks = {
     "export includes architecture": "Generation architecture" in exporter and "GetModeCapabilities" in exporter,
     "export includes complete ancestry": "Complete evidence ancestry" in exporter and "for index, entry in ipairs(evidence.entries" in exporter,
     "export includes per-piece affinity": "Current-look Zone affinity" in exporter and "AFFINITY_COMPONENTS" in exporter,
-    "export includes latest Zone report": "Latest Zone Native diagnostic report" in exporter and "LatestZoneReport" in exporter,
+    "export includes latest Zone report": "Latest Zone Native diagnostic report" in exporter and "LatestZoneNativeReport" in exporter and "LatestZoneAnchorPolicyReport" in exporter,
     "export is session-only": "QuestChronicleDB" not in exporter and "SavedVariables" not in exporter,
     "export does not use randomness": "math.random" not in exporter and "random(" not in exporter.lower(),
     "export does not invoke generation": all(token not in exporter for token in ["GenerateCurrentMode", "StartGenerateOutfit", "RerollUnlockedCurrentMode"]),
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
-    print("FAIL: v1.11.4 Zone debug export guard failed:")
+    print("FAIL: v1.11.5 Zone debug export guard failed:")
     for name in failed:
         print("  -", name)
     raise SystemExit(1)
-print(f"PASS: v1.11.4 Zone debug export verification: {len(checks)} checks")
+print(f"PASS: v1.11.5 Zone debug export verification: {len(checks)} checks")

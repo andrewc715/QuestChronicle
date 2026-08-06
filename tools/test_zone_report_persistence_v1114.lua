@@ -59,7 +59,7 @@ for index = 1, 45 do phaseStats["phase_" .. index] = { calls = 100 + index, tota
 
 local report, message = D.AddReport({
     formatVersion = D.FORMAT_VERSION, id = "QCDBG-ZONE-PERSIST-1", sequence = 1,
-    timestamp = 1785981000, timestampText = "2026-08-06 09:50:00", version = "1.11.4",
+    timestamp = 1785981000, timestampText = "2026-08-06 09:50:00", version = "1.11.5",
     action = "GENERATE_OUTFIT", result = "COMPLETED", generationToken = "QCGEN-ZONE-PERSIST-1",
     lineageID = "Tester-Realm", character = { key = "Tester-Realm", name = "Tester", realm = "Realm" },
     outfit = { generatedName = "Zone Policy Persistence", slots = components },
@@ -116,4 +116,4 @@ local trimmed = false
 for _, warning in ipairs(report.warnings or {}) do if warning.key == "REPORT_TRIMMED" then trimmed = true end end
 assert(trimmed, "compacted Zone report must retain a trimming warning")
 
-print(string.format("PASS v1.11.4 realistic Zone report retained after policy-aware compaction: %d bytes", report.approximateBytes or 0))
+print(string.format("PASS v1.11.5 realistic Zone report retained after policy-aware compaction: %d bytes", report.approximateBytes or 0))

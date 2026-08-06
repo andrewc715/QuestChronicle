@@ -1,12 +1,11 @@
 local QC = QuestChronicle
 local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
-function P.GenerateWeapons(state, reroll, styleMode, styleContext)
+function P.GenerateWeapons(state, reroll, styleMode, styleContext, generationJob)
     local lockedMode, errorMessage = P.GetLockedWeaponMode(state)
     if errorMessage then return false, errorMessage end
 
-    local context = P.CreateWeaponGenerationContext()
-    if P.MaybeYieldWeaponGeneration then P.MaybeYieldWeaponGeneration("weaponContext") end
+    local context = P.CreateWeaponGenerationContext(generationJob)
     local capabilities = P.NormalizeWeaponFamilyChoices(state, context.capabilities)
     if P.MaybeYieldWeaponGeneration then P.MaybeYieldWeaponGeneration("weaponCapabilities") end
     local topology = capabilities.topology

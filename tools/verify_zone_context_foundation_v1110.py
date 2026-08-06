@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the v1.11.4 Zone context and evidence foundation contract."""
+"""Verify the v1.11.5 Zone context and evidence foundation contract."""
 from pathlib import Path
 import re
 
@@ -33,7 +33,7 @@ required_modules = [
 ]
 
 checks = {
-    "clean v1.11.4 metadata": "## Version: 1.11.4" in toc and (root / "VERSION.txt").read_text().strip() == "1.11.4",
+    "clean v1.11.5 metadata": "## Version: 1.11.5" in toc and (root / "VERSION.txt").read_text().strip() == "1.11.5",
     "all Zone foundation modules are listed exactly once": all(toc.count(path) == 1 for path in required_modules),
     "Zone remains truthful LEGACY generation": 'implementationGeneration = 1' in adapter and 'sharedFramework = false' in adapter and 'legacy = true' in adapter,
     "Zone foundation marker is exposed": 'zoneFoundation = "CONTEXT_EVIDENCE_V1"' in adapter,
@@ -54,8 +54,8 @@ checks = {
 
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
-    print("FAIL: v1.11.4 Zone context foundation guard failed:")
+    print("FAIL: v1.11.5 Zone context foundation guard failed:")
     for name in failed:
         print("  -", name)
     raise SystemExit(1)
-print(f"PASS: v1.11.4 Zone context foundation verification: {len(checks)} checks")
+print(f"PASS: v1.11.5 Zone context foundation verification: {len(checks)} checks")

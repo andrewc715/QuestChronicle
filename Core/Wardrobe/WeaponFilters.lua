@@ -442,24 +442,6 @@ function P.GetCachedWeaponSourceInfo(sourceID)
     return sourceID and P.weaponSourceInfoCache[tonumber(sourceID) or sourceID] or nil
 end
 
-function P.CreateWeaponGenerationContext()
-    -- GetWeaponAppearanceCapabilities queries Blizzard's live slot-and-option
-    -- APIs directly. Forcing UpdateUsableAppearances here performs a global,
-    -- synchronous collection recalculation and can lock the client every time
-    -- Generate Outfit is clicked. Route invalidation on equipment and spec
-    -- events is sufficient to keep this context current.
-    local capabilities = Wardrobe.GetWeaponAppearanceCapabilities()
-    return {
-        mainItem = capabilities.topology.mainItem,
-        offItem = capabilities.topology.offItem,
-        appearancesByCategory = {},
-        locationsBySlot = {},
-        validation = {},
-        topology = capabilities.topology,
-        capabilities = capabilities,
-    }
-end
-
 function P.GetGenerationLocation(definition, context)
     local slotName = definition.slotName
     if context.locationsBySlot[slotName] == nil then

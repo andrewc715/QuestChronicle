@@ -13,13 +13,13 @@ def sha(path: str) -> str:
 
 frozen_hashes = {
     "Core/ZoneStyle/Traveler/StyleLexicon.lua": "a7d84e72b749ea36e2d9f99ceb1bd8a3b5a56d5067cd9965d4f118f21aa60d5d",
-    "Core/ZoneStyle/Scoring.lua": "a3a896498f5a65444c0772fc1c8b19ea6eb3f59adf009277e43d9b7bc4bf7abf",
+    "Core/ZoneStyle/Scoring.lua": "34749bf94f7ddac3bcbfbff72a0f7c1a3d1a70b4700fd6cfb449172a0cd87ecb",
     "Core/Wardrobe/SupportFinalValidation.lua": "8a3ce9ec3bdc6eb8b66ab8d647dfea240cdd090342b37516c73c4ef0bda75295",
     "Core/Wardrobe/SupportRepair.lua": "87494c9386a7169552587c8d8353372260089c888f770720be9cc14e7c3d8ab9",
     "Core/Wardrobe/AnchorSkeletonSearch.lua": "b2ed9aafd6116bff0197281e877b9d9a2d60edae75012fdf8a003b5f18ee51ce",
     "Core/Wardrobe/GenerationScheduling.lua": "a523d71b827da1f96dbacd9a605d6a7a2d1a666dc4135f58cc3d05e4d14c4f36",
     "Core/Wardrobe/AppearanceRoutes.lua": "9428bb5e2c091d217a15cef28758485143d28b63ec17c2ea5596bdd49f3562f2",
-    "Core/Wardrobe/WeaponPipeline.lua": "652b672fe6401edd473b36913ffa812e19408114e384b23cd7b7742f77f2676b",
+    "Core/Wardrobe/WeaponPipeline.lua": "41f495e24c15cf2342cfbe8d90ffa1001646082311c2ab488411545d09b33068",
 }
 
 overrides = text("Core/ZoneStyle/Traveler/CuratedOverrides.lua")
