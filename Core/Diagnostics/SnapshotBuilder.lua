@@ -309,6 +309,7 @@ local function PerformanceSnapshot(performance)
         schedulerDiagnostics = CopyTable(performance.schedulerDiagnostics),
         eraScheduling = CopyTable(performance.eraScheduling),
         supportScheduling = CopyTable(performance.supportScheduling),
+        scoringPotholes = CopyTable(performance.scoringPotholes),
         weaponCapabilities = CopyTable(performance.weaponCapabilities),
         phaseStats = CopyTable(performance.phaseStats),
     }

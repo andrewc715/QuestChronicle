@@ -163,6 +163,13 @@ local report, message = D.AddReport({
             eligibilityMarkerBatch = 4, beamCandidateSteps = 5408, beamFallbackSteps = 6,
             beamFallbackYields = 5, beamStageFinalizations = 7, beamFreshSliceDeferrals = 7,
             beamStageFinalizeMaxMs = 6.8, largestSubphase = "supportBeamStageFinalize", largestSubphaseMs = 6.8 },
+        scoringPotholes = {
+            anchor = { substeps = 440, completions = 32, apiOperations = 12, admissionDeferrals = 4,
+                metadataAPICalls = 4, setAPICalls = 4, trackingAPICalls = 4, preparedMetadataHits = 28,
+                preparedSetHits = 28, preparedTrackingHits = 28, largestSubphase = "anchorCandidateDescriptor", largestSubphaseMs = 1.7 },
+            supportBridge = { targetResolutions = 900, descriptorHits = 900, descriptorFallbacks = 0, candidatePairs = 720,
+                baselinePairs = 180, admissionDeferrals = 9, largestSubphase = "supportCandidateBridgePair", largestSubphaseMs = 1.5 },
+        },
         weaponCapabilities = { status = "REUSED", generation = 4, buildsThisAction = 1,
             reusesThisAction = 4, staleAtCommit = false, currentGeneration = 4,
             invalidationReason = "LOGIN_SESSION_RESET", eligibilitySteps = 110,
@@ -189,6 +196,9 @@ assert(report.performance.weaponCapabilities.eligibilitySteps == 110, "weapon ca
 assert(report.performance.schedulerDiagnostics.postExpensiveCallContinuations == 0, "scheduler integrity was lost")
 assert(report.performance.supportScheduling and report.performance.supportScheduling.eligibilityMarkerBatch == 4, "support scheduling core was lost")
 assert(report.performance.supportScheduling.largestSubphase == "supportBeamStageFinalize", "support subphase identity was lost")
+assert(report.performance.scoringPotholes and report.performance.scoringPotholes.anchor.substeps == 440, "anchor pothole counters were lost")
+assert(report.performance.scoringPotholes.supportBridge.descriptorFallbacks == 0, "support bridge pothole counters were lost")
+assert(report.performance.scoringPotholes.supportBridge.largestSubphase == "supportCandidateBridgePair", "support bridge subphase identity was lost")
 assert(report.support and report.support.finalValidationStatus == "CLEAN", "support validation outcome was lost")
 assert(report.support.phaseDFinal and report.support.phaseDFinal.status == "CLEAN", "Phase D outcome was lost")
 assert(#(report.skeleton and report.skeleton.components or {}) == 5, "selected skeleton was lost")
@@ -214,12 +224,16 @@ local pathological, pathologicalMessage = D.AddReport({
         anchorPolicy = { policyID = "ZONE_ANCHOR_POLICY_V1", authority = "ACTIVE",
             selected = selected, pools = { huge = { detail = string.rep("pool ", 20000) } } } },
     support = { finalValidationStatus = "CLEAN", profile = { entries = entries }, decisions = decisions },
-    skeleton = { components = components }, performance = { phaseStats = phaseStats },
+    skeleton = { components = components }, performance = { phaseStats = phaseStats,
+        scoringPotholes = { anchor = { substeps = 999, largestSubphase = "anchorCandidateAffinity", largestSubphaseMs = 2.2 },
+            supportBridge = { descriptorFallbacks = 1, largestSubphase = "supportCandidateBridgeDescriptor", largestSubphaseMs = 2.4 } } },
 })
 assert(pathological, pathologicalMessage or "pathological valid report must persist as a stub")
 assert(pathological.approximateBytes <= D.MAX_REPORT_BYTES, "pathological stub exceeded the ceiling")
 assert(pathological.compaction and pathological.compaction.emergencyStub == true, "pathological report did not use emergency fallback")
 assert(pathological.compaction.tier == 5 or pathological.compaction.tier == 6, "unexpected emergency tier")
+assert(pathological.performance and pathological.performance.scoringPotholes and pathological.performance.scoringPotholes.anchor.substeps == 999, "emergency stub lost anchor pothole diagnostics")
+assert(pathological.performance.scoringPotholes.supportBridge.descriptorFallbacks == 1, "emergency stub lost support bridge diagnostics")
 assert(#printed == 0, "emergency persistence should not print a rejection")
 for _, event in ipairs(notified) do assert(event[1] ~= "DIAGNOSTIC_REPORT_REJECTED", "emergency stub emitted rejection event") end
 

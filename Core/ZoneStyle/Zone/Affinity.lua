@@ -51,11 +51,21 @@ local function AvoidConflict(descriptor, avoids)
     return result and (1 - result) or nil
 end
 
-local function ProvenanceAffinity(source, snapshot)
+local function ProvenanceAffinity(source, snapshot, prepared)
     if not source or not snapshot or not snapshot.provenance or not snapshot.provenance.key then return nil, nil end
-    local nativeExpansion = ZoneStyle.GetSourceExpansionID and ZoneStyle.GetSourceExpansionID(source) or source.expansionID
+    local nativeExpansion
+    if prepared and prepared.expansionIDKnown then
+        nativeExpansion = prepared.expansionID
+    else
+        nativeExpansion = ZoneStyle.GetSourceExpansionID and ZoneStyle.GetSourceExpansionID(source) or source.expansionID
+    end
     local curated = P.GetCuratedSourceOrigin and P.GetCuratedSourceOrigin(source, nativeExpansion)
-    local tracked = P.GetTrackedSourceOrigin and P.GetTrackedSourceOrigin(source)
+    local tracked
+    if prepared and prepared.trackedOriginKnown then
+        tracked = prepared.trackedOrigin
+    else
+        tracked = P.GetTrackedSourceOrigin and P.GetTrackedSourceOrigin(source)
+    end
     local origin = curated or tracked
     if origin and origin.provenanceKey then
         return origin.provenanceKey == snapshot.provenance.key and 1 or 0, origin
@@ -149,12 +159,12 @@ function Zone.NormalizeSelectedOutfitAffinity(affinity, snapshot)
     return normalized
 end
 
-function Zone.GetZoneAffinity(source, definition, snapshot)
+function Zone.GetZoneAffinity(source, definition, snapshot, prepared)
     snapshot = snapshot or (ZoneStyle.GetZoneContextSnapshot and ZoneStyle.GetZoneContextSnapshot())
     if not source or not snapshot then
         return EmptyAffinity({ "source", "snapshot" })
     end
-    local descriptor = ZoneStyle.GetTravelerDescriptor and ZoneStyle.GetTravelerDescriptor(source, definition)
+    local descriptor = prepared and prepared.descriptor or (ZoneStyle.GetTravelerDescriptor and ZoneStyle.GetTravelerDescriptor(source, definition, prepared))
     if not descriptor then
         return EmptyAffinity({ "visual_descriptor" })
     end
@@ -168,7 +178,7 @@ function Zone.GetZoneAffinity(source, definition, snapshot)
         magic = TextAffinity(descriptor.text, style.magic),
         avoids = AvoidConflict(descriptor, style.avoids),
     }
-    local provenance, origin = ProvenanceAffinity(source, snapshot)
+    local provenance, origin = ProvenanceAffinity(source, snapshot, prepared)
     components.provenance = provenance
     local componentStatus, missing, notApplicable = BuildComponentStatuses(components, snapshot)
     for _, key in ipairs(COMPONENT_ORDER) do
@@ -257,6 +267,6 @@ function Zone.BuildSelectedOutfitAffinity(state, snapshot)
     return result
 end
 
-function ZoneStyle.GetZoneAffinity(source, definition, snapshot)
-    return Zone.CopyPrimitive(Zone.GetZoneAffinity(source, definition, snapshot))
+function ZoneStyle.GetZoneAffinity(source, definition, snapshot, prepared)
+    return Zone.CopyPrimitive(Zone.GetZoneAffinity(source, definition, snapshot, prepared))
 end

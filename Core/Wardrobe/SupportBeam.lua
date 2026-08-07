@@ -131,7 +131,10 @@ local function StepCandidateDecision(holder, candidate, node, work, remaining, l
             holder.candidateWork = P.CreateSupportCandidateWork(candidate, node, work.job, work.profile, remaining, locked)
         end
         local subphase = P.DescribeSupportCandidateWorkOperation and P.DescribeSupportCandidateWorkOperation(holder.candidateWork) or "FINALIZE"
+        local fallbackBefore = tonumber(holder.candidateWork.descriptorFallbacks) or 0
         local done, decision = P.StepSupportCandidateWork(holder.candidateWork)
+        work.lastCandidateDescriptorFallbacks = math.max(0, (tonumber(holder.candidateWork.descriptorFallbacks) or 0) - fallbackBefore)
+        work.lastCandidateBridgeDescriptorHit = holder.candidateWork.lastBridgeDescriptorHit == true
         work.lastCandidateSubphase = subphase
         work.lastCandidateCompleted = done == true
         if not done then return nil, false end
@@ -189,7 +192,7 @@ function P.DescribeNextSupportBeamCandidateSubphase(work)
 end
 
 function P.StepSupportBeamWork(work)
-    work.lastCandidateSubphase, work.lastCandidateCompleted = nil, false
+    work.lastCandidateSubphase, work.lastCandidateCompleted, work.lastCandidateDescriptorFallbacks, work.lastCandidateBridgeDescriptorHit = nil, false, 0, false
     if work.stageIndex > #work.slotOrder then return true end
     if work.fallbackWork then StepFallback(work) return false end
     local slotKey = work.slotOrder[work.stageIndex]

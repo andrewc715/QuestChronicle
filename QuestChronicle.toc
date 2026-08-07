@@ -2,7 +2,7 @@
 ## Title: Quest Chronicle
 ## Notes: Records quest lifecycle, objective progress, completions, and roleplay notes, with a native-styled Chronicle window.
 ## Author: OpenAI & Andrew
-## Version: 1.11.10
+## Version: 1.11.11
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## AddonCompartmentFunc: QuestChronicle_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: QuestChronicle_OnAddonCompartmentEnter
@@ -36,9 +36,12 @@ Core\Wardrobe\GenerationAndConcepts.lua
 Core\Wardrobe\WeaponPipeline.lua
 Core\Wardrobe\AnchorSkeletonCache.lua
 Core\Wardrobe\AnchorPolicyBridge.lua
+Core\Wardrobe\AnchorCandidateWork.lua
+Core\Wardrobe\AnchorWorkerScheduling.lua
 Core\Wardrobe\AnchorSkeletonNovelty.lua
 Core\Wardrobe\AnchorSkeletonSearch.lua
 Core\Wardrobe\GenerationPerformance.lua
+Core\Wardrobe\ScoringPotholePerformance.lua
 Core\Wardrobe\GenerationScheduling.lua
 Core\Wardrobe\GenerationSetupWorker.lua
 Core\Wardrobe\GenerationJobFactory.lua
@@ -63,6 +66,7 @@ Core\ZoneStyle\Zone\StartingZoneRegistry.lua
 Core\ZoneStyle\Zone\ContextResolver.lua
 Core\ZoneStyle\Zone\Compatibility.lua
 Core\ZoneStyle\SourceMetadata.lua
+Core\ZoneStyle\PreparedSource.lua
 Core\ZoneStyle\EraExecution.lua
 Core\ZoneStyle\EraEvidence.lua
 Core\ZoneStyle\EraCandidateWork.lua
@@ -111,6 +115,7 @@ Core\Diagnostics\SupportSnapshot.lua
 Core\Diagnostics\SnapshotBuilder.lua
 Core\Diagnostics\SupportReportFormatter.lua
 Core\Diagnostics\EraPerformanceFormatter.lua
+Core\Diagnostics\ScoringPotholeFormatter.lua
 Core\Diagnostics\ReportFormatter.lua
 Core\ZoneStyle\Traveler\Debug.lua
 Core\ZoneStyle\Zone\Debug.lua

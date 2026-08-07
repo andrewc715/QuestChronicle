@@ -21,7 +21,7 @@ for mode in ("GENERATION_COOPERATIVE", "SUPPORT_REROLL_COOPERATIVE", "BACKGROUND
 require("schedulerOwner" in execution and "work.schedulerOwner" in execution, "era admission does not own its scheduler explicitly")
 require("sameSliceDeferredRetries" in execution, "same-slice deferred retry instrumentation missing")
 require("ERA_EXECUTION_SYNCHRONOUS" in era, "synchronous era getter does not select synchronous execution mode")
-require("StepSourceEraEvidenceWork(work, 1000000)" not in era, "v1.11.10 million-step era drain survived")
+require("StepSourceEraEvidenceWork(work, 1000000)" not in era, "v1.11.11 million-step era drain survived")
 require("progressSerial" in era and "AbortSynchronousEraWork" in era, "synchronous forward-progress guard missing")
 
 constructor = cached[cached.index("function ZoneStyle.CreateCachedSourceEligibilityWork"):cached.index("function ZoneStyle.StepCachedSourceEligibilityWork")]
@@ -61,4 +61,4 @@ idx_era = toc.index("Core\\ZoneStyle\\EraEvidence.lua")
 idx_candidate = toc.index("Core\\ZoneStyle\\EraCandidateWork.lua")
 require(idx_exec < idx_era < idx_candidate, "TOC execution-contract order is invalid")
 
-print("PASS v1.11.10 era execution boundary: explicit modes, nested eligibility, no eager synchronous getter, and no million-step drain")
+print("PASS v1.11.11 era execution boundary: explicit modes, nested eligibility, no eager synchronous getter, and no million-step drain")

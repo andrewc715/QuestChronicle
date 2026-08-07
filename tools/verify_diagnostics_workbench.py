@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the v1.11.10 diagnostics workbench wiring and read-only boundaries."""
+"""Verify the v1.11.11 diagnostics workbench wiring and read-only boundaries."""
 from pathlib import Path
 import sys
 
@@ -16,7 +16,7 @@ debug_tab = (ROOT / "UI/DebugTab.lua").read_text(encoding="utf-8")
 tooltip = (ROOT / "UI/Outfits/ConceptManager.lua").read_text(encoding="utf-8")
 
 checks = {
-    "version is v1.11.10": version == "1.11.10" and "## Version: 1.11.10" in toc,
+    "version is v1.11.11": version == "1.11.11" and "## Version: 1.11.11" in toc,
     "all diagnostics modules load": all(name in toc for name in (
         "Core\\Diagnostics\\Foundation.lua", "Core\\Diagnostics\\ReportCompaction.lua", "Core\\Diagnostics\\History.lua",
         "Core\\Diagnostics\\SnapshotBuilder.lua", "Core\\Diagnostics\\ReportFormatter.lua",

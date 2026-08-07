@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the v1.11.10 adaptive diagnostic-budget persistence contract."""
+"""Verify the v1.11.11 adaptive diagnostic-budget persistence contract."""
 from pathlib import Path
 import sys
 
@@ -14,7 +14,7 @@ formatter = read("Core/Diagnostics/ReportFormatter.lua")
 test = read("tools/test_adaptive_report_budget_v1116.lua")
 
 checks = {
-    "numeric v1.11.10 metadata": version == "1.11.10" and "## Version: 1.11.10" in toc,
+    "numeric v1.11.11 metadata": version == "1.11.11" and "## Version: 1.11.11" in toc,
     "emergency module ordered before compaction": toc.index("Core\\Diagnostics\\ReportEmergencyStub.lua") < toc.index("Core\\Diagnostics\\ReportCompaction.lua"),
     "exact serialized size authority": "QC._Core.JsonEncode" in compaction and "pcall(QC._Core.JsonEncode, report)" in compaction,
     "all adaptive tier labels": all(label in compaction for label in (
@@ -40,8 +40,8 @@ checks = {
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
-    print("FAIL v1.11.10 adaptive diagnostic-budget verifier:")
+    print("FAIL v1.11.11 adaptive diagnostic-budget verifier:")
     for name in failed:
         print(f"- {name}")
     sys.exit(1)
-print(f"PASS v1.11.10 adaptive diagnostic-budget verification: {len(checks)} checks")
+print(f"PASS v1.11.11 adaptive diagnostic-budget verification: {len(checks)} checks")

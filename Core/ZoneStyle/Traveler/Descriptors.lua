@@ -93,7 +93,7 @@ local function InferMaterialFromSubtype(source, material, evidence)
     return 0
 end
 
-local function ComputeLoudness(text, descriptor)
+local function ComputeLoudness(text, descriptor, prepared)
     local padded = " " .. tostring(text or "") .. " "
     local loudness = 0.08
     for token, value in pairs(T.LEXICON.loudness or {}) do
@@ -102,7 +102,7 @@ local function ComputeLoudness(text, descriptor)
             loudness = loudness + value
         end
     end
-    local styleSignals = P.GetSourceStyleSignals and P.GetSourceStyleSignals(descriptor.source)
+    local styleSignals = prepared and prepared.styleSignals or (P.GetSourceStyleSignals and P.GetSourceStyleSignals(descriptor.source))
     local intensity = styleSignals and tonumber(styleSignals.intensity) or 0
     loudness = loudness + math.min(0.30, intensity * 0.035)
     if descriptor.definition and descriptor.definition.key == "SHOULDER" then loudness = loudness + 0.08 end
@@ -124,10 +124,16 @@ local function DescriptorFingerprint(source, definition, text)
     }, "|")
 end
 
-function T.BuildDescriptor(source, definition)
+function T.BuildDescriptor(source, definition, prepared)
     if not source then return nil end
     definition = definition or (QC.Wardrobe and QC.Wardrobe.GetSlotDefinition and QC.Wardrobe.GetSlotDefinition(source.slotKey))
-    local text = P.SourceMetadata(source)
+    local text = prepared and prepared.metadataText or P.SourceMetadata(source)
+    local expansionID
+    if prepared and prepared.expansionIDKnown then
+        expansionID = prepared.expansionID
+    else
+        expansionID = ZoneStyle.GetSourceExpansionID and ZoneStyle.GetSourceExpansionID(source) or source.expansionID
+    end
     local fingerprint = DescriptorFingerprint(source, definition, text)
     local cached = T.descriptorCache[source]
     if cached and cached.fingerprint == fingerprint then return cached end
@@ -148,8 +154,8 @@ function T.BuildDescriptor(source, definition)
         motifs = {},
         evidence = {},
         confidence = {},
-        setIDs = P.GetSourceSetIDs and P.GetSourceSetIDs(source) or {},
-        expansionID = ZoneStyle.GetSourceExpansionID and ZoneStyle.GetSourceExpansionID(source) or source.expansionID,
+        setIDs = prepared and prepared.setIDsKnown and (prepared.setIDs or {}) or (P.GetSourceSetIDs and P.GetSourceSetIDs(source) or {}),
+        expansionID = expansionID,
     }
 
     local paletteHits = ApplyLexicon(text, T.LEXICON.palette, descriptor.palette, descriptor.evidence, "name palette lexicon")
@@ -185,7 +191,7 @@ function T.BuildDescriptor(source, definition)
     if text:find("heavy", 1, true) or text:find("colossal", 1, true) or text:find("massive", 1, true) then visualWeight = visualWeight + 0.55 end
     descriptor.visualWeight = Clamp(visualWeight, 1, 4)
     descriptor.confidence.visualWeight = definition and 0.72 or 0.40
-    descriptor.loudness = ComputeLoudness(text, descriptor)
+    descriptor.loudness = ComputeLoudness(text, descriptor, prepared)
 
     T.descriptorCache[source] = descriptor
     return descriptor
@@ -195,10 +201,10 @@ function T.InvalidateDescriptor(source)
     if source then T.descriptorCache[source] = nil end
 end
 
-function T.GetDescriptor(source, definition)
-    return T.BuildDescriptor(source, definition)
+function T.GetDescriptor(source, definition, prepared)
+    return T.BuildDescriptor(source, definition, prepared)
 end
 
-function ZoneStyle.GetTravelerDescriptor(source, definition)
-    return T.GetDescriptor(source, definition)
+function ZoneStyle.GetTravelerDescriptor(source, definition, prepared)
+    return T.GetDescriptor(source, definition, prepared)
 end

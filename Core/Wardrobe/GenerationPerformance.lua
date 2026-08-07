@@ -278,6 +278,7 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         largestInstrumentedCallPhase = largestKey,
         largestInstrumentedCallMs = largestMax,
         supportRerollTiming = job and job.supportReroll == true or false,
+        scoringPotholes = job and P.BuildScoringPotholeDiagnostics and P.BuildScoringPotholeDiagnostics(job, job.phaseStats) or nil,
         synchronousLaunchPreparationMs = job and (job.synchronousLaunchPreparationMs or job.preWorkerPreparationMs) or 0,
         preWorkerPreparationMs = job and (job.synchronousLaunchPreparationMs or job.preWorkerPreparationMs) or 0,
         schedulerDiagnostics = job and job.schedulerDiagnostics or nil,

@@ -69,20 +69,9 @@ local function ContinuePoolCandidate(job, work)
         candidate.valid = Wardrobe.ValidateSource(source, work.slotKey) == true
         RecordPhase(job, "validation", validationStarted)
         if not candidate.valid then return true end
-        if work.locked then
-            local scoringStarted = NowMilliseconds()
-            local fixedCandidate = P.EvaluateAnchorCandidateForJob
-                and P.EvaluateAnchorCandidateForJob(job, source, work.definition, job.styleContext, true)
-                or P.BuildAnchorCandidate(source, work.definition, job.styleMode, job.styleContext, true)
-            RecordPhase(job, "anchorCandidateScoring", scoringStarted)
-            if fixedCandidate then
-                fixedCandidate.locked = true
-                if P.RecordAnchorPolicyCandidate then P.RecordAnchorPolicyCandidate(work, fixedCandidate) end
-                P.AddAnchorPoolCandidate(work, fixedCandidate)
-            end
-            return true
-        end
-        if job.styleEngine and job.styleEngine.GetSourcePreEraEligibility then
+        candidate.locked = work.locked == true
+
+        if not candidate.locked and job.styleEngine and job.styleEngine.GetSourcePreEraEligibility then
             local eligibilityStarted = NowMilliseconds()
             local eligible
             if job.styleEngine.GetSourcePreEraEligibilityCached then
@@ -94,7 +83,7 @@ local function ContinuePoolCandidate(job, work)
             if not eligible then return true end
             candidate.prechecked = true
         end
-        if job.styleEngine then
+        if not candidate.locked and job.styleEngine then
             local eraStarted = NowMilliseconds()
             if job.styleEngine.CreateSourceEraEvidenceWork then
                 candidate.eraWork = job.styleEngine.CreateSourceEraEvidenceWork(source, {
@@ -108,7 +97,8 @@ local function ContinuePoolCandidate(job, work)
             RecordPhase(job, "eraEvidence", eraStarted)
         end
     end
-    if candidate.eraWork and not candidate.eraWork.done then
+
+    if not candidate.locked and candidate.eraWork and not candidate.eraWork.done then
         local eraStarted = NowMilliseconds()
         local done, evidence, processed = job.styleEngine.StepSourceEraEvidenceWork(candidate.eraWork, P.GENERATION_ERA_CANDIDATES_PER_OPERATION)
         job.eraCandidatesProcessed = job.eraCandidatesProcessed + (tonumber(processed) or 0)
@@ -117,7 +107,8 @@ local function ContinuePoolCandidate(job, work)
         if not done then return false end
         candidate.eraEvidence = evidence
     end
-    if job.styleEngine then
+
+    if not candidate.locked and job.styleEngine and not candidate.eligibilityChecked then
         local eligibilityStarted = NowMilliseconds()
         local eligible
         if job.styleEngine.GetSourceEligibilityCached then
@@ -126,13 +117,22 @@ local function ContinuePoolCandidate(job, work)
             eligible = job.styleEngine.GetSourceEligibility(candidate.source, job.styleMode, job.styleContext, candidate.eraEvidence, candidate.prechecked)
         end
         RecordPhase(job, "eligibility", eligibilityStarted)
+        candidate.eligibilityChecked = true
         if not eligible then return true end
     end
-    local scoringStarted = NowMilliseconds()
-    local anchorCandidate = P.EvaluateAnchorCandidateForJob
-        and P.EvaluateAnchorCandidateForJob(job, candidate.source, work.definition, job.styleContext, false)
-        or P.BuildAnchorCandidate(candidate.source, work.definition, job.styleMode, job.styleContext)
-    RecordPhase(job, "anchorCandidateScoring", scoringStarted)
+
+    local anchorCandidate
+    if P.IsCooperativeZoneAnchorJob and P.IsCooperativeZoneAnchorJob(job) then
+        local done, result = P.StepPreparedAnchorCandidateForWorker(job, candidate, work.definition, candidate.locked)
+        if not done then return false end
+        anchorCandidate = result
+    else
+        local scoringStarted = NowMilliseconds()
+        anchorCandidate = P.EvaluateAnchorCandidateForJob
+            and P.EvaluateAnchorCandidateForJob(job, candidate.source, work.definition, job.styleContext, candidate.locked)
+            or P.BuildAnchorCandidate(candidate.source, work.definition, job.styleMode, job.styleContext, candidate.locked)
+        RecordPhase(job, "anchorCandidateScoring", scoringStarted)
+    end
     if anchorCandidate then
         anchorCandidate.locked = work.locked
         if P.RecordAnchorPolicyCandidate then P.RecordAnchorPolicyCandidate(work, anchorCandidate) end
@@ -218,25 +218,40 @@ local function StepWeaponExpansions(job, work)
         work.weaponExpansion = BeginWeaponExpansion(job, work, work.beam[work.weaponNodeIndex])
     end
     local expansion = work.weaponExpansion
-    local weaponStarted = NowMilliseconds()
-    local done, ok, value, notice
-    if expansion.weaponWork and P.StepWeaponGenerationWork then
-        done, ok, value, notice = P.StepWeaponGenerationWork(expansion.weaponWork)
+    if not expansion.generationDone then
+        local weaponStarted = NowMilliseconds()
+        local done, ok, value, notice
+        if expansion.weaponWork and P.StepWeaponGenerationWork then
+            done, ok, value, notice = P.StepWeaponGenerationWork(expansion.weaponWork)
+        else
+            done = true
+            ok, value, notice = P.GenerateWeapons(expansion.draft, job.reroll, job.styleMode, expansion.styleContext, job)
+        end
+        RecordPhase(job, "anchorWeaponExpansion", weaponStarted)
+        work.weaponCallExceededBudget = NowMilliseconds() - weaponStarted >= P.GENERATION_TIME_BUDGET_MS
+        if expansion.weaponWork and (tonumber(expansion.weaponWork.maxResumeMs) or 0) > (tonumber(job.anchorWeaponSlowYieldMs) or 0) then
+            job.anchorWeaponSlowYieldMs = expansion.weaponWork.maxResumeMs
+            job.anchorWeaponSlowYieldPhase = expansion.weaponWork.slowestYieldPhase
+        end
+        if not done then
+            job.weaponYields = job.weaponYields + 1
+            return false
+        end
+        expansion.generationDone = true
+        expansion.ok, expansion.value, expansion.notice = ok, value, notice
+        if not ok then
+            work.lastWeaponFailure = value
+            work.weaponNodeIndex = work.weaponNodeIndex + 1
+            work.weaponExpansion = nil
+            return work.weaponNodeIndex > limit
+        end
+    end
+
+    if P.IsCooperativeZoneAnchorJob and P.IsCooperativeZoneAnchorJob(job) and P.CreateWeaponAnchorScoringWork and P.StepWeaponAnchorScoringWork then
+        if not P.StepWeaponAnchorScoringForWorker(job, work, expansion) then return false end
     else
-        done = true
-        ok, value, notice = P.GenerateWeapons(expansion.draft, job.reroll, job.styleMode, expansion.styleContext, job)
+        FinishWeaponExpansion(job, work, expansion, expansion.ok, expansion.value, expansion.notice)
     end
-    RecordPhase(job, "anchorWeaponExpansion", weaponStarted)
-    work.weaponCallExceededBudget = NowMilliseconds() - weaponStarted >= P.GENERATION_TIME_BUDGET_MS
-    if expansion.weaponWork and (tonumber(expansion.weaponWork.maxResumeMs) or 0) > (tonumber(job.anchorWeaponSlowYieldMs) or 0) then
-        job.anchorWeaponSlowYieldMs = expansion.weaponWork.maxResumeMs
-        job.anchorWeaponSlowYieldPhase = expansion.weaponWork.slowestYieldPhase
-    end
-    if not done then
-        job.weaponYields = job.weaponYields + 1
-        return false
-    end
-    FinishWeaponExpansion(job, work, expansion, ok, value, notice)
     work.weaponNodeIndex = work.weaponNodeIndex + 1
     work.weaponExpansion = nil
     return work.weaponNodeIndex > limit
@@ -356,7 +371,9 @@ function P.StepAnchorSkeletonJob(job, stepStarted)
             else
                 local slotKey = (work.anchorSlots or P.ANCHOR_SLOT_ORDER)[work.poolSlotIndex]
                 if not work.poolWork then work.poolWork = CreatePoolWork(job, slotKey) end
-                if StepPoolWork(job, work.poolWork) then
+                local poolComplete = StepPoolWork(job, work.poolWork)
+                if P.ConsumeAnchorCandidateYieldRequest and P.ConsumeAnchorCandidateYieldRequest(job) then return "RUNNING" end
+                if poolComplete then
                     if work.poolWork.requiredMissing then
                         work.fallbackReason = work.poolWork.missingReason or "a locked anchor source is unavailable"
                         return "FALLBACK", work.fallbackReason
@@ -386,6 +403,7 @@ function P.StepAnchorSkeletonJob(job, stepStarted)
             if P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.5) then return "RUNNING" end
             work.weaponCallExceededBudget = false
             if StepWeaponExpansions(job, work) then work.stage = "SELECT" return "RUNNING" end
+            if P.ConsumeAnchorCandidateYieldRequest and P.ConsumeAnchorCandidateYieldRequest(job) then return "RUNNING" end
             if work.weaponCallExceededBudget or (P.ShouldYieldGenerationWorker and P.ShouldYieldGenerationWorker(job, 0.5)) then return "RUNNING" end
         elseif work.stage == "SELECT" then
             if P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.5) then return "RUNNING" end

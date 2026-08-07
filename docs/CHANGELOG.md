@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.11 - 2026-08-07
+
+- Decomposed Zone anchor-candidate scoring into prepared cooperative stages.
+- Reused prepared metadata, sets, tracking, and support bridge descriptors to eliminate hidden duplicate work.
+- Split support bridge relationship scoring into bounded target/descriptor/pair/baseline/finalize operations.
+- Preserved v1.11.10 era admission and all scoring, random, support, weapon, cache, and format contracts.
+- Added additive anchor/bridge scheduling diagnostics for Retail closure.
+
 ## 1.11.10 - 2026-08-07
 
 - Replaced unconditional era fresh-frame admission with demand-aware local and API-headroom admission.

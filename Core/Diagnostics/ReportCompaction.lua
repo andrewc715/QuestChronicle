@@ -302,6 +302,7 @@ local function CompactPerformanceCore(performance)
     core.schedulerDiagnostics = performance.schedulerDiagnostics
     core.eraScheduling = performance.eraScheduling
     core.supportScheduling = performance.supportScheduling
+    core.scoringPotholes = performance.scoringPotholes
     core.weaponCapabilities = performance.weaponCapabilities
     core.weaponIndex = CompactWeaponIndex(performance.weaponIndex)
     return core

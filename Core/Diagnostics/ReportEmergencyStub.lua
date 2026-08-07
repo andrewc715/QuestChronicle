@@ -282,6 +282,7 @@ local function CompactPerformance(performance)
     result.schedulerDiagnostics = CompactScheduler(performance.schedulerDiagnostics)
     result.eraScheduling = CompactEraScheduling(performance.eraScheduling)
     result.supportScheduling = CompactSupportScheduling(performance.supportScheduling)
+    result.scoringPotholes = performance.scoringPotholes
     result.weaponCapabilities = CompactCapabilities(performance.weaponCapabilities)
     return result
 end

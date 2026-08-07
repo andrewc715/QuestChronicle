@@ -375,6 +375,7 @@ local function AddPerformance(lines, report, rich)
     end
     if P.AddEraSchedulingPerformanceLines then P.AddEraSchedulingPerformanceLines(lines, performance, QC.Wardrobe and QC.Wardrobe._Private and QC.Wardrobe._Private.GENERATION_PHASE_LABELS or PHASE_LABELS) end
     if P.AddSupportSchedulingPerformanceLines then P.AddSupportSchedulingPerformanceLines(lines, performance, PHASE_LABELS) end
+    if P.AddScoringPotholePerformanceLines then P.AddScoringPotholePerformanceLines(lines, performance) end
 end
 local function AddCache(lines, report, verbose, rich)
     AddHeading(lines, "Cache and Metadata", rich)

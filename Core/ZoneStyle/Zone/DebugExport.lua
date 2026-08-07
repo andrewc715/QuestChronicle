@@ -365,6 +365,12 @@ local function AddZoneAnchorPolicy(lines, report, latestReport)
         Add(lines, "- Maximum slice debt: " .. Code("Not recorded")
             .. " • post-expensive continuations: " .. Code("Not recorded"))
     end
+    local potholes = perf.scoringPotholes or {}
+    local anchorPerf, bridgePerf = potholes.anchor, potholes.supportBridge
+    if anchorPerf then Add(lines, string.format("- Anchor candidate scheduling: `%d` substeps • `%d` completions • `%d` API operations • `%d` admission deferrals • largest: %s `%.2f ms`", tonumber(anchorPerf.substeps) or 0, tonumber(anchorPerf.completions) or 0, tonumber(anchorPerf.apiOperations) or 0, tonumber(anchorPerf.admissionDeferrals) or 0, Code(anchorPerf.largestSubphase or "Not recorded"), tonumber(anchorPerf.largestSubphaseMs) or 0))
+    else Add(lines, "- Anchor candidate scheduling: " .. Code("Not recorded")) end
+    if bridgePerf then Add(lines, string.format("- Support bridge scheduling: `%d` targets • `%d` descriptor hits • `%d` descriptor fallbacks • `%d` candidate pairs • `%d` baseline pairs • `%d` admission deferrals • largest: %s `%.2f ms`", tonumber(bridgePerf.targetResolutions) or 0, tonumber(bridgePerf.descriptorHits) or 0, tonumber(bridgePerf.descriptorFallbacks) or 0, tonumber(bridgePerf.candidatePairs) or 0, tonumber(bridgePerf.baselinePairs) or 0, tonumber(bridgePerf.admissionDeferrals) or 0, Code(bridgePerf.largestSubphase or "Not recorded"), tonumber(bridgePerf.largestSubphaseMs) or 0))
+    else Add(lines, "- Support bridge scheduling: " .. Code("Not recorded")) end
     local era = perf.eraScheduling
     if era then
         Add(lines, string.format("- Era operations: `%d` • sibling completions: `%d` • local: `%d` • API: `%d` • fragment-cache hits: `%d`",

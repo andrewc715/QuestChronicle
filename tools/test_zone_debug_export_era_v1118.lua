@@ -49,6 +49,8 @@ local policy = { id="QCDBG-policy", timestampText="2026-08-06 12:00:01", action=
             pendingCandidateCompletions=2,aggregateFinalizations=37,largestSubphase="eraSetList",largestSubphaseMs=2.75},
         supportScheduling={eligibilitySteps=928,eligibilityYields=140,eligibilityMarkerBatch=4,beamStageFinalizations=7,
             beamFreshSliceDeferrals=7,beamStageFinalizeMaxMs=6.8,candidateSubsteps=1234,candidateCompletions=192,candidateDeferrals=4,largestCandidateSubphase="supportCandidateBridge",largestCandidateSubphaseMs=1.2,largestSubphase="supportBeamStageFinalize",largestSubphaseMs=6.8},
+        scoringPotholes={anchor={substeps=440,completions=32,apiOperations=12,admissionDeferrals=4,largestSubphase="anchorCandidateDescriptor",largestSubphaseMs=1.7},
+            supportBridge={targetResolutions=900,descriptorHits=899,descriptorFallbacks=1,candidatePairs=720,baselinePairs=180,admissionDeferrals=9,largestSubphase="supportCandidateBridgePair",largestSubphaseMs=1.5}},
         schedulerDiagnostics={maximumSliceDebtMs=0.4,postExpensiveCallContinuations=0}}, message="Policy reroll" }
 QC.Diagnostics.GetReports = function() return { newest, malformed, fallbackOnly, policy } end
 
@@ -62,6 +64,8 @@ for _, expected in ipairs({
     "## Zone Anchor Policy Performance", "Capability snapshot: `REUSED`", "Eligibility steps: `12` • eligibility yields: `5`",
     "Support eligibility steps: `928` • yields: `140` • batch: `4`", "Support stage finalizations: `7` • fresh-slice deferrals: `7`",
     "Support candidate scheduling: `1234` substeps • completions: `192` • admission deferrals: `4`",
+    "Anchor candidate scheduling: `440` substeps • `32` completions • `12` API operations • `4` admission deferrals",
+    "Support bridge scheduling: `900` targets • `899` descriptor hits • `1` descriptor fallbacks • `720` candidate pairs • `180` baseline pairs • `9` admission deferrals",
     "Largest support candidate subphase: `supportCandidateBridge` `1.20 ms`", "Largest support subphase: `supportBeamStageFinalize` `6.80 ms`",
     "Era operations: `444` • sibling completions: `37` • local: `390` • API: `54` • fragment-cache hits: `22`",
     "Era admission: `54` API admissions • headroom deferrals: `7` • fresh-only: `0` • phantom: `0`",
@@ -81,6 +85,7 @@ for _, expected in ipairs({
     "Maximum slice debt: `Not recorded`", "Support eligibility steps: `Not recorded`",
     "Support stage finalizations: `Not recorded`", "Support candidate scheduling: `Not recorded`", "Largest support candidate subphase: `Not recorded`", "Largest support subphase: `Not recorded`",
     "Era operations: `Not recorded`", "Era admission: `Not recorded`", "Largest era subphase: `Not recorded`",
+    "Anchor candidate scheduling: `Not recorded`", "Support bridge scheduling: `Not recorded`",
 }) do assert(older:find(expected,1,true), "older policy performance should remain unknown: "..expected) end
 
 QC.Diagnostics.GetReports = function() return {} end

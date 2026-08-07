@@ -275,11 +275,22 @@ function P.StepSupportGenerationJob(job, stepStarted)
                     job.supportBeamFreshSliceDeferrals = (tonumber(job.supportBeamFreshSliceDeferrals) or 0) + 1
                     return "RUNNING"
                 end
-            elseif P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.0) then
-                if operation == "CANDIDATE" or operation == "FALLBACK_SCAN" then
-                    job.supportCandidateDeferrals = (tonumber(job.supportCandidateDeferrals) or 0) + 1
+            else
+                local candidateSubphase = (operation == "CANDIDATE" or operation == "FALLBACK_SCAN")
+                    and P.DescribeNextSupportBeamCandidateSubphase and P.DescribeNextSupportBeamCandidateSubphase(work.beamWork) or nil
+                local reserveMs = (candidateSubphase == "BRIDGE_DESCRIPTOR" or candidateSubphase == "NEIGHBOR_DESCRIPTOR") and 3.0 or 1.0
+                if P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, reserveMs) then
+                    if operation == "CANDIDATE" or operation == "FALLBACK_SCAN" then
+                        job.supportCandidateDeferrals = (tonumber(job.supportCandidateDeferrals) or 0) + 1
+                        if candidateSubphase and candidateSubphase:find("^BRIDGE") then
+                            job.supportBridgeAdmissionDeferrals = (tonumber(job.supportBridgeAdmissionDeferrals) or 0) + 1
+                        end
+                        if candidateSubphase == "BRIDGE_DESCRIPTOR" then
+                            job.supportBridgeDescriptorDeferrals = (tonumber(job.supportBridgeDescriptorDeferrals) or 0) + 1
+                        end
+                    end
+                    return "RUNNING"
                 end
-                return "RUNNING"
             end
             local phaseKey = operation == "FALLBACK_SCAN" and "supportBeamFallback"
                 or operation == "STAGE_FINALIZE" and "supportBeamStageFinalize"
@@ -290,12 +301,29 @@ function P.StepSupportGenerationJob(job, stepStarted)
             if P.RecordGenerationPhase then P.RecordGenerationPhase(job, "supportBeamExpansion", elapsed) end
             if operation == "CANDIDATE" or operation == "FALLBACK_SCAN" then
                 local subphase = work.beamWork.lastCandidateSubphase
-                local subphaseKey = subphase == "NEIGHBOR" and "supportCandidateNeighbor"
-                    or subphase == "BRIDGE" and "supportCandidateBridge"
+                local subphaseKey = subphase == "NEIGHBOR_TARGET" and "supportCandidateNeighborTarget"
+                    or subphase == "NEIGHBOR_DESCRIPTOR" and "supportCandidateNeighborDescriptor"
+                    or subphase == "NEIGHBOR_PAIR" and "supportCandidateNeighborPair"
+                    or subphase == "NEIGHBOR_FINALIZE" and "supportCandidateNeighborFinalize"
+                    or subphase == "BRIDGE_TARGET" and "supportCandidateBridgeTarget"
+                    or subphase == "BRIDGE_DESCRIPTOR" and "supportCandidateBridgeDescriptor"
+                    or subphase == "BRIDGE_PAIR" and "supportCandidateBridgePair"
+                    or subphase == "BRIDGE_AFTER" and "supportCandidateBridgeAfter"
+                    or subphase == "BRIDGE_BASELINE" and "supportCandidateBridgeBaseline"
+                    or subphase == "BRIDGE_FINALIZE" and "supportCandidateBridgeFinalize"
                     or subphase == "BUDGET" and "supportCandidateBudget"
                     or "supportCandidateFinalize"
-                if P.RecordGenerationPhase then P.RecordGenerationPhase(job, subphaseKey, elapsed) end
+                if P.RecordGenerationPhase then
+                    P.RecordGenerationPhase(job, subphaseKey, elapsed)
+                    if subphase and subphase:find("^NEIGHBOR") then P.RecordGenerationPhase(job, "supportCandidateNeighbor", elapsed) end
+                    if subphase and subphase:find("^BRIDGE") then P.RecordGenerationPhase(job, "supportCandidateBridge", elapsed) end
+                end
                 job.supportCandidateSubsteps = (tonumber(job.supportCandidateSubsteps) or 0) + 1
+                if subphase == "BRIDGE_TARGET" then job.supportBridgeTargetResolutions = (tonumber(job.supportBridgeTargetResolutions) or 0) + 1 end
+                if work.beamWork.lastCandidateBridgeDescriptorHit then job.supportBridgeDescriptorHits = (tonumber(job.supportBridgeDescriptorHits) or 0) + 1 end
+                if subphase == "BRIDGE_PAIR" then job.supportBridgeCandidatePairs = (tonumber(job.supportBridgeCandidatePairs) or 0) + 1 end
+                if subphase == "BRIDGE_BASELINE" then job.supportBridgeBaselinePairs = (tonumber(job.supportBridgeBaselinePairs) or 0) + 1 end
+                job.supportBridgeDescriptorFallbacks = (tonumber(job.supportBridgeDescriptorFallbacks) or 0) + (tonumber(work.beamWork.lastCandidateDescriptorFallbacks) or 0)
                 if work.beamWork.lastCandidateCompleted then
                     job.supportCandidateCompletions = (tonumber(job.supportCandidateCompletions) or 0) + 1
                 end
