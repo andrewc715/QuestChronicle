@@ -2,7 +2,7 @@
 ## Title: Quest Chronicle
 ## Notes: Records quest lifecycle, objective progress, completions, and roleplay notes, with a native-styled Chronicle window.
 ## Author: OpenAI & Andrew
-## Version: 1.11.9
+## Version: 1.11.10
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## AddonCompartmentFunc: QuestChronicle_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: QuestChronicle_OnAddonCompartmentEnter
@@ -86,6 +86,7 @@ Core\Wardrobe\SupportProfile.lua
 Core\Wardrobe\SupportBudget.lua
 Core\Wardrobe\SupportRoleResolver.lua
 Core\Wardrobe\SupportScoring.lua
+Core\Wardrobe\SupportCandidateWork.lua
 Core\Wardrobe\SupportBeam.lua
 Core\Wardrobe\SupportFinalValidation.lua
 Core\Wardrobe\SupportRepair.lua

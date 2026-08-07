@@ -239,9 +239,12 @@ end
 local function CompactEraScheduling(scheduling)
     if type(scheduling) ~= "table" then return nil end
     return PrimitiveMap(scheduling, {
-        "operations", "siblingCompletions", "freshSliceDeferrals", "deferredReturns",
+        "operations", "siblingCompletions", "localOperations", "apiOperations", "apiAdmissions",
+        "apiHeadroomDeferrals", "freshOnlyDeferrals", "phantomDeferrals", "sourceCacheCompletions",
+        "fragmentCacheCompletions", "freshSliceDeferrals", "deferredReturns",
         "sameSliceDeferredRetries", "synchronousProgressGuardTrips", "executionMode", "fragmentCacheHits",
         "fragmentCacheBuilds", "pendingCandidateCompletions", "aggregateFinalizations",
+        "setListCalls", "setEntryCalls", "trackingCalls", "encounterListCalls", "encounterEntryOperations", "itemMetadataCalls",
         "largestSubphase", "largestSubphaseMs",
     })
 end
@@ -252,7 +255,9 @@ local function CompactSupportScheduling(scheduling)
         "eligibilitySteps", "eligibilityYields", "eligibilityCacheCompletions",
         "eligibilityComputedCompletions", "eligibilityMarkerBatch", "beamCandidateSteps",
         "beamFallbackSteps", "beamFallbackYields", "beamStageFinalizations",
-        "beamFreshSliceDeferrals", "beamStageFinalizeMaxMs", "largestSubphase", "largestSubphaseMs",
+        "beamFreshSliceDeferrals", "beamStageFinalizeMaxMs", "candidateSubsteps", "candidateDeferrals",
+        "candidateCompletions", "largestCandidateSubphase", "largestCandidateSubphaseMs",
+        "largestSubphase", "largestSubphaseMs",
     })
 end
 

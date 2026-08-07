@@ -167,6 +167,10 @@ function P.AddSupportSchedulingPerformanceLines(lines, performance, phaseLabels)
     Add(lines, string.format("Support eligibility completions: %s cache • %s computed", Integer(support.eligibilityCacheCompletions), Integer(support.eligibilityComputedCompletions)))
     Add(lines, string.format("Support beam scheduling: %s candidate • %s fallback • %s fallback yields", Integer(support.beamCandidateSteps), Integer(support.beamFallbackSteps), Integer(support.beamFallbackYields)))
     Add(lines, string.format("Support stage finalizations: %s • fresh-slice deferrals %s • %.2f ms max", Integer(support.beamStageFinalizations), Integer(support.beamFreshSliceDeferrals), tonumber(support.beamStageFinalizeMaxMs) or 0))
+    Add(lines, string.format("Support candidate scheduling: %s substeps • %s completions • %s admission deferrals", Integer(support.candidateSubsteps), Integer(support.candidateCompletions), Integer(support.candidateDeferrals)))
+    if support.largestCandidateSubphase then
+        Add(lines, string.format("Largest support candidate subphase: %s %.2f ms", phaseLabels and phaseLabels[support.largestCandidateSubphase] or support.largestCandidateSubphase, tonumber(support.largestCandidateSubphaseMs) or 0))
+    end
     local largestKey, largestMs = support.largestSubphase, tonumber(support.largestSubphaseMs) or 0
     if not largestKey then
         local phaseStats = performance.phaseStats or {}

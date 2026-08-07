@@ -367,9 +367,12 @@ local function AddZoneAnchorPolicy(lines, report, latestReport)
     end
     local era = perf.eraScheduling
     if era then
-        Add(lines, string.format("- Era operations: `%d` • sibling completions: `%d` • fresh-slice deferrals: `%d` • fragment-cache hits: `%d`",
-            tonumber(era.operations) or 0, tonumber(era.siblingCompletions) or 0,
-            tonumber(era.freshSliceDeferrals) or 0, tonumber(era.fragmentCacheHits) or 0))
+        Add(lines, string.format("- Era operations: `%d` • sibling completions: `%d` • local: `%d` • API: `%d` • fragment-cache hits: `%d`",
+            tonumber(era.operations) or 0, tonumber(era.siblingCompletions) or 0, tonumber(era.localOperations) or 0,
+            tonumber(era.apiOperations) or 0, tonumber(era.fragmentCacheHits) or 0))
+        Add(lines, string.format("- Era admission: `%d` API admissions • headroom deferrals: `%d` • fresh-only: `%d` • phantom: `%d` • source-cache completions: `%d` • fragment-cache completions: `%d`",
+            tonumber(era.apiAdmissions) or 0, tonumber(era.apiHeadroomDeferrals) or 0, tonumber(era.freshOnlyDeferrals) or 0,
+            tonumber(era.phantomDeferrals) or 0, tonumber(era.sourceCacheCompletions) or 0, tonumber(era.fragmentCacheCompletions) or 0))
         Add(lines, string.format("- Era execution boundary: %s • deferred returns: `%d` • same-slice retries: `%d` • synchronous guard trips: `%d`",
             Code(era.executionMode or "Not recorded"), tonumber(era.deferredReturns) or 0,
             tonumber(era.sameSliceDeferredRetries) or 0, tonumber(era.synchronousProgressGuardTrips) or 0))
@@ -377,7 +380,9 @@ local function AddZoneAnchorPolicy(lines, report, latestReport)
             .. (era.largestSubphaseMs and string.format(" `%.2f ms`", tonumber(era.largestSubphaseMs) or 0) or ""))
     else
         Add(lines, "- Era operations: " .. Code("Not recorded") .. " • sibling completions: " .. Code("Not recorded")
-            .. " • fresh-slice deferrals: " .. Code("Not recorded") .. " • fragment-cache hits: " .. Code("Not recorded"))
+            .. " • local: " .. Code("Not recorded") .. " • API: " .. Code("Not recorded") .. " • fragment-cache hits: " .. Code("Not recorded"))
+        Add(lines, "- Era admission: " .. Code("Not recorded") .. " • headroom deferrals: " .. Code("Not recorded")
+            .. " • fresh-only: " .. Code("Not recorded") .. " • phantom: " .. Code("Not recorded"))
         Add(lines, "- Era execution boundary: " .. Code("Not recorded") .. " • deferred returns: " .. Code("Not recorded")
             .. " • same-slice retries: " .. Code("Not recorded") .. " • synchronous guard trips: " .. Code("Not recorded"))
         Add(lines, "- Largest era subphase: " .. Code("Not recorded"))
@@ -390,11 +395,18 @@ local function AddZoneAnchorPolicy(lines, report, latestReport)
         Add(lines, string.format("- Support stage finalizations: `%d` • fresh-slice deferrals: `%d` • max: `%.2f ms`",
             tonumber(support.beamStageFinalizations) or 0, tonumber(support.beamFreshSliceDeferrals) or 0,
             tonumber(support.beamStageFinalizeMaxMs) or 0))
+        Add(lines, string.format("- Support candidate scheduling: `%d` substeps • completions: `%d` • admission deferrals: `%d`",
+            tonumber(support.candidateSubsteps) or 0, tonumber(support.candidateCompletions) or 0, tonumber(support.candidateDeferrals) or 0))
+        Add(lines, "- Largest support candidate subphase: " .. Code(support.largestCandidateSubphase or "Not recorded")
+            .. (support.largestCandidateSubphaseMs and string.format(" `%.2f ms`", tonumber(support.largestCandidateSubphaseMs) or 0) or ""))
         Add(lines, "- Largest support subphase: " .. Code(support.largestSubphase or "Not recorded")
             .. (support.largestSubphaseMs and string.format(" `%.2f ms`", tonumber(support.largestSubphaseMs) or 0) or ""))
     else
         Add(lines, "- Support eligibility steps: " .. Code("Not recorded") .. " • yields: " .. Code("Not recorded"))
         Add(lines, "- Support stage finalizations: " .. Code("Not recorded") .. " • fresh-slice deferrals: " .. Code("Not recorded"))
+        Add(lines, "- Support candidate scheduling: " .. Code("Not recorded") .. " • completions: " .. Code("Not recorded")
+            .. " • admission deferrals: " .. Code("Not recorded"))
+        Add(lines, "- Largest support candidate subphase: " .. Code("Not recorded"))
         Add(lines, "- Largest support subphase: " .. Code("Not recorded"))
     end
     Add(lines, "")

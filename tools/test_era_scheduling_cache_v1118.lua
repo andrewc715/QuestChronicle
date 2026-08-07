@@ -49,16 +49,17 @@ Z.StepSourceEraEvidenceWork(work,1)
 Z.StepSourceEraEvidenceWork(work,1)
 assert(work.candidateWork.stage=="SET_LIST","fixture did not reach SET_LIST")
 W.generationJob.currentSlice.operationCount = 2
+W.generationJob.currentSlice.startedAtMs = -3
 local beforeSets=calls.sets
 local done,_,processed,status=Z.StepSourceEraEvidenceWork(work,1)
-assert(not done and processed==0 and status=="DEFERRED","used-slice SET_LIST was not deferred")
+assert(not done and processed==0 and status=="DEFERRED","low-headroom SET_LIST was not deferred")
 assert(calls.sets==beforeSets and work.candidateWork.stage=="SET_LIST","deferred SET_LIST mutated state")
-assert((W.generationJob.eraFreshSliceDeferrals or 0)==1,"fresh-slice deferral counter missing")
+assert((W.generationJob.eraApiHeadroomDeferrals or 0)==1,"API-headroom deferral counter missing")
 
--- Fresh slice admits SET_LIST.
+-- Available headroom admits SET_LIST.
 W.generationJob.currentSlice=QuestChronicle._Core.Workers.BeginSlice(5.5,7.5)
 Z.StepSourceEraEvidenceWork(work,1)
-assert(calls.sets==beforeSets+1 and work.candidateWork.stage=="SET_ENTRY","fresh SET_LIST did not execute exactly once")
+assert(calls.sets==beforeSets+1 and work.candidateWork.stage=="SET_ENTRY","admitted SET_LIST did not execute exactly once")
 
 -- Finish with a fresh slice whenever the descriptor requires it.
 local guard=0
@@ -92,4 +93,4 @@ local third=Z.CreateSourceEraEvidenceWork(source,{forceRefresh=true,suppressCach
 while not third.done do Z.StepSourceEraEvidenceWork(third,1) end
 assert((third.fragmentCacheHits or 0)==0,"stale fragment survived item invalidation")
 
-print("PASS v1.11.8 fresh-slice admission and stable fragment-cache invalidation")
+print("PASS v1.11.10 headroom admission and stable fragment-cache invalidation")

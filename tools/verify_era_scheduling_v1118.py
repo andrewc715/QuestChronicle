@@ -51,4 +51,4 @@ assert "Zone debug export format" in export and "DEBUG_EXPORT_FORMAT = 4" in exp
 toc = (root / "QuestChronicle.toc").read_text(encoding="utf-8")
 assert toc.count("Core\\ZoneStyle\\EraCandidateWork.lua") == 1
 assert toc.count("Core\\Diagnostics\\EraPerformanceFormatter.lua") == 1
-print(f"PASS v1.11.9 era scheduling verification: {len(checks) + 4*3 + 6} checks")
+print(f"PASS v1.11.10 era scheduling verification: {len(checks) + 4*3 + 6} checks")

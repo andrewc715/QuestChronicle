@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.10 - 2026-08-07
+
+- Replaced unconditional era fresh-frame admission with demand-aware local and API-headroom admission.
+- Added productive-deferral diagnostics including phantom-deferral detection and source/fragment cache completions.
+- Split contextual-support candidate scoring into resumable neighbor, bridge, budget, and finalize substeps.
+- Preserved the v1.11.9 watchdog boundary, scoring, random order, support semantics, persistence, and export formats.
+- Added explicit cold and warm end-to-end latency closure gates.
+
 ## 1.11.9 - 2026-08-07
 
 - Corrected the cooperative/synchronous era-evidence execution boundary after the v1.11.8 Retail watchdog failure.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify v1.11.9 Zone anchor-policy lineage and cooperative weapon closure wiring."""
+"""Verify v1.11.10 Zone anchor-policy lineage and cooperative weapon closure wiring."""
 from pathlib import Path
 import sys
 root=Path(__file__).resolve().parents[1]
@@ -14,7 +14,7 @@ anchor=(root/'Core/Wardrobe/AnchorSkeletonWorker.lua').read_text()
 perf=(root/'Core/Wardrobe/GenerationPerformance.lua').read_text()
 snapshot=(root/'Core/Diagnostics/SnapshotBuilder.lua').read_text()
 checks={
- 'numeric v1.11.9 metadata': version=='1.11.9' and '## Version: 1.11.9' in toc,
+ 'numeric v1.11.10 metadata': version=='1.11.10' and '## Version: 1.11.10' in toc,
  'new modules listed once': toc.count(r'Core\Wardrobe\WeaponCapabilitySnapshot.lua')==1 and toc.count(r'Core\Wardrobe\WeaponStyleOrdering.lua')==1,
  'ordering loads after eligibility': toc.index(r'Core\ZoneStyle\GenerationEligibility.lua') < toc.index(r'Core\Wardrobe\WeaponStyleOrdering.lua'),
  'export format 4': 'Zone.DEBUG_EXPORT_FORMAT = 4' in exporter,
@@ -34,7 +34,7 @@ checks={
 }
 failed=[k for k,v in checks.items() if not v]
 if failed:
- print('FAIL v1.11.9 Zone anchor closure verifier:')
+ print('FAIL v1.11.10 Zone anchor closure verifier:')
  for k in failed: print('  -',k)
  sys.exit(1)
-print(f'PASS v1.11.9 Zone anchor closure verification: {len(checks)} checks')
+print(f'PASS v1.11.10 Zone anchor closure verification: {len(checks)} checks')

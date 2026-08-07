@@ -119,6 +119,14 @@ function P.AttachWarningsAndComparison(report)
     if eraScheduling and (tonumber(eraScheduling.synchronousProgressGuardTrips) or 0) > 0 then
         AddWarning(report, "ERA_SYNCHRONOUS_PROGRESS_GUARD", "SEVERE", "A synchronous era-evidence drain stopped because it failed its forward-progress contract.")
     end
+    if eraScheduling and (tonumber(eraScheduling.phantomDeferrals) or 0) > 0 then
+        AddWarning(report, "ERA_PHANTOM_DEFERRAL", "SEVERE", "Era evidence deferred for an API boundary that resolved without crossing that API boundary.")
+    end
+    if eraScheduling and (tonumber(eraScheduling.apiOperations) or 0) == 0
+        and ((tonumber(eraScheduling.apiHeadroomDeferrals) or 0) + (tonumber(eraScheduling.freshOnlyDeferrals) or 0)) > 0
+    then
+        AddWarning(report, "ERA_ZERO_API_DEFERRAL", "SEVERE", "Era evidence returned to the scheduler for API admission even though the action performed no era API work.")
+    end
     local weaponIndex = performance.weaponIndex or report.weaponIndex
     if weaponIndex and weaponIndex.invalidationReason == "UNKNOWN" then
         AddWarning(report, "UNKNOWN_WEAPON_INDEX_INVALIDATION", "WARNING", "The weapon candidate index was invalidated without a recognized lifecycle reason.")

@@ -1,7 +1,6 @@
 local QC = QuestChronicle
 local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
-
 P.GENERATION_PHASE_LABELS = {
     setup = "Setup (legacy)",
     generationActionIdentity = "Generation action identity",
@@ -77,7 +76,6 @@ P.GENERATION_PHASE_LABELS = {
     weaponLinkedValidate = "Linked-weapon validation", weaponRouteFilter = "Weapon route filtering",
     weaponCompanionRoute = "Weapon companion route", weaponBundleCohesion = "Weapon bundle cohesion",
 }
-
 P.GENERATION_PHASE_SHORT_LABELS = {
     validation = "Validation",
     eraEvidence = "Era",
@@ -124,7 +122,6 @@ P.GENERATION_PHASE_SHORT_LABELS = {
     rerollBridgeScoring = "Reroll bridge", rerollBudgetEvaluation = "Reroll budget",
     rerollShortlistSelection = "Reroll shortlist", rerollStateCommit = "Reroll commit",
 }
-
 function P.GenerationNowMilliseconds()
     if type(debugprofilestop) == "function" then
         return debugprofilestop()
@@ -137,7 +134,6 @@ function P.GenerationNowMilliseconds()
     end
     return 0
 end
-
 function P.RecordGenerationPhase(target, phaseKey, elapsedMs)
     if not target or not phaseKey then return end
     elapsedMs = math.max(0, tonumber(elapsedMs) or 0)
@@ -151,7 +147,6 @@ function P.RecordGenerationPhase(target, phaseKey, elapsedMs)
     phase.totalMs = phase.totalMs + elapsedMs
     phase.maxMs = math.max(phase.maxMs, elapsedMs)
 end
-
 local function ResolveSlowestPhase(phaseStats, allowed)
     local slowestKey, slowestMax = nil, 0
     for phaseKey, phase in pairs(phaseStats or {}) do
@@ -163,7 +158,6 @@ local function ResolveSlowestPhase(phaseStats, allowed)
     end
     return slowestKey, slowestMax
 end
-
 local ERA_OPERATION_PHASE = {
     BUILD = "eraCandidateBuild", CURATED = "eraCurated", SET_LIST = "eraSetList",
     SET_ENTRY = "eraSetEntry", TRACKING = "eraTracking", ENCOUNTER_LIST = "eraEncounterList",
@@ -172,13 +166,11 @@ local ERA_OPERATION_PHASE = {
     ITEM_METADATA = "eraItemMetadata", FINALIZE = "eraCandidateFinalize",
     AGGREGATE_FINALIZE = "eraAggregateFinalize",
 }
-
 local ERA_SUBPHASES = {
     "eraCandidateBuild", "eraCurated", "eraSetList", "eraSetEntry", "eraTracking",
     "eraEncounterList", "eraEncounterEntry", "eraEncounterResolve", "eraItemMetadata",
     "eraCandidateFinalize", "eraAggregateFinalize",
 }
-
 local function ResolveLargestEraSubphase(phaseStats)
     local key, value = nil, 0
     for _, phaseKey in ipairs(ERA_SUBPHASES) do
@@ -187,7 +179,6 @@ local function ResolveLargestEraSubphase(phaseStats)
     end
     return key, value
 end
-
 function P.RecordEraSchedulingOperation(job, eraWork, elapsedMs)
     if not job or not eraWork then return end
     local diag = eraWork.lastStepDiagnostics or {}
@@ -199,21 +190,22 @@ function P.RecordEraSchedulingOperation(job, eraWork, elapsedMs)
     if diag.fragmentCacheHit then job.eraFragmentCacheHits = (tonumber(job.eraFragmentCacheHits) or 0) + 1 end
     if diag.fragmentCacheBuilt then job.eraFragmentCacheBuilds = (tonumber(job.eraFragmentCacheBuilds) or 0) + 1 end
     if diag.pendingCandidate then job.eraPendingCandidateCompletions = (tonumber(job.eraPendingCandidateCompletions) or 0) + 1 end
-    if operation == "SET_LIST" then job.eraSetListCalls = (tonumber(job.eraSetListCalls) or 0) + 1
-    elseif operation == "SET_ENTRY" then job.eraSetEntryCalls = (tonumber(job.eraSetEntryCalls) or 0) + 1
-    elseif operation == "TRACKING" then job.eraTrackingCalls = (tonumber(job.eraTrackingCalls) or 0) + 1
-    elseif operation == "ENCOUNTER_LIST" then job.eraEncounterListCalls = (tonumber(job.eraEncounterListCalls) or 0) + 1
-    elseif operation == "ENCOUNTER_DROP" or operation == "ENCOUNTER_TIER" then job.eraEncounterEntryOperations = (tonumber(job.eraEncounterEntryOperations) or 0) + 1
-    elseif operation == "ITEM_METADATA" then job.eraItemMetadataCalls = (tonumber(job.eraItemMetadataCalls) or 0) + 1
-    elseif operation == "AGGREGATE_FINALIZE" then job.eraAggregateFinalizations = (tonumber(job.eraAggregateFinalizations) or 0) + 1 end
+    if diag.apiInvoked then
+        if operation == "SET_LIST" then job.eraSetListCalls = (tonumber(job.eraSetListCalls) or 0) + 1
+        elseif operation == "SET_ENTRY" then job.eraSetEntryCalls = (tonumber(job.eraSetEntryCalls) or 0) + 1
+        elseif operation == "TRACKING" then job.eraTrackingCalls = (tonumber(job.eraTrackingCalls) or 0) + 1
+        elseif operation == "ENCOUNTER_LIST" then job.eraEncounterListCalls = (tonumber(job.eraEncounterListCalls) or 0) + 1
+        elseif operation == "ITEM_METADATA" then job.eraItemMetadataCalls = (tonumber(job.eraItemMetadataCalls) or 0) + 1 end
+    elseif operation == "ENCOUNTER_DROP" or operation == "ENCOUNTER_TIER" then
+        job.eraEncounterEntryOperations = (tonumber(job.eraEncounterEntryOperations) or 0) + 1
+    elseif operation == "AGGREGATE_FINALIZE" then
+        job.eraAggregateFinalizations = (tonumber(job.eraAggregateFinalizations) or 0) + 1
+    end
     local phaseKey = ERA_OPERATION_PHASE[operation]
     if phaseKey then P.RecordGenerationPhase(job, phaseKey, elapsedMs) end
 end
-
-local SUPPORT_SUBPHASES = {
-    "supportEligibility", "supportBeamCandidate", "supportBeamFallback", "supportBeamStageFinalize",
-}
-
+local SUPPORT_SUBPHASES = { "supportEligibility", "supportBeamCandidate", "supportBeamFallback", "supportBeamStageFinalize", "supportCandidateNeighbor", "supportCandidateBridge", "supportCandidateBudget", "supportCandidateFinalize" }
+local SUPPORT_CANDIDATE_SUBPHASES = { "supportCandidateNeighbor", "supportCandidateBridge", "supportCandidateBudget", "supportCandidateFinalize" }
 local function ResolveLargestSupportSubphase(phaseStats)
     local key, value = nil, 0
     for _, phaseKey in ipairs(SUPPORT_SUBPHASES) do
@@ -222,12 +214,18 @@ local function ResolveLargestSupportSubphase(phaseStats)
     end
     return key, value
 end
-
+local function ResolveLargestSupportCandidateSubphase(phaseStats)
+    local key, value = nil, 0
+    for _, phaseKey in ipairs(SUPPORT_CANDIDATE_SUBPHASES) do
+        local current = tonumber(phaseStats and phaseStats[phaseKey] and phaseStats[phaseKey].maxMs) or 0
+        if current > value then key, value = phaseKey, current end
+    end
+    return key, value
+end
 local function IsCooperativeRerollPhase(phaseKey)
     return phaseKey ~= "rerollLaunchManifest" and phaseKey ~= "rerollStateCapture"
         and phaseKey ~= "previewApply" and phaseKey ~= "uiRefresh" and phaseKey ~= "completionNotify"
 end
-
 local function ApplyTimingDomains(performance)
     if not performance or not performance.supportRerollTiming then return end
     local phases = performance.phaseStats or {}
@@ -240,10 +238,10 @@ local function ApplyTimingDomains(performance)
     performance.largestCooperativeCallPhase = key
     performance.largestCooperativeCallMs = value
 end
-
 function P.BuildGenerationPerformance(job, finishedAtMs)
     local slowestKey, slowestMax = ResolveSlowestPhase(job and job.phaseStats)
     local supportSlowestKey, supportSlowestMax = ResolveLargestSupportSubphase(job and job.phaseStats)
+    local supportCandidateSlowestKey, supportCandidateSlowestMax = ResolveLargestSupportCandidateSubphase(job and job.phaseStats)
     local eraSlowestKey, eraSlowestMax = ResolveLargestEraSubphase(job and job.phaseStats)
     local weaponYieldMs = job and math.max(job.weaponWork and job.weaponWork.maxResumeMs or 0, job.anchorWeaponSlowYieldMs or 0) or 0
     local weaponYieldPhase = job and ((job.weaponWork and job.weaponWork.slowestYieldPhase) or job.anchorWeaponSlowYieldPhase) or nil
@@ -286,6 +284,14 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         eraScheduling = job and {
             operations = tonumber(job.eraOperations) or 0,
             siblingCompletions = tonumber(job.eraSiblingCompletions) or 0,
+            localOperations = tonumber(job.eraLocalOperations) or 0,
+            apiOperations = tonumber(job.eraApiOperations) or 0,
+            apiAdmissions = tonumber(job.eraApiAdmissions) or 0,
+            apiHeadroomDeferrals = tonumber(job.eraApiHeadroomDeferrals) or 0,
+            freshOnlyDeferrals = tonumber(job.eraFreshOnlyDeferrals) or 0,
+            phantomDeferrals = tonumber(job.eraPhantomDeferrals) or 0,
+            sourceCacheCompletions = tonumber(job.eraSourceCacheCompletions) or 0,
+            fragmentCacheCompletions = tonumber(job.eraFragmentCacheCompletions) or 0,
             freshSliceDeferrals = tonumber(job.eraFreshSliceDeferrals) or 0,
             deferredReturns = tonumber(job.eraDeferredReturns) or 0,
             sameSliceDeferredRetries = tonumber(job.eraSameSliceDeferredRetries) or 0,
@@ -296,10 +302,12 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
             fragmentCacheHits = tonumber(job.eraFragmentCacheHits) or 0,
             fragmentCacheBuilds = tonumber(job.eraFragmentCacheBuilds) or 0,
             pendingCandidateCompletions = tonumber(job.eraPendingCandidateCompletions) or 0,
-            setListCalls = tonumber(job.eraSetListCalls) or 0, setEntryCalls = tonumber(job.eraSetEntryCalls) or 0,
-            trackingCalls = tonumber(job.eraTrackingCalls) or 0, encounterListCalls = tonumber(job.eraEncounterListCalls) or 0,
+            setListCalls = tonumber(job.eraApiSetListCalls) or tonumber(job.eraSetListCalls) or 0,
+            setEntryCalls = tonumber(job.eraApiSetEntryCalls) or tonumber(job.eraSetEntryCalls) or 0,
+            trackingCalls = tonumber(job.eraApiTrackingCalls) or tonumber(job.eraTrackingCalls) or 0,
+            encounterListCalls = tonumber(job.eraApiEncounterListCalls) or tonumber(job.eraEncounterListCalls) or 0,
             encounterEntryOperations = tonumber(job.eraEncounterEntryOperations) or 0,
-            itemMetadataCalls = tonumber(job.eraItemMetadataCalls) or 0,
+            itemMetadataCalls = tonumber(job.eraApiItemMetadataCalls) or tonumber(job.eraItemMetadataCalls) or 0,
             aggregateFinalizations = tonumber(job.eraAggregateFinalizations) or 0,
             largestSubphase = eraSlowestKey, largestSubphaseMs = eraSlowestMax,
         } or nil,
@@ -315,6 +323,11 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
             beamStageFinalizations = tonumber(job.supportBeamStageFinalizations) or 0,
             beamFreshSliceDeferrals = tonumber(job.supportBeamFreshSliceDeferrals) or 0,
             beamStageFinalizeMaxMs = tonumber(job.supportBeamStageFinalizeMaxMs) or 0,
+            candidateSubsteps = tonumber(job.supportCandidateSubsteps) or 0,
+            candidateDeferrals = tonumber(job.supportCandidateDeferrals) or 0,
+            candidateCompletions = tonumber(job.supportCandidateCompletions) or 0,
+            largestCandidateSubphase = supportCandidateSlowestKey,
+            largestCandidateSubphaseMs = supportCandidateSlowestMax,
             largestSubphase = supportSlowestKey,
             largestSubphaseMs = supportSlowestMax,
         } or nil,
@@ -335,7 +348,6 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
     ApplyTimingDomains(result)
     return result
 end
-
 function Wardrobe.RecordGenerationPostPhase(performance, phaseKey, elapsedMs)
     if not performance then return end
     P.RecordGenerationPhase(performance, phaseKey, elapsedMs)
@@ -360,7 +372,6 @@ function Wardrobe.RecordGenerationPostPhase(performance, phaseKey, elapsedMs)
         performance.elapsedMs = math.max(tonumber(performance.elapsedMs) or 0, P.GenerationNowMilliseconds() - performance.startedAtMs)
     end
 end
-
 function Wardrobe.FormatGenerationPerformance(performance)
     if not performance then return "" end
     local steps = tonumber(performance.steps) or 0
@@ -385,7 +396,6 @@ function Wardrobe.FormatGenerationPerformance(performance)
         steps, steps == 1 and "" or "s", elapsedSeconds, maxStep, slowestLabel, slowestMs
     )
 end
-
 function Wardrobe.GetGenerationPerformanceDetails(performance)
     performance = performance or P.lastGenerationPerformance
     if not performance then return {} end
@@ -414,8 +424,6 @@ function Wardrobe.GetGenerationPerformanceDetails(performance)
     end)
     return details
 end
-
-
 function Wardrobe.GetAnchorSkeletonPerformanceLines(performance)
     local stats = performance and performance.anchorStats
     if not stats then
@@ -431,7 +439,6 @@ function Wardrobe.GetAnchorSkeletonPerformanceLines(performance)
         string.format("Pair cache: %d hits • %d misses", stats.pairCacheHits or 0, stats.pairCacheMisses or 0),
     }
 end
-
 function Wardrobe.GetGenerationCachePerformanceLines(performance)
     local diagnostics = performance and performance.cacheDiagnostics
     if not diagnostics then return {} end

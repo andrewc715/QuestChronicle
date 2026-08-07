@@ -1,7 +1,6 @@
 local QC = QuestChronicle
 local D = QC.Diagnostics
 local P = D._Private
-
 local ACTION_LABELS = {
     GENERATE_OUTFIT = "Generate Outfit",
     REROLL_UNLOCKED = "Reroll Unlocked",
@@ -20,7 +19,8 @@ local PHASE_ORDER = {
     "generationWeaponIndexSnapshot", "setup", "validation", "eraEvidence", "eligibility", "coherence", "scoring",
     "anchorCandidateScoring", "zoneAnchorPolicy", "anchorBeamSearch", "anchorWeaponExpansion", "anchorSelection",
     "supportProfile", "supportLockedCommitments", "supportValidation", "supportEraEvidence", "supportEligibility",
-    "supportCandidateScoring", "supportBeamCandidate", "supportBeamFallback", "supportBeamStageFinalize",
+    "supportCandidateScoring", "supportCandidateNeighbor", "supportCandidateBridge", "supportCandidateBudget", "supportCandidateFinalize",
+    "supportBeamCandidate", "supportBeamFallback", "supportBeamStageFinalize",
     "supportBeamExpansion", "supportSelection", "supportFinalValidation",
     "supportRepairTargeting", "supportRepairCandidateEvaluation", "supportRepairPass1", "supportRepairRevalidation",
     "supportRepairPass2", "supportAlternateSkeleton", "slotSetup", "slotFinalization", "progressUpdate", "weaponRouting", "stateCommit",
@@ -47,6 +47,8 @@ local PHASE_LABELS = {
     supportProfile = "Support profile", supportLockedCommitments = "Locked support commitments",
     supportValidation = "Support validation", supportEraEvidence = "Support era evidence",
     supportEligibility = "Support eligibility", supportCandidateScoring = "Support candidate scoring",
+    supportCandidateNeighbor = "Support candidate neighbor", supportCandidateBridge = "Support candidate bridge",
+    supportCandidateBudget = "Support candidate budget", supportCandidateFinalize = "Support candidate finalize",
     supportBeamCandidate = "Support beam candidate", supportBeamFallback = "Support beam fallback",
     supportBeamStageFinalize = "Support beam stage finalization", supportBeamExpansion = "Support beam expansion",
     supportSelection = "Support selection",
@@ -110,14 +112,12 @@ local function AddHeading(lines, title, rich)
     if #lines > 0 then Add(lines, "") end
     Add(lines, rich and ("|cffd9b36c" .. title .. "|r") or ("== " .. title .. " =="))
 end
-
 local function FindComponent(report, slotKey)
     for _, component in ipairs(report and report.skeleton and report.skeleton.components or {}) do
         if component.slotKey == slotKey then return component end
     end
     return nil
 end
-
 local function FormatSource(component, rawIDs)
     if not component then return "None" end
     local markers = {}
@@ -139,7 +139,6 @@ local function FormatSource(component, rawIDs)
     end
     return text
 end
-
 local function PhaseRows(report)
     local stats = report and report.performance and report.performance.phaseStats or {}
     local rows, seen = {}, {}
@@ -158,7 +157,6 @@ local function PhaseRows(report)
     for _, entry in ipairs(extras) do rows[#rows + 1] = entry end
     return rows
 end
-
 local function AddOverview(lines, report, rich)
     AddHeading(lines, "Overview", rich)
     Add(lines, "Version: " .. tostring(report.version or "Unknown"))
@@ -196,7 +194,6 @@ local function AddOverview(lines, report, rich)
     end
     Add(lines, "Fallback: " .. tostring((report.skeleton and report.skeleton.fallbackReason) or report.supportFallbackReason or "None"))
 end
-
 local function AddZoneFoundation(lines, report, rich)
     local foundation = report.zoneFoundation
     if type(foundation) ~= "table" then return end
@@ -246,7 +243,6 @@ local function AddZoneFoundation(lines, report, rich)
     table.sort(classes)
     Add(lines, "Affinity classes: " .. (#classes > 0 and table.concat(classes, " • ") or "None"))
 end
-
 local function AddZoneAnchorPolicy(lines, report, rich)
     local policy = report.zoneFoundation and report.zoneFoundation.anchorPolicy
     if type(policy) ~= "table" or not policy.policyID then return end
@@ -283,7 +279,6 @@ local function AddZoneAnchorPolicy(lines, report, rich)
             tonumber(pool.meanAffinity) or 0, tonumber(pool.meanAdjustment) or 0)) end
     end
 end
-
 local function AddSkeleton(lines, report, rawIDs, rich)
     AddHeading(lines, "Anchor Skeleton", rich)
     local skeleton = report.skeleton or {}
@@ -319,7 +314,6 @@ local function AddSkeleton(lines, report, rawIDs, rich)
         Add(lines, "Weakest relationship: " .. tostring(skeleton.weakestRelationship.label) .. string.format(" (%.3f)", tonumber(skeleton.weakestRelationship.score) or 0))
     end
 end
-
 local function AddBeam(lines, report, verbose, rich)
     AddHeading(lines, "Beam Search", rich)
     local beam = report.beam or {}
@@ -336,7 +330,6 @@ local function AddBeam(lines, report, verbose, rich)
         Add(lines, string.format("Deduplicated: %s • hard-constraint rejects: %s • hard-clash rejects: %s", N(beam.deduplicated), N(beam.hardConstraintRejections), N(beam.hardClashRejections)))
     end
 end
-
 local function AddScore(lines, report, rich)
     AddHeading(lines, "Score Breakdown", rich)
     local skeleton = report.skeleton or {}
@@ -365,7 +358,6 @@ local function AddScore(lines, report, rich)
     end
     if not any and not next(components) then Add(lines, "No anchor score ledger was recorded for this attempt.") end
 end
-
 local function AddPerformance(lines, report, rich)
     AddHeading(lines, "Performance", rich)
     Add(lines, "Phase                              Max       Total      Calls")
@@ -384,7 +376,6 @@ local function AddPerformance(lines, report, rich)
     if P.AddEraSchedulingPerformanceLines then P.AddEraSchedulingPerformanceLines(lines, performance, QC.Wardrobe and QC.Wardrobe._Private and QC.Wardrobe._Private.GENERATION_PHASE_LABELS or PHASE_LABELS) end
     if P.AddSupportSchedulingPerformanceLines then P.AddSupportSchedulingPerformanceLines(lines, performance, PHASE_LABELS) end
 end
-
 local function AddCache(lines, report, verbose, rich)
     AddHeading(lines, "Cache and Metadata", rich)
     local perf, cache = report.performance or {}, report.cache or {}
@@ -427,7 +418,6 @@ local function AddCache(lines, report, verbose, rich)
         for _, entry in ipairs(reasons) do Add(lines, "Invalidated " .. tostring(entry.reason) .. ": " .. N(entry.count)) end
     end
 end
-
 local function AddComparison(lines, report, rich)
     local comparison = report.comparison
     if not comparison then return end
@@ -440,7 +430,6 @@ local function AddComparison(lines, report, rich)
     if comparison.previousCohesion ~= nil or comparison.cohesion ~= nil then Add(lines, string.format("Cohesion: %.3f → %.3f", tonumber(comparison.previousCohesion) or 0, tonumber(comparison.cohesion) or 0)) end
     if P.AddSupportComparisonLines then P.AddSupportComparisonLines(lines, comparison) end
 end
-
 local function AddWarnings(lines, report, rich)
     AddHeading(lines, "Warnings and Fallback", rich)
     local compaction = report.compaction
@@ -454,7 +443,6 @@ local function AddWarnings(lines, report, rich)
         Add(lines, string.format("[%s] %s", tostring(warning.severity or "INFO"), tostring(warning.text or warning.key or "Warning")))
     end
 end
-
 local function Format(report, options)
     if not report then return "No diagnostic report is selected." end
     options = options or {}
@@ -476,23 +464,18 @@ local function Format(report, options)
     end
     return table.concat(lines, "\n")
 end
-
 function D.FormatDisplayReport(report, rawIDs, verbose)
     return Format(report, { rich = true, rawIDs = rawIDs == true, verbose = verbose == true })
 end
-
 function D.FormatCopyReport(report, rawIDs, verbose)
     return Format(report, { rich = false, rawIDs = rawIDs == true, verbose = verbose == true })
 end
-
 function D.GetActionLabel(action)
     return ACTION_LABELS[action] or tostring(action or "Unknown")
 end
-
 function D.GetResultLabel(result)
     return RESULT_LABELS[result] or tostring(result or "Unknown")
 end
-
 function D.GetModeLabel(mode)
     return MODE_LABELS[mode] or tostring(mode or "Unknown")
 end

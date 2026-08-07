@@ -59,6 +59,7 @@ local source={sourceID=7,visualID=7,itemID=1007,sourceType=1,eraManifestVersion=
 local context=Z.PrepareGenerationEligibilityContext(Z.GetCurrentContext())
 local job={currentSlice=QC._Core.Workers.BeginSlice(5.5,7.5),phaseStats={}}
 job.currentSlice.operationCount=1
+job.currentSlice.startedAtMs=-3
 W.generationJob=job
 local ordering=W.CreateWeaponStyleOrderingWork({{source=source,slotKey="MAIN_HAND"}},"ZONE_NATIVE",context,job)
 

@@ -102,7 +102,8 @@ end
 
 local function BeginFallback(work, node, pool, remaining)
     work.fallbackWork = {
-        node = node, pool = pool or {}, remaining = remaining or {}, candidateIndex = 1, bestDecision = nil,
+        node = node, pool = pool or {}, remaining = remaining or {}, candidateIndex = 1,
+        bestDecision = nil, candidateWork = nil,
     }
 end
 
@@ -124,12 +125,31 @@ local function FinishFallback(work, fallback)
     work.candidateIndex = 1
 end
 
+local function StepCandidateDecision(holder, candidate, node, work, remaining, locked)
+    if P.CreateSupportCandidateWork and P.StepSupportCandidateWork then
+        if not holder.candidateWork then
+            holder.candidateWork = P.CreateSupportCandidateWork(candidate, node, work.job, work.profile, remaining, locked)
+        end
+        local subphase = P.DescribeSupportCandidateWorkOperation and P.DescribeSupportCandidateWorkOperation(holder.candidateWork) or "FINALIZE"
+        local done, decision = P.StepSupportCandidateWork(holder.candidateWork)
+        work.lastCandidateSubphase = subphase
+        work.lastCandidateCompleted = done == true
+        if not done then return nil, false end
+        holder.candidateWork = nil
+        return decision, true
+    end
+    work.lastCandidateSubphase = "FINALIZE"
+    work.lastCandidateCompleted = true
+    return P.ScoreSupportCandidate(candidate, node, work.job, work.profile, remaining, locked), true
+end
+
 local function StepFallback(work)
     local fallback = work.fallbackWork
     if not fallback then return true end
     local candidate = fallback.pool[fallback.candidateIndex]
     if candidate then
-        local decision = P.ScoreSupportCandidate(candidate, fallback.node, work.job, work.profile, fallback.remaining, false)
+        local decision, complete = StepCandidateDecision(fallback, candidate, fallback.node, work, fallback.remaining, false)
+        if not complete then return false end
         if not fallback.bestDecision or decision.mismatchSpent < fallback.bestDecision.mismatchSpent then
             fallback.bestDecision = decision
         end
@@ -145,7 +165,7 @@ function P.CreateSupportBeamWork(job, profile, budget, slotOrder, pools, lockedS
     return {
         job = job, profile = profile, slotOrder = slotOrder or {}, pools = pools or {},
         beam = { NewRoot(lockedSelections or {}, lockedDecisions or {}, budget) },
-        stageIndex = 1, nodeIndex = 1, candidateIndex = 1, nextBeam = {},
+        stageIndex = 1, nodeIndex = 1, candidateIndex = 1, nextBeam = {}, candidateWork = nil,
         expansions = {}, retained = {}, rejections = 0, deduplicated = 0, fallbacks = 0, emptySlots = 0,
     }
 end
@@ -157,12 +177,19 @@ function P.DescribeNextSupportBeamOperation(work)
     if not node then return #(work.nextBeam or {}) == 0 and "COMPLETE" or "STAGE_FINALIZE" end
     local slotKey = work.slotOrder[work.stageIndex]
     local pool = work.pools[slotKey] or {}
-    if pool[work.candidateIndex] then return "CANDIDATE" end
+    if work.candidateWork or pool[work.candidateIndex] then return "CANDIDATE" end
     if #pool == 0 or #(work.nextBeam or {}) == (work.nodeStartCount or 0) then return "FALLBACK_SCAN" end
     return "CANDIDATE"
 end
 
+function P.DescribeNextSupportBeamCandidateSubphase(work)
+    if not work then return nil end
+    local candidateWork = work.fallbackWork and work.fallbackWork.candidateWork or work.candidateWork
+    return candidateWork and P.DescribeSupportCandidateWorkOperation and P.DescribeSupportCandidateWorkOperation(candidateWork) or nil
+end
+
 function P.StepSupportBeamWork(work)
+    work.lastCandidateSubphase, work.lastCandidateCompleted = nil, false
     if work.stageIndex > #work.slotOrder then return true end
     if work.fallbackWork then StepFallback(work) return false end
     local slotKey = work.slotOrder[work.stageIndex]
@@ -173,10 +200,11 @@ function P.StepSupportBeamWork(work)
         FinishStage(work)
         return work.stageIndex > #work.slotOrder
     end
-    if work.candidateIndex == 1 then work.nodeStartCount = #work.nextBeam end
+    if work.candidateIndex == 1 and not work.candidateWork then work.nodeStartCount = #work.nextBeam end
     local candidate = pool[work.candidateIndex]
     if candidate then
-        local decision = P.ScoreSupportCandidate(candidate, node, work.job, work.profile, RemainingSlots(work, work.stageIndex), false)
+        local decision, complete = StepCandidateDecision(work, candidate, node, work, RemainingSlots(work, work.stageIndex), false)
+        if not complete then return false end
         work.expansions[slotKey] = (work.expansions[slotKey] or 0) + 1
         if decision.allowed then work.nextBeam[#work.nextBeam + 1] = ExtendNode(node, decision)
         else work.rejections = work.rejections + 1 end

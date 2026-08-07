@@ -8,8 +8,13 @@ function P.AddEraSchedulingPerformanceLines(lines, performance, phaseLabels)
     local era = performance and performance.eraScheduling
     if not era then return end
     lines[#lines + 1] = string.format(
-        "Era evidence scheduling: %s operations • %s siblings • %s fresh-slice deferrals • %s fragment hits",
-        Integer(era.operations), Integer(era.siblingCompletions), Integer(era.freshSliceDeferrals), Integer(era.fragmentCacheHits)
+        "Era evidence scheduling: %s operations • %s siblings • %s local • %s API • %s fragment hits",
+        Integer(era.operations), Integer(era.siblingCompletions), Integer(era.localOperations), Integer(era.apiOperations), Integer(era.fragmentCacheHits)
+    )
+    lines[#lines + 1] = string.format(
+        "Era admission: %s API admissions • %s headroom deferrals • %s fresh-only • %s phantom • %s source-cache completions • %s fragment-cache completions",
+        Integer(era.apiAdmissions), Integer(era.apiHeadroomDeferrals), Integer(era.freshOnlyDeferrals), Integer(era.phantomDeferrals),
+        Integer(era.sourceCacheCompletions), Integer(era.fragmentCacheCompletions)
     )
     lines[#lines + 1] = string.format(
         "Era execution boundary: %s • %s deferred returns • %s same-slice retries • %s synchronous guard trips",

@@ -23,7 +23,7 @@ dofile(base.."Core/ZoneStyle/EligibilityWork.lua"); dofile(base.."Core/ZoneStyle
 local source={sourceID=3,visualID=3,itemID=1003,sourceType=1,eraManifestVersion=E.ERA_MANIFEST_VERSION,eraSourceIDs={3},metadataRevision=0}
 local context=Z.PrepareGenerationEligibilityContext(Z.GetCurrentContext())
 local syncCalls=0; local real=Z.GetSourceEraEvidence; Z.GetSourceEraEvidence=function(s) syncCalls=syncCalls+1; return real(s) end
-local job={currentSlice=QC._Core.Workers.BeginSlice(5.5,7.5)}; job.currentSlice.operationCount=1; W.generationJob=job
+local job={currentSlice=QC._Core.Workers.BeginSlice(5.5,7.5)}; job.currentSlice.startedAtMs=-3; job.currentSlice.operationCount=1; W.generationJob=job
 local work=Z.CreateSourceEligibilityWork(source,"ZONE_NATIVE",context,nil,true,{executionMode=E.ERA_EXECUTION_GENERATION_COOPERATIVE,schedulerOwner=job})
 local deferred=false
 for _=1,12 do

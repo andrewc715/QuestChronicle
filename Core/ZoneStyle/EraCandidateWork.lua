@@ -152,18 +152,22 @@ local function GetCurated(work)
 end
 
 local function StepSetList(work)
+    work.lastInvokedAPI = false
     if not C_TransmogSets or type(C_TransmogSets.GetSetsContainingSourceID) ~= "function" or type(C_TransmogSets.GetSetInfo) ~= "function" then
         work.setIDs, work.stage = {}, "TRACKING"
         return
     end
+    work.lastInvokedAPI = true
     work.setIDs = P.SafeCall(C_TransmogSets.GetSetsContainingSourceID, work.candidate.sourceID) or {}
     work.setIndex = 1
     work.stage = #work.setIDs > 0 and "SET_ENTRY" or "TRACKING"
 end
 
 local function StepSetEntry(work)
+    work.lastInvokedAPI = false
     local setID = work.setIDs and work.setIDs[work.setIndex]
     if setID == nil then work.stage = "TRACKING" return end
+    work.lastInvokedAPI = true
     local info = P.SafeCall(C_TransmogSets.GetSetInfo, setID)
     if type(info) == "table" and info.expansionID ~= nil then
         local label = string.format("set %s", tostring(info.name or setID))
@@ -174,10 +178,12 @@ local function StepSetEntry(work)
 end
 
 local function StepTracking(work)
+    work.lastInvokedAPI = false
     local candidate = work.candidate
     local trackingAvailable = C_ContentTracking and type(C_ContentTracking.GetBestMapForTrackable) == "function"
         and P.GetAppearanceTrackingType and P.GetAppearanceTrackingType() ~= nil
     if not trackingAvailable then work.stage = "ENCOUNTER_LIST" return end
+    if P.trackedOriginCache and P.trackedOriginCache[candidate.sourceID] == nil then work.lastInvokedAPI = true end
     local origin = P.GetTrackedSourceOrigin and P.GetTrackedSourceOrigin(candidate)
     if origin then
         local expansionID = origin.expansionID or (P.ResolveEraFromText and P.ResolveEraFromText(table.concat({ origin.label or "", origin.mapName or "" }, " ")))
@@ -192,10 +198,12 @@ local function StepTracking(work)
 end
 
 local function StepEncounterList(work)
+    work.lastInvokedAPI = false
     if not C_TransmogCollection or type(C_TransmogCollection.GetAppearanceSourceDrops) ~= "function" then
         work.drops, work.stage = {}, "ENCOUNTER_RESOLVE"
         return
     end
+    work.lastInvokedAPI = true
     work.drops = P.SafeCall(C_TransmogCollection.GetAppearanceSourceDrops, work.candidate.sourceID) or {}
     work.dropIndex, work.tierIndex, work.encounterParts = 1, nil, {}
     work.stage = #work.drops > 0 and "ENCOUNTER_DROP" or "ENCOUNTER_RESOLVE"
@@ -236,10 +244,12 @@ local function StepEncounterResolve(work)
 end
 
 local function StepItemMetadata(work)
+    work.lastInvokedAPI = false
     local candidate = work.candidate
     if not candidate.itemID then work.itemPending = false work.stage = "FINALIZE" return end
     local getter = C_Item and C_Item.GetItemInfo or GetItemInfo
     if type(getter) ~= "function" then work.itemPending = false work.stage = "FINALIZE" return end
+    work.lastInvokedAPI = true
     local ok, name, link, quality, itemLevel, requiredLevel, itemType, itemSubType,
         stackCount, equipLocation, icon, sellPrice, classID, subclassID, bindType,
         expansionID = pcall(getter, candidate.itemID)
@@ -269,16 +279,59 @@ function P.CreateEraCandidateResolutionWork(source, sourceID, options)
     }
 end
 
-function P.DescribeNextEraCandidateOperation(work)
-    if not work or work.done then return "COMPLETE", false end
+local function LocalAdmission(operation)
+    return { operation = operation, admission = P.ERA_ADMISSION_LOCAL or "LOCAL", reserveMs = 0, willInvokeAPI = false }
+end
+
+function P.DescribeNextEraCandidateAdmission(work)
+    if not work or work.done then
+        return { operation = "COMPLETE", admission = P.ERA_ADMISSION_COMPLETE or "COMPLETE", reserveMs = 0, willInvokeAPI = false }
+    end
     local stage = work.stage or "BUILD"
-    local fresh = stage == "SET_LIST" or stage == "TRACKING" or stage == "ENCOUNTER_LIST" or stage == "ITEM_METADATA"
-    return stage, fresh
+    local candidate = work.candidate
+    if stage == "SET_LIST" then
+        local ready = candidate and tonumber(candidate.sourceID) and C_TransmogSets
+            and type(C_TransmogSets.GetSetsContainingSourceID) == "function"
+            and type(C_TransmogSets.GetSetInfo) == "function"
+        if ready then return { operation=stage, admission=P.ERA_ADMISSION_API_HEADROOM or "API_HEADROOM", reserveMs=P.ERA_API_RESERVE_MS or 3.0, willInvokeAPI=true } end
+    elseif stage == "SET_ENTRY" then
+        local setID = work.setIDs and work.setIDs[work.setIndex]
+        if setID ~= nil and C_TransmogSets and type(C_TransmogSets.GetSetInfo) == "function" then
+            return { operation=stage, admission=P.ERA_ADMISSION_API_HEADROOM or "API_HEADROOM", reserveMs=P.ERA_API_RESERVE_MS or 3.0, willInvokeAPI=true }
+        end
+    elseif stage == "TRACKING" then
+        local sourceID = candidate and tonumber(candidate.sourceID)
+        if sourceID and P.trackedOriginCache and P.trackedOriginCache[sourceID] ~= nil then return LocalAdmission(stage) end
+        local ready = sourceID and C_ContentTracking and type(C_ContentTracking.GetBestMapForTrackable) == "function"
+            and P.GetAppearanceTrackingType and P.GetAppearanceTrackingType() ~= nil
+        if ready then return { operation=stage, admission=P.ERA_ADMISSION_API_HEADROOM or "API_HEADROOM", reserveMs=P.ERA_API_RESERVE_MS or 3.0, willInvokeAPI=true } end
+    elseif stage == "ENCOUNTER_LIST" then
+        if candidate and tonumber(candidate.sourceID) and C_TransmogCollection
+            and type(C_TransmogCollection.GetAppearanceSourceDrops) == "function"
+        then
+            return { operation=stage, admission=P.ERA_ADMISSION_API_HEADROOM or "API_HEADROOM", reserveMs=P.ERA_API_RESERVE_MS or 3.0, willInvokeAPI=true }
+        end
+    elseif stage == "ITEM_METADATA" then
+        local getter = C_Item and C_Item.GetItemInfo or GetItemInfo
+        if candidate and tonumber(candidate.itemID) and type(getter) == "function" then
+            return { operation=stage, admission=P.ERA_ADMISSION_API_HEADROOM or "API_HEADROOM", reserveMs=P.ERA_API_RESERVE_MS or 3.0, willInvokeAPI=true }
+        end
+    end
+    return LocalAdmission(stage)
+end
+
+function P.DescribeNextEraCandidateOperation(work)
+    local descriptor = P.DescribeNextEraCandidateAdmission(work)
+    -- Compatibility: the second return remains true for an API-sensitive stage,
+    -- even though production admission is now headroom-based rather than fresh-only.
+    return descriptor.operation, descriptor.admission ~= (P.ERA_ADMISSION_LOCAL or "LOCAL")
+        and descriptor.admission ~= (P.ERA_ADMISSION_COMPLETE or "COMPLETE")
 end
 
 function P.StepEraCandidateResolutionWork(work)
     if not work then return true, nil, true, nil, false end
     if work.done then return true, work.resultEvidence, work.candidatePending, work.pendingItemID, work.trackingPending end
+    work.lastInvokedAPI = false
     local stage = work.stage
     if stage == "BUILD" then
         work.candidate = P.BuildEraCandidate(work.source, work.sourceID)

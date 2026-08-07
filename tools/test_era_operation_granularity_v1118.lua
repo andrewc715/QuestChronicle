@@ -56,20 +56,22 @@ local expected={"CURATED","SET_LIST","SET_ENTRY","SET_ENTRY","TRACKING","ENCOUNT
 assert(#stages==#expected,"candidate stage count changed")
 for i,name in ipairs(expected) do assert(stages[i]==name,string.format("stage %d mismatch: %s vs %s",i,tostring(stages[i]),name)) end
 
--- Every variable-cost operation defers from an already-used generation slice without mutation.
+-- Every variable-cost operation defers when API headroom is insufficient without mutation.
 local function assertFreshDeferral(stage, setup)
  local cw=P.CreateEraCandidateResolutionWork(nil,9,{candidate={sourceID=9,itemID=1009,sourceType=1},skipFragmentCache=true})
  setup(cw)
  W.generationJob={currentSlice=QuestChronicle._Core.Workers.BeginSlice(5.5,7.5)}
  local outer={candidateWork=cw,lastStepDiagnostics=nil,executionMode=P.ERA_EXECUTION_GENERATION_COOPERATIVE,schedulerOwner=W.generationJob,progressSerial=0}
  W.generationJob.currentSlice.operationCount=1
+ W.generationJob.currentSlice.startedAtMs=-3
  local before={stage=cw.stage,setIndex=cw.setIndex,dropIndex=cw.dropIndex,item=calls.item,setList=calls.setList,tracking=calls.tracking,dropList=calls.dropList}
- local op,fresh=P.DescribeNextEraCandidateOperation(cw)
- assert(op==stage and fresh==true,"fixture did not target fresh stage "..stage)
- assert(P.AdmitEraEvidenceOperation(outer,op,fresh)==false,"used slice admitted "..stage)
+ local descriptor=P.DescribeNextEraCandidateAdmission(cw)
+ local op=descriptor.operation
+ assert(op==stage and descriptor.admission==P.ERA_ADMISSION_API_HEADROOM,"fixture did not target API-headroom stage "..stage)
+ assert(P.AdmitEraEvidenceOperation(outer,op,descriptor)==false,"low-headroom slice admitted "..stage)
  assert(cw.stage==before.stage and cw.setIndex==before.setIndex and cw.dropIndex==before.dropIndex,"deferred "..stage.." mutated work")
  assert(calls.item==before.item and calls.setList==before.setList and calls.tracking==before.tracking and calls.dropList==before.dropList,"deferred "..stage.." ran an API")
- assert((W.generationJob.eraFreshSliceDeferrals or 0)==1,"fresh deferral counter missing for "..stage)
+ assert((W.generationJob.eraApiHeadroomDeferrals or 0)==1,"headroom deferral counter missing for "..stage)
  W.generationJob=nil
 end
 assertFreshDeferral("SET_LIST",function(cw) cw.stage="SET_LIST" end)
@@ -77,4 +79,4 @@ assertFreshDeferral("TRACKING",function(cw) cw.stage="TRACKING" end)
 assertFreshDeferral("ENCOUNTER_LIST",function(cw) cw.stage="ENCOUNTER_LIST" end)
 assertFreshDeferral("ITEM_METADATA",function(cw) cw.stage="ITEM_METADATA" end)
 
-print("PASS v1.11.8 era operation granularity and fresh admission for all variable API stages")
+print("PASS v1.11.10 era operation granularity and headroom admission for variable API stages")

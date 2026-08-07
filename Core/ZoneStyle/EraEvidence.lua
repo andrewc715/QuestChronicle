@@ -1,19 +1,12 @@
 local QC = QuestChronicle
 local ZoneStyle = QC.ZoneStyle
 local P = ZoneStyle._Private
-
 P.ERA_EVIDENCE_VERSION = 2
 P.ERA_MANIFEST_VERSION = 3
-
--- Exact corrections remain intentionally small and reviewable. They protect
--- known legacy item records whose sparse expansion field is incorrect while
--- the broader resolver uses sets, source tracking, encounters, and all visual
--- siblings for the rest of the collection.
 P.curatedEraItemIDs = {
     [89561] = 4, -- Green Belt of Quiet Understanding
     [89565] = 4, -- Biting Yellow Belt
 }
-
 local evidenceRanks = {
     curated = 100,
     set = 90,
@@ -22,7 +15,6 @@ local evidenceRanks = {
     item = 40,
 }
 P.eraEvidenceRanks = evidenceRanks
-
 local function Evidence(expansionID, method, label, sourceID, itemID, rank)
     expansionID = tonumber(expansionID)
     if expansionID == nil then return nil end
@@ -35,9 +27,7 @@ local function Evidence(expansionID, method, label, sourceID, itemID, rank)
         rank = rank or evidenceRanks[method] or 0,
     }
 end
-
 P.CreateEraEvidence = Evidence
-
 local function PreferStronger(current, candidate)
     if not candidate then return current end
     if not current then return candidate end
@@ -45,18 +35,14 @@ local function PreferStronger(current, candidate)
         return candidate.rank > current.rank and candidate or current
     end
     if candidate.expansionID ~= current.expansionID then
-        -- Conflicting evidence for one source fails toward the later era.
         return candidate.expansionID > current.expansionID and candidate or current
     end
     return current
 end
-
 P.PreferEraEvidence = PreferStronger
-
 function P.ResolveEraFromText(text)
     text = P.Normalize(text)
     if text == "" then return nil end
-
     for expansionID = 11, 0, -1 do
         local info = ZoneStyle.expansions[expansionID]
         if info and P.TextMatchesAny(text, { info.label, info.shortLabel }) then
@@ -70,7 +56,6 @@ function P.ResolveEraFromText(text)
     end
     return nil
 end
-
 local function AddSourceID(list, seen, value)
     value = tonumber(value)
     if value and value > 0 and not seen[value] then
@@ -78,11 +63,9 @@ local function AddSourceID(list, seen, value)
         table.insert(list, value)
     end
 end
-
 function P.GetAppearanceEraSourceIDs(source)
     local sourceIDs, seen = {}, {}
     AddSourceID(sourceIDs, seen, source and source.sourceID)
-
     if source and source.eraManifestVersion == P.ERA_MANIFEST_VERSION and type(source.eraSourceIDs) == "table" then
         for _, sourceID in ipairs(source.eraSourceIDs) do AddSourceID(sourceIDs, seen, sourceID) end
     elseif source and source.visualID and C_TransmogCollection and type(C_TransmogCollection.GetAllAppearanceSources) == "function" then
@@ -93,7 +76,6 @@ function P.GetAppearanceEraSourceIDs(source)
     table.sort(sourceIDs)
     return sourceIDs
 end
-
 function P.BuildEraCandidate(source, sourceID)
     local info
     if source and tonumber(source.sourceID) == tonumber(sourceID) then
@@ -101,7 +83,6 @@ function P.BuildEraCandidate(source, sourceID)
     elseif C_TransmogCollection and type(C_TransmogCollection.GetSourceInfo) == "function" then
         info = P.SafeCall(C_TransmogCollection.GetSourceInfo, sourceID)
     end
-
     local itemID = info and info.itemID
     if not itemID and C_TransmogCollection and type(C_TransmogCollection.GetSourceItemID) == "function" then
         itemID = P.SafeCall(C_TransmogCollection.GetSourceItemID, sourceID)
@@ -114,7 +95,6 @@ function P.BuildEraCandidate(source, sourceID)
         name = info and info.name or (source and source.name),
     }
 end
-
 local function GetCuratedEvidence(candidate)
     local expansionID = P.curatedEraItemIDs[tonumber(candidate.itemID)]
     if expansionID ~= nil then
@@ -126,7 +106,6 @@ local function GetCuratedEvidence(candidate)
         return Evidence(origin.expansionID, "curated", tostring(origin.label or "curated source"), candidate.sourceID, candidate.itemID)
     end
 end
-
 local function GetSetEvidence(candidate)
     if not C_TransmogSets or type(C_TransmogSets.GetSetsContainingSourceID) ~= "function" or type(C_TransmogSets.GetSetInfo) ~= "function" then
         return nil
@@ -141,11 +120,9 @@ local function GetSetEvidence(candidate)
     end
     return best
 end
-
 local function GetTrackingEvidence(candidate)
     local trackingAvailable = C_ContentTracking and type(C_ContentTracking.GetBestMapForTrackable) == "function" and P.GetAppearanceTrackingType() ~= nil
     if not trackingAvailable then return nil, false end
-
     local origin = P.GetTrackedSourceOrigin(candidate)
     if origin then
         local expansionID = origin.expansionID or P.ResolveEraFromText(table.concat({ origin.label or "", origin.mapName or "" }, " "))
@@ -153,12 +130,8 @@ local function GetTrackingEvidence(candidate)
             return Evidence(expansionID, "tracking", "WoW tracking: " .. tostring(origin.label or origin.mapName or "tracked source"), candidate.sourceID, candidate.itemID), false
         end
     end
-
-    -- false means Blizzard gave a stable Failure. nil means DataPending and is
-    -- retried rather than allowing weak item metadata to pass prematurely.
     return nil, P.trackedOriginCache[candidate.sourceID] == nil
 end
-
 local function GetEncounterEvidence(candidate)
     if not C_TransmogCollection or type(C_TransmogCollection.GetAppearanceSourceDrops) ~= "function" then return nil end
     local parts = {}
@@ -173,15 +146,10 @@ local function GetEncounterEvidence(candidate)
         return Evidence(expansionID, "encounter", "encounter journal", candidate.sourceID, candidate.itemID)
     end
 end
-
 local function GetItemEvidence(candidate)
     if not candidate.itemID then return nil, false, nil end
     local getter = C_Item and C_Item.GetItemInfo or GetItemInfo
     if type(getter) ~= "function" then return nil, false, nil end
-
-    -- C_Item.GetItemInfo returns expansionID as its fifteenth result after
-    -- the item name. Keep the tuple explicit so future API changes are easier
-    -- to audit than a row of anonymous placeholders.
     local ok, name, link, quality, itemLevel, requiredLevel, itemType, itemSubType,
         stackCount, equipLocation, icon, sellPrice, classID, subclassID, bindType,
         expansionID = pcall(getter, candidate.itemID)
@@ -195,29 +163,23 @@ local function GetItemEvidence(candidate)
     end
     return nil, false, nil
 end
-
 function P.ResolveEraCandidate(candidate)
     local best = GetCuratedEvidence(candidate)
     best = PreferStronger(best, GetSetEvidence(candidate))
-
     local tracking, trackingPending = GetTrackingEvidence(candidate)
     best = PreferStronger(best, tracking)
     best = PreferStronger(best, GetEncounterEvidence(candidate))
-
     if best and best.rank >= evidenceRanks.encounter then return best, false, nil, false end
-
     local item, itemPending, pendingItemID = GetItemEvidence(candidate)
     if trackingPending then return nil, true, pendingItemID, true end
     return PreferStronger(best, item), itemPending, pendingItemID, false
 end
-
 local function EraNow()
     if type(time) == "function" then return time() end
     if type(GetTimePreciseSec) == "function" then return GetTimePreciseSec() end
     if type(GetTime) == "function" then return GetTime() end
     return 0
 end
-
 local function ManifestSignature(source)
     if not source then return "" end
     if source.eraManifestSignature then return source.eraManifestSignature end
@@ -225,7 +187,6 @@ local function ManifestSignature(source)
     for _, sourceID in ipairs(source.eraSourceIDs or {}) do parts[#parts + 1] = tostring(sourceID) end
     return table.concat(parts, ",")
 end
-
 local function CacheEraResult(source, result, candidateCount)
     if not source or not result then return result end
     source.eraEvidenceVersion = P.ERA_EVIDENCE_VERSION
@@ -262,7 +223,6 @@ local function CacheEraResult(source, result, candidateCount)
     end
     return result
 end
-
 local function ReadCachedEvidence(source)
     local localValid = source
         and source.eraEvidenceVersion == P.ERA_EVIDENCE_VERSION
@@ -297,23 +257,19 @@ local function ReadCachedEvidence(source)
             }
         end
     end
-
     local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
     if wardrobePrivate and wardrobePrivate.GetPersistentEraEvidence then
         return wardrobePrivate.GetPersistentEraEvidence(source, P.ERA_EVIDENCE_VERSION)
     end
     return nil
 end
-
+P.ReadCachedEraEvidence = ReadCachedEvidence
 local function FinalizeEraWork(work)
     local earliest = work.earliest
     local pending = work.pending == true
     local candidateCount = #work.sourceIDs
     local result
     if earliest then
-        -- A pending sibling may still reveal stronger set/tracking/encounter
-        -- evidence. Do not freeze a weak item-only answer while Blizzard is
-        -- still loading the rest of the visual family.
         if pending and (earliest.rank or 0) < evidenceRanks.encounter then
             result = {
                 pending = true,
@@ -344,7 +300,6 @@ local function FinalizeEraWork(work)
     work.result = result
     return result
 end
-
 function ZoneStyle.CreateSourceEraEvidenceWork(source, options)
     options = type(options) == "table" and options or {}
     local executionMode, schedulerOwner = P.NormalizeEraExecutionOptions(options, P.ERA_EXECUTION_SYNCHRONOUS)
@@ -357,13 +312,13 @@ function ZoneStyle.CreateSourceEraEvidenceWork(source, options)
     end
     local cached = not options.forceRefresh and ReadCachedEvidence(source) or nil
     if cached then
-        local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
-        if wardrobePrivate and wardrobePrivate.generationJob then
-            wardrobePrivate.generationJob.eraCacheHits = (wardrobePrivate.generationJob.eraCacheHits or 0) + 1
+        if schedulerOwner then
+            schedulerOwner.eraCacheHits = (schedulerOwner.eraCacheHits or 0) + 1
+            schedulerOwner.eraSourceCacheCompletions = (schedulerOwner.eraSourceCacheCompletions or 0) + 1
         end
         return {
             source = source, sourceIDs = {}, sourceIndex = 1, done = true,
-            result = cached, cached = true, executionMode = executionMode,
+            result = cached, cached = true, sourceCacheCompletion = true, executionMode = executionMode,
             schedulerOwner = schedulerOwner, progressSerial = 0,
         }
     end
@@ -375,17 +330,15 @@ function ZoneStyle.CreateSourceEraEvidenceWork(source, options)
         sameSliceDeferredRetries = 0, synchronousProgressGuardTrips = 0,
     }
 end
-
 function ZoneStyle.DescribeNextSourceEraEvidenceOperation(work)
     if not work or work.done then return "COMPLETE", false end
     if work.candidateWork and P.DescribeNextEraCandidateOperation then
-        local operation, fresh = P.DescribeNextEraCandidateOperation(work.candidateWork)
-        return operation, fresh == true
+        local operation, sensitive = P.DescribeNextEraCandidateOperation(work.candidateWork)
+        return operation, sensitive == true
     end
     if work.sourceIndex <= #work.sourceIDs then return "BUILD", false end
     return "AGGREGATE_FINALIZE", false
 end
-
 local function FoldCandidateResult(work, evidence, candidatePending, pendingItemID, trackingPending)
     work.pending = work.pending or candidatePending
     if pendingItemID then work.pendingItemIDs[tonumber(pendingItemID)] = true end
@@ -397,40 +350,90 @@ local function FoldCandidateResult(work, evidence, candidatePending, pendingItem
         work.earliest = evidence
     end
 end
-
-
-
+local function TryLateSourceCacheCompletion(work)
+    if not work or work.done or work.suppressCache or not work.candidateWork or not P.ReadCachedEraEvidence then return nil end
+    local cached = P.ReadCachedEraEvidence(work.source)
+    if not cached then return nil end
+    if work.pendingDeferredOperation and P.ResolveEraDeferredAdmission then
+        P.ResolveEraDeferredAdmission(work, work.pendingDeferredOperation, false)
+    end
+    work.done, work.result, work.sourceCacheCompletion = true, cached, true
+    local job = P.GetEraSchedulerOwner and P.GetEraSchedulerOwner(work)
+    if job then
+        job.eraCacheHits = (job.eraCacheHits or 0) + 1
+        job.eraSourceCacheCompletions = (job.eraSourceCacheCompletions or 0) + 1
+        job.eraLocalOperations = (job.eraLocalOperations or 0) + 1
+    end
+    work.lastStepDiagnostics = {
+        operation = "SOURCE_CACHE", admission = P.ERA_ADMISSION_LOCAL or "LOCAL",
+        sourceCacheCompletion = true, apiInvoked = false,
+    }
+    P.MarkEraEvidenceProgress(work)
+    return cached
+end
 function ZoneStyle.StepSourceEraEvidenceWork(work, maxCandidates)
     if not work then return true, { pending = true, reason = "No era-evidence work was provided." }, 0, "COMPLETE" end
     if work.done then return true, work.result, 0, "COMPLETE" end
-
     if P.CreateEraCandidateResolutionWork and P.StepEraCandidateResolutionWork then
         if work.sourceIndex > #work.sourceIDs then
-            if not P.AdmitEraEvidenceOperation(work, "AGGREGATE_FINALIZE", false) then return false, nil, 0, "DEFERRED" end
+            local descriptor = { operation="AGGREGATE_FINALIZE", admission=P.ERA_ADMISSION_LOCAL or "LOCAL", reserveMs=0, willInvokeAPI=false }
+            if not P.AdmitEraEvidenceOperation(work, descriptor.operation, descriptor) then return false, nil, 0, "DEFERRED" end
             work.aggregateFinalizations = (work.aggregateFinalizations or 0) + 1
-            work.lastStepDiagnostics = { operation = "AGGREGATE_FINALIZE", aggregateFinalized = true }
+            work.localOperations = (work.localOperations or 0) + 1
+            local job = P.GetEraSchedulerOwner and P.GetEraSchedulerOwner(work)
+            if job then job.eraLocalOperations = (job.eraLocalOperations or 0) + 1 end
+            work.lastStepDiagnostics = { operation = "AGGREGATE_FINALIZE", admission=descriptor.admission, aggregateFinalized = true, apiInvoked=false }
             P.MarkEraEvidenceProgress(work)
             return true, FinalizeEraWork(work), 0, "COMPLETE"
         end
         if not work.candidateWork then
             work.candidateWork = P.CreateEraCandidateResolutionWork(work.source, work.sourceIDs[work.sourceIndex])
         end
-        local operation, fresh = "BUILD", false
-        if P.DescribeNextEraCandidateOperation then operation, fresh = P.DescribeNextEraCandidateOperation(work.candidateWork) end
-        if not P.AdmitEraEvidenceOperation(work, operation, fresh) then return false, nil, 0, "DEFERRED" end
+        local cached = TryLateSourceCacheCompletion(work)
+        if cached then return true, cached, 0, "PROGRESSED" end
+        local descriptor = P.DescribeNextEraCandidateAdmission and P.DescribeNextEraCandidateAdmission(work.candidateWork)
+            or { operation="BUILD", admission=P.ERA_ADMISSION_LOCAL or "LOCAL", reserveMs=0, willInvokeAPI=false }
+        local operation = descriptor.operation or "BUILD"
+        if not P.AdmitEraEvidenceOperation(work, operation, descriptor, descriptor.reserveMs) then return false, nil, 0, "DEFERRED" end
         local candidateWork = work.candidateWork
         local done, evidence, candidatePending, pendingItemID, trackingPending = P.StepEraCandidateResolutionWork(candidateWork)
+        local apiInvoked = candidateWork.lastInvokedAPI == true
+        if P.ResolveEraDeferredAdmission then P.ResolveEraDeferredAdmission(work, operation, apiInvoked) end
         work.candidateOperations = (work.candidateOperations or 0) + 1
-        work.lastStepDiagnostics = { operation = operation }
-        if operation == "SET_LIST" then work.setListCalls = (work.setListCalls or 0) + 1
-        elseif operation == "SET_ENTRY" then work.setEntryCalls = (work.setEntryCalls or 0) + 1
-        elseif operation == "TRACKING" then work.trackingCalls = (work.trackingCalls or 0) + 1
-        elseif operation == "ENCOUNTER_LIST" then work.encounterListCalls = (work.encounterListCalls or 0) + 1
-        elseif operation == "ENCOUNTER_DROP" or operation == "ENCOUNTER_TIER" then work.encounterEntryOperations = (work.encounterEntryOperations or 0) + 1
-        elseif operation == "ITEM_METADATA" then work.itemMetadataCalls = (work.itemMetadataCalls or 0) + 1 end
+        work.lastStepDiagnostics = {
+            operation = operation, admission = descriptor.admission, apiInvoked = apiInvoked,
+            willInvokeAPI = descriptor.willInvokeAPI == true,
+        }
+        local job = P.GetEraSchedulerOwner and P.GetEraSchedulerOwner(work)
+        if apiInvoked then
+            work.apiOperations = (work.apiOperations or 0) + 1
+            if job then
+                job.eraApiOperations = (job.eraApiOperations or 0) + 1
+                if operation == "SET_LIST" then job.eraApiSetListCalls = (job.eraApiSetListCalls or 0) + 1
+                elseif operation == "SET_ENTRY" then job.eraApiSetEntryCalls = (job.eraApiSetEntryCalls or 0) + 1
+                elseif operation == "TRACKING" then job.eraApiTrackingCalls = (job.eraApiTrackingCalls or 0) + 1
+                elseif operation == "ENCOUNTER_LIST" then job.eraApiEncounterListCalls = (job.eraApiEncounterListCalls or 0) + 1
+                elseif operation == "ITEM_METADATA" then job.eraApiItemMetadataCalls = (job.eraApiItemMetadataCalls or 0) + 1 end
+            end
+        else
+            work.localOperations = (work.localOperations or 0) + 1
+            if job then job.eraLocalOperations = (job.eraLocalOperations or 0) + 1 end
+        end
+        if apiInvoked then
+            if operation == "SET_LIST" then work.setListCalls = (work.setListCalls or 0) + 1
+            elseif operation == "SET_ENTRY" then work.setEntryCalls = (work.setEntryCalls or 0) + 1
+            elseif operation == "TRACKING" then work.trackingCalls = (work.trackingCalls or 0) + 1
+            elseif operation == "ENCOUNTER_LIST" then work.encounterListCalls = (work.encounterListCalls or 0) + 1
+            elseif operation == "ITEM_METADATA" then work.itemMetadataCalls = (work.itemMetadataCalls or 0) + 1 end
+        elseif operation == "ENCOUNTER_DROP" or operation == "ENCOUNTER_TIER" then
+            work.encounterEntryOperations = (work.encounterEntryOperations or 0) + 1
+        end
         P.MarkEraEvidenceProgress(work)
         if done then
-            if candidateWork.fragmentCacheHit then work.fragmentCacheHits = (work.fragmentCacheHits or 0) + 1 end
+            if candidateWork.fragmentCacheHit then
+                work.fragmentCacheHits = (work.fragmentCacheHits or 0) + 1
+                if job then job.eraFragmentCacheCompletions = (job.eraFragmentCacheCompletions or 0) + 1 end
+            end
             if candidateWork.fragmentCacheBuilt then work.fragmentCacheBuilds = (work.fragmentCacheBuilds or 0) + 1 end
             if candidatePending then work.pendingCandidateCompletions = (work.pendingCandidateCompletions or 0) + 1 end
             work.lastStepDiagnostics.siblingCompleted = true
@@ -445,8 +448,6 @@ function ZoneStyle.StepSourceEraEvidenceWork(work, maxCandidates)
         end
         return false, nil, 0, "PROGRESSED"
     end
-
-    -- Reference fallback retained for focused harnesses and compatibility.
     maxCandidates = math.max(1, tonumber(maxCandidates) or 1)
     local processed = 0
     while work.sourceIndex <= #work.sourceIDs and processed < maxCandidates do
@@ -458,14 +459,11 @@ function ZoneStyle.StepSourceEraEvidenceWork(work, maxCandidates)
         processed = processed + 1
         P.MarkEraEvidenceProgress(work)
         local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
-        if wardrobePrivate and wardrobePrivate.MaybeYieldWeaponGeneration then
-            wardrobePrivate.MaybeYieldWeaponGeneration("eraEvidence")
-        end
+        if wardrobePrivate and wardrobePrivate.MaybeYieldWeaponGeneration then wardrobePrivate.MaybeYieldWeaponGeneration("eraEvidence") end
     end
     if work.sourceIndex > #work.sourceIDs then return true, FinalizeEraWork(work), processed, "COMPLETE" end
     return false, nil, processed, "PROGRESSED"
 end
-
 function ZoneStyle.GetSourceEraEvidence(source)
     local work = ZoneStyle.CreateSourceEraEvidenceWork(source, { executionMode = P.ERA_EXECUTION_SYNCHRONOUS })
     local operations = 0
@@ -484,12 +482,10 @@ function ZoneStyle.GetSourceEraEvidence(source)
     end
     return work.result
 end
-
 function ZoneStyle.GetSourceExpansionID(source)
     local evidence = ZoneStyle.GetSourceEraEvidence(source)
     return evidence and evidence.expansionID or nil
 end
-
 function ZoneStyle.FormatEraEvidence(evidence)
     if not evidence or evidence.expansionID == nil then return "unverified era" end
     local info = ZoneStyle.expansions[evidence.expansionID]

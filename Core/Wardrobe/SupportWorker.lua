@@ -276,6 +276,9 @@ function P.StepSupportGenerationJob(job, stepStarted)
                     return "RUNNING"
                 end
             elseif P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.0) then
+                if operation == "CANDIDATE" or operation == "FALLBACK_SCAN" then
+                    job.supportCandidateDeferrals = (tonumber(job.supportCandidateDeferrals) or 0) + 1
+                end
                 return "RUNNING"
             end
             local phaseKey = operation == "FALLBACK_SCAN" and "supportBeamFallback"
@@ -285,6 +288,18 @@ function P.StepSupportGenerationJob(job, stepStarted)
             local done = P.StepSupportBeamWork(work.beamWork)
             local elapsed = RecordPhase(job, phaseKey, started)
             if P.RecordGenerationPhase then P.RecordGenerationPhase(job, "supportBeamExpansion", elapsed) end
+            if operation == "CANDIDATE" or operation == "FALLBACK_SCAN" then
+                local subphase = work.beamWork.lastCandidateSubphase
+                local subphaseKey = subphase == "NEIGHBOR" and "supportCandidateNeighbor"
+                    or subphase == "BRIDGE" and "supportCandidateBridge"
+                    or subphase == "BUDGET" and "supportCandidateBudget"
+                    or "supportCandidateFinalize"
+                if P.RecordGenerationPhase then P.RecordGenerationPhase(job, subphaseKey, elapsed) end
+                job.supportCandidateSubsteps = (tonumber(job.supportCandidateSubsteps) or 0) + 1
+                if work.beamWork.lastCandidateCompleted then
+                    job.supportCandidateCompletions = (tonumber(job.supportCandidateCompletions) or 0) + 1
+                end
+            end
             if operation == "FALLBACK_SCAN" then
                 job.supportBeamFallbackSteps = (tonumber(job.supportBeamFallbackSteps) or 0) + 1
                 if work.beamWork.fallbackWork then job.supportBeamFallbackYields = (tonumber(job.supportBeamFallbackYields) or 0) + 1 end
