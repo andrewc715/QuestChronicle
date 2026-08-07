@@ -18,6 +18,7 @@ P.trackedOriginCache = {}
 
 local root = (... and (...):match("^(.*)[/\\]") or "")
 local base = root ~= "" and root .. "/../" or ""
+dofile("Core/ZoneStyle/EraExecution.lua")
 dofile(base .. "Core/ZoneStyle/EraEvidence.lua")
 
 local calls = 0

@@ -41,6 +41,7 @@ local base = root ~= "" and root .. "/../" or ""
 dofile(base .. "Core/Wardrobe/GenerationCacheStore.lua")
 dofile(base .. "Core/Wardrobe/GenerationCacheAccess.lua")
 dofile(base .. "Core/Wardrobe/GenerationDependencyIndex.lua")
+dofile("Core/ZoneStyle/EraExecution.lua")
 dofile(base .. "Core/ZoneStyle/GenerationEligibility.lua")
 
 local source = {

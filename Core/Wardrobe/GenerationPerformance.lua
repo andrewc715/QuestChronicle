@@ -287,6 +287,12 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
             operations = tonumber(job.eraOperations) or 0,
             siblingCompletions = tonumber(job.eraSiblingCompletions) or 0,
             freshSliceDeferrals = tonumber(job.eraFreshSliceDeferrals) or 0,
+            deferredReturns = tonumber(job.eraDeferredReturns) or 0,
+            sameSliceDeferredRetries = tonumber(job.eraSameSliceDeferredRetries) or 0,
+            synchronousProgressGuardTrips = math.max(0,
+                (tonumber(QC.ZoneStyle and QC.ZoneStyle._Private and QC.ZoneStyle._Private.eraSynchronousProgressGuardTrips) or 0)
+                - (tonumber(job.eraSynchronousProgressGuardStart) or 0)),
+            executionMode = job.supportReroll and "SUPPORT_REROLL_COOPERATIVE" or "GENERATION_COOPERATIVE",
             fragmentCacheHits = tonumber(job.eraFragmentCacheHits) or 0,
             fragmentCacheBuilds = tonumber(job.eraFragmentCacheBuilds) or 0,
             pendingCandidateCompletions = tonumber(job.eraPendingCandidateCompletions) or 0,

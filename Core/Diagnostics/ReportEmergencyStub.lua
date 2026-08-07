@@ -239,7 +239,8 @@ end
 local function CompactEraScheduling(scheduling)
     if type(scheduling) ~= "table" then return nil end
     return PrimitiveMap(scheduling, {
-        "operations", "siblingCompletions", "freshSliceDeferrals", "fragmentCacheHits",
+        "operations", "siblingCompletions", "freshSliceDeferrals", "deferredReturns",
+        "sameSliceDeferredRetries", "synchronousProgressGuardTrips", "executionMode", "fragmentCacheHits",
         "fragmentCacheBuilds", "pendingCandidateCompletions", "aggregateFinalizations",
         "largestSubphase", "largestSubphaseMs",
     })

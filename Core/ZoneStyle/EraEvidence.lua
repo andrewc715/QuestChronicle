@@ -347,13 +347,12 @@ end
 
 function ZoneStyle.CreateSourceEraEvidenceWork(source, options)
     options = type(options) == "table" and options or {}
+    local executionMode, schedulerOwner = P.NormalizeEraExecutionOptions(options, P.ERA_EXECUTION_SYNCHRONOUS)
     if not source then
         return {
-            source = source,
-            sourceIDs = {},
-            sourceIndex = 1,
-            done = true,
+            source = source, sourceIDs = {}, sourceIndex = 1, done = true,
             result = { pending = true, reason = "No appearance source was provided." },
+            executionMode = executionMode, schedulerOwner = schedulerOwner, progressSerial = 0,
         }
     end
     local cached = not options.forceRefresh and ReadCachedEvidence(source) or nil
@@ -363,24 +362,17 @@ function ZoneStyle.CreateSourceEraEvidenceWork(source, options)
             wardrobePrivate.generationJob.eraCacheHits = (wardrobePrivate.generationJob.eraCacheHits or 0) + 1
         end
         return {
-            source = source,
-            sourceIDs = {},
-            sourceIndex = 1,
-            done = true,
-            result = cached,
-            cached = true,
+            source = source, sourceIDs = {}, sourceIndex = 1, done = true,
+            result = cached, cached = true, executionMode = executionMode,
+            schedulerOwner = schedulerOwner, progressSerial = 0,
         }
     end
     return {
-        source = source,
-        sourceIDs = P.GetAppearanceEraSourceIDs(source),
-        sourceIndex = 1,
-        earliest = nil,
-        pending = false,
-        pendingItemIDs = {},
-        trackingPending = false,
-        suppressCache = options.suppressCache == true,
-        done = false,
+        source = source, sourceIDs = P.GetAppearanceEraSourceIDs(source), sourceIndex = 1,
+        earliest = nil, pending = false, pendingItemIDs = {}, trackingPending = false,
+        suppressCache = options.suppressCache == true, done = false,
+        executionMode = executionMode, schedulerOwner = schedulerOwner, progressSerial = 0,
+        sameSliceDeferredRetries = 0, synchronousProgressGuardTrips = 0,
     }
 end
 
@@ -409,30 +401,25 @@ end
 
 
 function ZoneStyle.StepSourceEraEvidenceWork(work, maxCandidates)
-    if not work then return true, { pending = true, reason = "No era-evidence work was provided." }, 0 end
-    if work.done then return true, work.result, 0 end
+    if not work then return true, { pending = true, reason = "No era-evidence work was provided." }, 0, "COMPLETE" end
+    if work.done then return true, work.result, 0, "COMPLETE" end
 
-    -- v1.11.8 runtime path: one bounded nested candidate operation per step.
     if P.CreateEraCandidateResolutionWork and P.StepEraCandidateResolutionWork then
         if work.sourceIndex > #work.sourceIDs then
             if not P.AdmitEraEvidenceOperation(work, "AGGREGATE_FINALIZE", false) then return false, nil, 0, "DEFERRED" end
             work.aggregateFinalizations = (work.aggregateFinalizations or 0) + 1
             work.lastStepDiagnostics = { operation = "AGGREGATE_FINALIZE", aggregateFinalized = true }
-            return true, FinalizeEraWork(work), 0
+            P.MarkEraEvidenceProgress(work)
+            return true, FinalizeEraWork(work), 0, "COMPLETE"
         end
         if not work.candidateWork then
             work.candidateWork = P.CreateEraCandidateResolutionWork(work.source, work.sourceIDs[work.sourceIndex])
         end
-        local operation, fresh
-        if P.DescribeNextEraCandidateOperation then
-            operation, fresh = P.DescribeNextEraCandidateOperation(work.candidateWork)
-        else
-            operation, fresh = "BUILD", false
-        end
+        local operation, fresh = "BUILD", false
+        if P.DescribeNextEraCandidateOperation then operation, fresh = P.DescribeNextEraCandidateOperation(work.candidateWork) end
         if not P.AdmitEraEvidenceOperation(work, operation, fresh) then return false, nil, 0, "DEFERRED" end
         local candidateWork = work.candidateWork
-        local done, evidence, candidatePending, pendingItemID, trackingPending =
-            P.StepEraCandidateResolutionWork(candidateWork)
+        local done, evidence, candidatePending, pendingItemID, trackingPending = P.StepEraCandidateResolutionWork(candidateWork)
         work.candidateOperations = (work.candidateOperations or 0) + 1
         work.lastStepDiagnostics = { operation = operation }
         if operation == "SET_LIST" then work.setListCalls = (work.setListCalls or 0) + 1
@@ -441,6 +428,7 @@ function ZoneStyle.StepSourceEraEvidenceWork(work, maxCandidates)
         elseif operation == "ENCOUNTER_LIST" then work.encounterListCalls = (work.encounterListCalls or 0) + 1
         elseif operation == "ENCOUNTER_DROP" or operation == "ENCOUNTER_TIER" then work.encounterEntryOperations = (work.encounterEntryOperations or 0) + 1
         elseif operation == "ITEM_METADATA" then work.itemMetadataCalls = (work.itemMetadataCalls or 0) + 1 end
+        P.MarkEraEvidenceProgress(work)
         if done then
             if candidateWork.fragmentCacheHit then work.fragmentCacheHits = (work.fragmentCacheHits or 0) + 1 end
             if candidateWork.fragmentCacheBuilt then work.fragmentCacheBuilds = (work.fragmentCacheBuilds or 0) + 1 end
@@ -453,9 +441,9 @@ function ZoneStyle.StepSourceEraEvidenceWork(work, maxCandidates)
             work.candidateWork = nil
             work.sourceIndex = work.sourceIndex + 1
             work.siblingCompletions = (work.siblingCompletions or 0) + 1
-            return false, nil, 1
+            return false, nil, 1, "PROGRESSED"
         end
-        return false, nil, 0
+        return false, nil, 0, "PROGRESSED"
     end
 
     -- Reference fallback retained for focused harnesses and compatibility.
@@ -468,19 +456,31 @@ function ZoneStyle.StepSourceEraEvidenceWork(work, maxCandidates)
         FoldCandidateResult(work, evidence, candidatePending, pendingItemID, trackingPending)
         work.sourceIndex = work.sourceIndex + 1
         processed = processed + 1
+        P.MarkEraEvidenceProgress(work)
         local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
         if wardrobePrivate and wardrobePrivate.MaybeYieldWeaponGeneration then
             wardrobePrivate.MaybeYieldWeaponGeneration("eraEvidence")
         end
     end
-    if work.sourceIndex > #work.sourceIDs then return true, FinalizeEraWork(work), processed end
-    return false, nil, processed
+    if work.sourceIndex > #work.sourceIDs then return true, FinalizeEraWork(work), processed, "COMPLETE" end
+    return false, nil, processed, "PROGRESSED"
 end
 
 function ZoneStyle.GetSourceEraEvidence(source)
-    local work = ZoneStyle.CreateSourceEraEvidenceWork(source)
+    local work = ZoneStyle.CreateSourceEraEvidenceWork(source, { executionMode = P.ERA_EXECUTION_SYNCHRONOUS })
+    local operations = 0
+    local ceiling = math.max(64, (#(work.sourceIDs or {}) + 1) * 2048)
     while not work.done do
-        ZoneStyle.StepSourceEraEvidenceWork(work, 1000000)
+        local before = tonumber(work.progressSerial) or 0
+        local done, _, _, status = ZoneStyle.StepSourceEraEvidenceWork(work, 1)
+        operations = operations + 1
+        if done then break end
+        if status == "DEFERRED" or (tonumber(work.progressSerial) or 0) == before then
+            return P.AbortSynchronousEraWork(work, "Synchronous era evidence made no forward progress.")
+        end
+        if operations > ceiling then
+            return P.AbortSynchronousEraWork(work, "Synchronous era evidence exceeded its bounded operation ceiling.")
+        end
     end
     return work.result
 end

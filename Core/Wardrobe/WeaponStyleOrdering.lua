@@ -61,7 +61,10 @@ function P.StepWeaponStyleOrderingWork(work)
         local candidate = work.candidates[work.eligibilityIndex]
         work.currentCandidate = candidate
         if ZoneStyle.CreateCachedSourceEligibilityWork then
-            work.eligibilityWork = ZoneStyle.CreateCachedSourceEligibilityWork(candidate.source, work.modeKey, work.context)
+            work.eligibilityWork = ZoneStyle.CreateCachedSourceEligibilityWork(candidate.source, work.modeKey, work.context, nil, false, {
+                executionMode = ZoneStyle._Private and ZoneStyle._Private.ERA_EXECUTION_GENERATION_COOPERATIVE,
+                schedulerOwner = work.job,
+            })
         else
             work.eligibilityWork = nil
         end
@@ -74,10 +77,7 @@ function P.StepWeaponStyleOrderingWork(work)
         if work.eligibilityWork and ZoneStyle.StepCachedSourceEligibilityWork then
             done, eligible = ZoneStyle.StepCachedSourceEligibilityWork(work.eligibilityWork, P.WEAPON_STYLE_MARKER_BATCH)
         else
-            eligible = ZoneStyle.GetSourceEligibilityCached and ZoneStyle.GetSourceEligibilityCached(
-                work.currentCandidate.source, work.modeKey, work.context
-            ) or ZoneStyle.GetSourceEligibility(work.currentCandidate.source, work.modeKey, work.context)
-            done = true
+            eligible, done = false, true
         end
         work.eligibilitySteps = work.eligibilitySteps + 1
         Record(work, "weaponStyleEligibilityStep", started)

@@ -256,38 +256,6 @@ local function StepItemMetadata(work)
     work.stage = "FINALIZE"
 end
 
-function P.AdmitEraEvidenceOperation(work, operation, fresh)
-    local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
-    if not wardrobePrivate then return true end
-    local job = wardrobePrivate.generationJob
-    local supportReroll = false
-    if not job or not job.currentSlice then
-        job = wardrobePrivate.supportRerollJob
-        supportReroll = job ~= nil
-    end
-    if not job or not job.currentSlice then return true end
-    local admitted = true
-    if fresh then
-        if supportReroll and wardrobePrivate.CanStartFreshSupportRerollPhase then
-            admitted = wardrobePrivate.CanStartFreshSupportRerollPhase(job.currentSlice, 0.25)
-        elseif wardrobePrivate.CanStartFreshGenerationPhase then
-            admitted = wardrobePrivate.CanStartFreshGenerationPhase(job, 0.25)
-        end
-    elseif supportReroll and wardrobePrivate.CanStartSupportRerollPhase then
-        admitted = wardrobePrivate.CanStartSupportRerollPhase(job, job.currentSlice)
-    elseif wardrobePrivate.CanStartGenerationPhase then
-        admitted = wardrobePrivate.CanStartGenerationPhase(job, 0.5)
-    end
-    if admitted then return true end
-    if fresh then
-        work.freshSliceDeferrals = (work.freshSliceDeferrals or 0) + 1
-        job.eraFreshSliceDeferrals = (job.eraFreshSliceDeferrals or 0) + 1
-    end
-    job.currentSlice.forceYield = true
-    work.lastStepDiagnostics = { operation = operation, deferred = true, fresh = fresh == true }
-    return false
-end
-
 function P.CreateEraCandidateResolutionWork(source, sourceID, options)
     options = type(options) == "table" and options or {}
     return {

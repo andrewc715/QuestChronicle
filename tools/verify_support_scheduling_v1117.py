@@ -19,4 +19,4 @@ for label, (path, token) in checks.items():
     assert token in text, f"missing {label}: {token}"
 assert "5.5, 7.5" in (root / "Core/Wardrobe/GenerationScheduling.lua").read_text(encoding="utf-8")
 assert "W.EXPENSIVE_CALL_MS = 2.0" in (root / "Core/Workers/SliceBudget.lua").read_text(encoding="utf-8")
-print(f"PASS v1.11.8 support scheduling verification: {len(checks)+2} checks")
+print(f"PASS v1.11.9 support scheduling verification: {len(checks)+2} checks")

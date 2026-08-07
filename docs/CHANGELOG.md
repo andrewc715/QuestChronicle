@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.9 - 2026-08-07
+
+- Corrected the cooperative/synchronous era-evidence execution boundary after the v1.11.8 Retail watchdog failure.
+- Nested unresolved era evidence inside cached and raw eligibility workers.
+- Added explicit scheduler ownership, DEFERRED integrity counters, and synchronous progress guards.
+
 ## 1.11.8 - 2026-08-06
 
 - Replaced monolithic per-sibling era resolution with a resumable bounded-operation state machine.

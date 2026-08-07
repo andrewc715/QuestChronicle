@@ -19,7 +19,7 @@ required = [
     r"Core\Diagnostics\AnchorAncestry.lua",
 ]
 checks = {
-    "v1.11.8 metadata": version == "1.11.8" and "## Version: 1.11.8" in toc,
+    "v1.11.9 metadata": version == "1.11.9" and "## Version: 1.11.9" in toc,
     "stabilization modules loaded": all(item in toc for item in required),
     "support reroll starts asynchronously": "C_Timer.After(0" in reroll and "StartSupportReroll" in reroll,
     "support reroll uses cooperative worker": "P.StepSupportRerollJob" in worker and "BeginSupportRerollSlice" in worker and "ShouldYieldSupportRerollSlice" in worker,
@@ -38,4 +38,4 @@ if failed:
     for name in failed:
         print("FAIL:", name)
     raise SystemExit(1)
-print("PASS: v1.11.8 cooperative support rerolls, bounded pools, dual ancestry, repetition filtering, and truthful relationship reporting are wired.")
+print("PASS: v1.11.9 cooperative support rerolls, bounded pools, dual ancestry, repetition filtering, and truthful relationship reporting are wired.")

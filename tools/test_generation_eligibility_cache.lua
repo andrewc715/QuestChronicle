@@ -35,6 +35,7 @@ function ZoneStyle.GetSourceEraEvidence() return { expansionID = 2, sourceID = 1
 
 local root = (... and (...):match("^(.*)[/\\]") or "")
 local base = root ~= "" and root .. "/../" or ""
+dofile("Core/ZoneStyle/EraExecution.lua")
 dofile(base .. "Core/ZoneStyle/GenerationEligibility.lua")
 
 local source = { sourceID = 10, visualID = 50, itemID = 500, metadataRevision = 1 }

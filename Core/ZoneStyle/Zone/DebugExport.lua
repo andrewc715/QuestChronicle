@@ -370,11 +370,16 @@ local function AddZoneAnchorPolicy(lines, report, latestReport)
         Add(lines, string.format("- Era operations: `%d` • sibling completions: `%d` • fresh-slice deferrals: `%d` • fragment-cache hits: `%d`",
             tonumber(era.operations) or 0, tonumber(era.siblingCompletions) or 0,
             tonumber(era.freshSliceDeferrals) or 0, tonumber(era.fragmentCacheHits) or 0))
+        Add(lines, string.format("- Era execution boundary: %s • deferred returns: `%d` • same-slice retries: `%d` • synchronous guard trips: `%d`",
+            Code(era.executionMode or "Not recorded"), tonumber(era.deferredReturns) or 0,
+            tonumber(era.sameSliceDeferredRetries) or 0, tonumber(era.synchronousProgressGuardTrips) or 0))
         Add(lines, "- Largest era subphase: " .. Code(era.largestSubphase or "Not recorded")
             .. (era.largestSubphaseMs and string.format(" `%.2f ms`", tonumber(era.largestSubphaseMs) or 0) or ""))
     else
         Add(lines, "- Era operations: " .. Code("Not recorded") .. " • sibling completions: " .. Code("Not recorded")
             .. " • fresh-slice deferrals: " .. Code("Not recorded") .. " • fragment-cache hits: " .. Code("Not recorded"))
+        Add(lines, "- Era execution boundary: " .. Code("Not recorded") .. " • deferred returns: " .. Code("Not recorded")
+            .. " • same-slice retries: " .. Code("Not recorded") .. " • synchronous guard trips: " .. Code("Not recorded"))
         Add(lines, "- Largest era subphase: " .. Code("Not recorded"))
     end
     local support = perf.supportScheduling

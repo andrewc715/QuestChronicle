@@ -32,6 +32,7 @@ function P.CreateWardrobeGenerationJob(options)
         candidatesProcessed = 0,
         eraCandidatesProcessed = 0,
         eraCacheHits = 0,
+        eraSynchronousProgressGuardStart = tonumber(QC.ZoneStyle and QC.ZoneStyle._Private and QC.ZoneStyle._Private.eraSynchronousProgressGuardTrips) or 0,
         eligibilityCacheHits = 0,
         weaponYields = 0,
         steps = 0,

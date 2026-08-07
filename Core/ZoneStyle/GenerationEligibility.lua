@@ -145,28 +145,24 @@ end
 
 local function CompletedEligibilityWork(source, key, eligible, kind, reason, fromCache)
     return {
-        source = source,
-        key = key,
-        done = true,
-        eligible = eligible == true,
-        kind = kind,
-        reason = reason,
-        fromCache = fromCache == true,
+        source = source, key = key, done = true, eligible = eligible == true,
+        kind = kind, reason = reason, fromCache = fromCache == true, stage = "COMPLETE",
     }
 end
 
-function ZoneStyle.CreateCachedSourceEligibilityWork(source, modeKey, context, evidence, prechecked)
-    if not source then return CompletedEligibilityWork(source, nil, false, "pending", "No appearance source was provided.", false) end
-    context = ResolveContext(context)
-    if not prechecked then
-        local preEligible, preKind, preReason = ZoneStyle.GetSourcePreEraEligibilityCached(source, context)
-        if not preEligible then return CompletedEligibilityWork(source, nil, false, preKind, preReason, true) end
-    end
-    if evidence == nil and ZoneStyle.GetSourceEraEvidence then evidence = ZoneStyle.GetSourceEraEvidence(source) end
-    local key = EligibilityKey(source, modeKey, context, evidence)
+local function EraOptions(work)
+    return { executionMode = work.executionMode, schedulerOwner = work.schedulerOwner }
+end
+
+local function PrepareCacheState(work)
+    work.key = EligibilityKey(work.source, work.modeKey, work.context, work.evidence)
+    local source, key = work.source, work.key
     if source.generationEligibilityKey == key and source.generationEligibilityEligible ~= nil then
         CountCacheHit()
-        return CompletedEligibilityWork(source, key, source.generationEligibilityEligible, source.generationEligibilityKind, source.generationEligibilityReason, true)
+        work.done, work.eligible, work.kind, work.reason, work.fromCache, work.stage = true,
+            source.generationEligibilityEligible == true, source.generationEligibilityKind,
+            source.generationEligibilityReason, true, "COMPLETE"
+        return true
     end
     local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
     local persistent = wardrobePrivate and wardrobePrivate.GetPersistentGenerationEligibility
@@ -174,52 +170,101 @@ function ZoneStyle.CreateCachedSourceEligibilityWork(source, modeKey, context, e
     if persistent then
         source.generationEligibilityKey = key
         source.generationEligibilityEligible = persistent.eligible == true
-        source.generationEligibilityKind = persistent.kind
-        source.generationEligibilityReason = persistent.reason
+        source.generationEligibilityKind, source.generationEligibilityReason = persistent.kind, persistent.reason
         CountCacheHit()
-        return CompletedEligibilityWork(source, key, persistent.eligible, persistent.kind, persistent.reason, true)
+        work.done, work.eligible, work.kind, work.reason, work.fromCache, work.stage = true,
+            persistent.eligible == true, persistent.kind, persistent.reason, true, "COMPLETE"
+        return true
     end
-    local raw = ZoneStyle.CreateSourceEligibilityWork
-        and ZoneStyle.CreateSourceEligibilityWork(source, modeKey, context, evidence, true) or nil
-    return {
-        source = source,
-        key = key,
-        modeKey = modeKey,
-        context = context,
-        evidence = evidence,
-        raw = raw,
-        legacy = raw == nil,
-        done = false,
-        fromCache = false,
-    }
+    work.stage = "RAW_INIT"
+    return false
 end
 
-function ZoneStyle.StepCachedSourceEligibilityWork(work, markerBatch)
-    if not work then return true, false, "pending", "No cached eligibility work was provided.", false end
-    if work.done then return true, work.eligible, work.kind, work.reason, work.fromCache end
-    local done, eligible, kind, reason
-    if work.legacy then
-        eligible, kind, reason = ZoneStyle.GetSourceEligibility(work.source, work.modeKey, work.context, work.evidence, true)
-        done = true
-    else
-        done, eligible, kind, reason = ZoneStyle.StepSourceEligibilityWork(work.raw, markerBatch)
-    end
-    if not done then return false end
-    work.done, work.eligible, work.kind, work.reason = true, eligible == true, kind, reason
+local function StoreComputedEligibility(work, eligible, kind, reason)
     local source = work.source
+    work.done, work.eligible, work.kind, work.reason, work.stage = true, eligible == true, kind, reason, "COMPLETE"
     source.generationEligibilityKey = work.key
     source.generationEligibilityEligible = work.eligible
-    source.generationEligibilityKind = kind
-    source.generationEligibilityReason = reason
+    source.generationEligibilityKind, source.generationEligibilityReason = kind, reason
     local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
     if wardrobePrivate and wardrobePrivate.StorePersistentGenerationEligibility then
         wardrobePrivate.StorePersistentGenerationEligibility(source, work.key, work.eligible, kind, reason)
     end
-    return true, work.eligible, kind, reason, false
+end
+
+function ZoneStyle.CreateCachedSourceEligibilityWork(source, modeKey, context, evidence, prechecked, options)
+    if not source then return CompletedEligibilityWork(source, nil, false, "pending", "No appearance source was provided.", false) end
+    context = ResolveContext(context)
+    if not prechecked then
+        local preEligible, preKind, preReason = ZoneStyle.GetSourcePreEraEligibilityCached(source, context)
+        if not preEligible then return CompletedEligibilityWork(source, nil, false, preKind, preReason, true) end
+    end
+    local executionMode, schedulerOwner = P.NormalizeEraExecutionOptions(options, P.ERA_EXECUTION_SYNCHRONOUS)
+    local work = {
+        source = source, key = nil, modeKey = modeKey, context = context, evidence = evidence,
+        executionMode = executionMode, schedulerOwner = schedulerOwner, prechecked = true,
+        raw = nil, eraWork = nil, done = false, fromCache = false,
+        stage = evidence ~= nil and "CACHE_KEY" or "ERA_INIT",
+    }
+    if evidence ~= nil then PrepareCacheState(work) end
+    return work
+end
+
+function ZoneStyle.StepCachedSourceEligibilityWork(work, markerBatch)
+    if not work then return true, false, "pending", "No cached eligibility work was provided.", false, "COMPLETE" end
+    if work.done then return true, work.eligible, work.kind, work.reason, work.fromCache, "COMPLETE" end
+
+    if work.stage == "ERA_INIT" then
+        work.eraWork = ZoneStyle.CreateSourceEraEvidenceWork(work.source, EraOptions(work))
+        if work.eraWork.done then work.evidence, work.stage = work.eraWork.result, "CACHE_KEY" else work.stage = "ERA_STEP" end
+        return false, nil, nil, nil, false, "PROGRESSED"
+    elseif work.stage == "ERA_STEP" then
+        local done, evidence, _, status = ZoneStyle.StepSourceEraEvidenceWork(work.eraWork, 1)
+        if status == "DEFERRED" then return false, nil, nil, nil, false, "DEFERRED" end
+        if not done then return false, nil, nil, nil, false, "PROGRESSED" end
+        work.evidence, work.stage = evidence, "CACHE_KEY"
+        return false, nil, nil, nil, false, "PROGRESSED"
+    elseif work.stage == "CACHE_KEY" then
+        if PrepareCacheState(work) then return true, work.eligible, work.kind, work.reason, true, "COMPLETE" end
+        return false, nil, nil, nil, false, "PROGRESSED"
+    elseif work.stage == "RAW_INIT" then
+        work.raw = ZoneStyle.CreateSourceEligibilityWork and ZoneStyle.CreateSourceEligibilityWork(
+            work.source, work.modeKey, work.context, work.evidence, true, EraOptions(work)
+        ) or nil
+        if not work.raw then
+            if work.executionMode ~= P.ERA_EXECUTION_SYNCHRONOUS then
+                StoreComputedEligibility(work, false, "pending", "Cooperative eligibility work is unavailable.")
+            else
+                local eligible, kind, reason = ZoneStyle.GetSourceEligibility(work.source, work.modeKey, work.context, work.evidence, true)
+                StoreComputedEligibility(work, eligible, kind, reason)
+            end
+        else
+            work.stage = "RAW_STEP"
+        end
+        if work.done then return true, work.eligible, work.kind, work.reason, false, "COMPLETE" end
+        return false, nil, nil, nil, false, "PROGRESSED"
+    elseif work.stage == "RAW_STEP" then
+        local done, eligible, kind, reason, status = ZoneStyle.StepSourceEligibilityWork(work.raw, markerBatch)
+        if status == "DEFERRED" then return false, nil, nil, nil, false, "DEFERRED" end
+        if not done then return false, nil, nil, nil, false, "PROGRESSED" end
+        StoreComputedEligibility(work, eligible, kind, reason)
+        return true, work.eligible, kind, reason, false, "COMPLETE"
+    end
+    work.done, work.eligible, work.kind, work.reason = true, false, "pending", "Cached eligibility entered an unknown stage."
+    return true, false, work.kind, work.reason, false, "COMPLETE"
 end
 
 function ZoneStyle.GetSourceEligibilityCached(source, modeKey, context, evidence, prechecked)
-    local work = ZoneStyle.CreateCachedSourceEligibilityWork(source, modeKey, context, evidence, prechecked)
-    while not work.done do ZoneStyle.StepCachedSourceEligibilityWork(work, 1000000) end
+    local work = ZoneStyle.CreateCachedSourceEligibilityWork(source, modeKey, context, evidence, prechecked, {
+        executionMode = P.ERA_EXECUTION_SYNCHRONOUS,
+    })
+    local guard = 0
+    while not work.done do
+        local _, _, _, _, _, status = ZoneStyle.StepCachedSourceEligibilityWork(work, 16)
+        guard = guard + 1
+        if status == "DEFERRED" or guard > 16384 then
+            work.done, work.eligible, work.kind, work.reason = true, false, "pending", "Synchronous cached eligibility failed to make bounded progress."
+        end
+    end
     return work.eligible, work.kind, work.reason, work.fromCache
 end

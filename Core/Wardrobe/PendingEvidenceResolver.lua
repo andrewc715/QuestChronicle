@@ -107,8 +107,9 @@ function P.StepPendingEraEvidenceReevaluations(force)
                 return false
             end
             job.work = zoneStyle.CreateSourceEraEvidenceWork(job.source, {
-                forceRefresh = true,
-                suppressCache = true,
+                forceRefresh = true, suppressCache = true,
+                executionMode = zoneStyle._Private and zoneStyle._Private.ERA_EXECUTION_BACKGROUND_TICK,
+                schedulerOwner = job,
             })
         end
 

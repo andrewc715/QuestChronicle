@@ -33,6 +33,7 @@ local root=(... and (...):match("^(.*)[/\\]") or ""); local base=root~="" and ro
 dofile(base.."Core/Workers/SliceBudget.lua")
 dofile(base.."Core/Wardrobe/GenerationScheduling.lua")
 dofile(base.."Core/Wardrobe/SupportRerollScheduling.lua")
+dofile("Core/ZoneStyle/EraExecution.lua")
 dofile(base.."Core/ZoneStyle/EraEvidence.lua")
 dofile(base.."Core/ZoneStyle/EraCandidateWork.lua")
 
@@ -59,8 +60,8 @@ for i,name in ipairs(expected) do assert(stages[i]==name,string.format("stage %d
 local function assertFreshDeferral(stage, setup)
  local cw=P.CreateEraCandidateResolutionWork(nil,9,{candidate={sourceID=9,itemID=1009,sourceType=1},skipFragmentCache=true})
  setup(cw)
- local outer={candidateWork=cw,lastStepDiagnostics=nil}
  W.generationJob={currentSlice=QuestChronicle._Core.Workers.BeginSlice(5.5,7.5)}
+ local outer={candidateWork=cw,lastStepDiagnostics=nil,executionMode=P.ERA_EXECUTION_GENERATION_COOPERATIVE,schedulerOwner=W.generationJob,progressSerial=0}
  W.generationJob.currentSlice.operationCount=1
  local before={stage=cw.stage,setIndex=cw.setIndex,dropIndex=cw.dropIndex,item=calls.item,setList=calls.setList,tracking=calls.tracking,dropList=calls.dropList}
  local op,fresh=P.DescribeNextEraCandidateOperation(cw)

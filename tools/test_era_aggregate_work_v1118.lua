@@ -34,6 +34,7 @@ C_Item = {
 }
 
 local root=(... and (...):match("^(.*)[/\\]") or ""); local base=root~="" and root.."/../" or ""
+dofile("Core/ZoneStyle/EraExecution.lua")
 dofile(base.."Core/ZoneStyle/EraEvidence.lua")
 dofile(base.."Core/ZoneStyle/EraCandidateWork.lua")
 

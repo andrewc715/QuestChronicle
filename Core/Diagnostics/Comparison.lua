@@ -112,6 +112,13 @@ function P.AttachWarningsAndComparison(report)
         if launch > 12 then AddWarning(report, "SYNC_LAUNCH_OVERRUN", "SEVERE", string.format("Synchronous support-reroll launch preparation reached %.1f ms.", launch))
         elseif launch >= 8 then AddWarning(report, "SYNC_LAUNCH_OVERRUN", "WARNING", string.format("Synchronous support-reroll launch preparation reached %.1f ms.", launch)) end
     end
+    local eraScheduling = performance.eraScheduling
+    if eraScheduling and (tonumber(eraScheduling.sameSliceDeferredRetries) or 0) > 0 then
+        AddWarning(report, "ERA_SAME_SLICE_DEFERRED_RETRY", "SEVERE", "Era evidence retried a deferred operation before returning to a new scheduler slice.")
+    end
+    if eraScheduling and (tonumber(eraScheduling.synchronousProgressGuardTrips) or 0) > 0 then
+        AddWarning(report, "ERA_SYNCHRONOUS_PROGRESS_GUARD", "SEVERE", "A synchronous era-evidence drain stopped because it failed its forward-progress contract.")
+    end
     local weaponIndex = performance.weaponIndex or report.weaponIndex
     if weaponIndex and weaponIndex.invalidationReason == "UNKNOWN" then
         AddWarning(report, "UNKNOWN_WEAPON_INDEX_INVALIDATION", "WARNING", "The weapon candidate index was invalidated without a recognized lifecycle reason.")

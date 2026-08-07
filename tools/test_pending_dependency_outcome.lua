@@ -35,6 +35,7 @@ dofile(base .. "Core/Wardrobe/GenerationDependencyIndex.lua")
 dofile(base .. "Core/Wardrobe/GenerationCacheInvalidation.lua")
 dofile(base .. "Core/Wardrobe/GenerationCacheDiagnostics.lua")
 dofile(base .. "Core/Wardrobe/AppearanceMetadata.lua")
+dofile("Core/ZoneStyle/EraExecution.lua")
 dofile(base .. "Core/ZoneStyle/EraEvidence.lua")
 dofile(base .. "Core/Wardrobe/PendingEvidenceResolver.lua")
 

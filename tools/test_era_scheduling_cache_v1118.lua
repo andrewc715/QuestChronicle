@@ -37,12 +37,13 @@ local root=(... and (...):match("^(.*)[/\\]") or ""); local base=root~="" and ro
 dofile(base.."Core/Workers/SliceBudget.lua")
 dofile(base.."Core/Wardrobe/GenerationScheduling.lua")
 dofile(base.."Core/Wardrobe/SupportRerollScheduling.lua")
+dofile("Core/ZoneStyle/EraExecution.lua")
 dofile(base.."Core/ZoneStyle/EraEvidence.lua")
 dofile(base.."Core/ZoneStyle/EraCandidateWork.lua")
 
 local source={sourceID=1,visualID=1,eraManifestVersion=P.ERA_MANIFEST_VERSION,eraSourceIDs={1},metadataRevision=0}
-local work=Z.CreateSourceEraEvidenceWork(source,{forceRefresh=true,suppressCache=true})
 W.generationJob={currentSlice=QuestChronicle._Core.Workers.BeginSlice(5.5,7.5)}
+local work=Z.CreateSourceEraEvidenceWork(source,{forceRefresh=true,suppressCache=true,executionMode=P.ERA_EXECUTION_GENERATION_COOPERATIVE,schedulerOwner=W.generationJob})
 -- BUILD and CURATED are ordinary operations.
 Z.StepSourceEraEvidenceWork(work,1)
 Z.StepSourceEraEvidenceWork(work,1)

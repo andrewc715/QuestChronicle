@@ -81,6 +81,7 @@ dofile(base .. "Core/Wardrobe/GenerationCacheCounters.lua")
 dofile(base .. "Core/Wardrobe/GenerationCacheAccess.lua")
 dofile(base .. "Core/Wardrobe/GenerationDependencyIndex.lua")
 dofile(base .. "Core/Wardrobe/GenerationCacheDiagnostics.lua")
+dofile("Core/ZoneStyle/EraExecution.lua")
 dofile(base .. "Core/ZoneStyle/EraEvidence.lua")
 dofile(base .. "Core/ZoneStyle/GenerationEligibility.lua")
 

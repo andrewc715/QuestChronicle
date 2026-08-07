@@ -33,6 +33,7 @@ local function StartSupportReroll(slotKey, styleMode, sharedPolicy, sharedAction
         slotLabel = P.slotByKey[slotKey] and P.slotByKey[slotKey].label or slotKey,
         phase = "IDENTITY", steps = 0, maxStepMs = 0, phaseStats = {},
         candidatesProcessed = 0, eraCandidatesProcessed = 0, eraCacheHits = 0,
+        eraSynchronousProgressGuardStart = tonumber(style and style._Private and style._Private.eraSynchronousProgressGuardTrips) or 0,
         eligibilityCacheHits = 0, weaponYields = 0, startedAtMs = launchStarted,
     }
     local launchElapsed = (P.GenerationNowMilliseconds and P.GenerationNowMilliseconds() or launchStarted) - launchStarted

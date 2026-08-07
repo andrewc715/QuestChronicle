@@ -71,7 +71,10 @@ end
 local function StepEraInit(job, work, candidate)
     local style = job.styleEngine
     if style and style.CreateSourceEraEvidenceWork then
-        candidate.eraWork = style.CreateSourceEraEvidenceWork(candidate.source)
+        candidate.eraWork = style.CreateSourceEraEvidenceWork(candidate.source, {
+            executionMode = style._Private and style._Private.ERA_EXECUTION_SUPPORT_REROLL_COOPERATIVE,
+            schedulerOwner = job,
+        })
         if candidate.eraWork.done then
             candidate.eraEvidence = candidate.eraWork.result
             candidate.stage = "ELIGIBILITY_INIT"
@@ -80,11 +83,7 @@ local function StepEraInit(job, work, candidate)
         end
         return
     end
-    if style and style.GetSourceEraEvidence then
-        local started = NowMilliseconds()
-        candidate.eraEvidence = style.GetSourceEraEvidence(candidate.source)
-        Record(job, "rerollEraEvidence", started)
-    end
+    candidate.eraEvidence = { pending = true, reason = "Cooperative era evidence is unavailable." }
     candidate.stage = "ELIGIBILITY_INIT"
 end
 
@@ -114,7 +113,10 @@ local function StepEligibilityInit(job, work, candidate)
     if job.styleEngine.CreateCachedSourceEligibilityWork then
         local started = NowMilliseconds()
         candidate.eligibilityWork = job.styleEngine.CreateCachedSourceEligibilityWork(
-            candidate.source, job.styleMode, job.styleContext, candidate.eraEvidence, candidate.prechecked
+            candidate.source, job.styleMode, job.styleContext, candidate.eraEvidence, candidate.prechecked, {
+                executionMode = job.styleEngine._Private and job.styleEngine._Private.ERA_EXECUTION_SUPPORT_REROLL_COOPERATIVE,
+                schedulerOwner = job,
+            }
         )
         local elapsed = Record(job, "rerollEligibility", started)
         if candidate.eligibilityWork.done then

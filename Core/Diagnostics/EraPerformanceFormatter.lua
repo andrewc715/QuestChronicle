@@ -12,6 +12,11 @@ function P.AddEraSchedulingPerformanceLines(lines, performance, phaseLabels)
         Integer(era.operations), Integer(era.siblingCompletions), Integer(era.freshSliceDeferrals), Integer(era.fragmentCacheHits)
     )
     lines[#lines + 1] = string.format(
+        "Era execution boundary: %s • %s deferred returns • %s same-slice retries • %s synchronous guard trips",
+        tostring(era.executionMode or "Not recorded"), Integer(era.deferredReturns),
+        Integer(era.sameSliceDeferredRetries), Integer(era.synchronousProgressGuardTrips)
+    )
+    lines[#lines + 1] = string.format(
         "Era evidence completions: %s fragment builds • %s pending • %s aggregate finalizations",
         Integer(era.fragmentCacheBuilds), Integer(era.pendingCandidateCompletions), Integer(era.aggregateFinalizations)
     )

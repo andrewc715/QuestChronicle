@@ -230,10 +230,10 @@ local function ContinueArmorCandidate(job, work)
         end
         local eraStarted = NowMilliseconds()
         if job.styleEngine.CreateSourceEraEvidenceWork then
-            candidate.eraWork = job.styleEngine.CreateSourceEraEvidenceWork(source)
+            candidate.eraWork = job.styleEngine.CreateSourceEraEvidenceWork(source, { executionMode = job.styleEngine._Private and job.styleEngine._Private.ERA_EXECUTION_GENERATION_COOPERATIVE, schedulerOwner = job })
             if candidate.eraWork.done then candidate.eraEvidence = candidate.eraWork.result end
         else
-            candidate.eraEvidence = job.styleEngine.GetSourceEraEvidence(source)
+            candidate.eraEvidence = { pending = true, reason = "Cooperative era evidence is unavailable." }
         end
         RecordPhase(job, "eraEvidence", eraStarted)
     end

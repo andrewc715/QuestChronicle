@@ -1,32 +1,19 @@
-# Quest Chronicle v1.11.8
+# Quest Chronicle v1.11.9
 
-Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Blizzard Custom Sets.
+Quest Chronicle v1.11.9 repairs the cooperative era-evidence execution boundary exposed by the v1.11.8 Retail watchdog failure. Cooperative generation now owns nested era work explicitly, synchronous compatibility getters cannot defer, and cached/raw eligibility no longer trigger synchronous era resolution while a generation scheduler is active.
 
-Version 1.11.8 closes the remaining era-evidence scheduling gap beneath the authoritative Zone anchor policy. Per-visual-sibling era evidence is now a resumable state machine, variable Blizzard API work starts from fresh worker slices, and stable non-pending sibling fragments can be reused during aggregate rebuilds.
+## v1.11.9 focus
 
-## v1.11.8 focus
+- Explicit era execution modes: generation cooperative, support-reroll cooperative, background tick, and synchronous.
+- Cached eligibility resolves missing era evidence through resumable nested work before constructing its cache key.
+- Raw eligibility uses ERA_INIT / ERA_STEP / ERA_APPLY rather than the synchronous era getter.
+- Weapon style ordering passes its generation scheduler owner into cached eligibility, eliminating the v1.11.8 Anchor Weapons busy-spin route.
+- The synchronous era getter uses the same evidence state machine in non-deferring mode with a forward-progress watchdog guard.
+- Background reevaluation is isolated from ambient foreground generation slices.
+- Debug diagnostics expose deferred returns, same-slice retries, synchronous guard trips, and execution mode.
 
-- resolve one bounded era-evidence operation per cooperative step;
-- preserve the exact curated, set, tracking, encounter, and item evidence precedence from v1.11.7;
-- require set-list, tracking, encounter-list, and item-metadata calls to begin on fresh worker slices;
-- process one set record, drop record, or tier record per operation;
-- cache only stable non-pending source fragments in session memory with conservative invalidation;
-- keep aggregate earliest-era, pending, retry, and persistent-cache semantics unchanged;
-- expose exact era subphase timing, operation counts, deferrals, sibling completions, and fragment reuse in retained diagnostics and Zone export format 4;
-- keep the frozen 5.5 ms preferred slice, 7.5 ms soft ceiling, and 2.0 ms expensive-call threshold.
+## Architecture identity
 
-## Architecture boundary
+Traveler remains `SHARED_FRAMEWORK`. Zone Native remains `LEGACY` with `CONTEXT_EVIDENCE_V1`, authoritative `ZONE_ANCHOR_POLICY_V1`, and legacy support policy. Class Fantasy and Chronicle Echo remain `LEGACY`. Scheduler budgets, scoring coefficients, evidence formats, cache formats, random consumption, legal weapon routes, locks, hidden slots, contextual support, and Phase D behavior remain unchanged.
 
-```text
-Traveler implementation:       SHARED_FRAMEWORK
-Zone Native implementation:    LEGACY
-Zone foundation:               CONTEXT_EVIDENCE_V1
-Zone anchor policy:            ZONE_ANCHOR_POLICY_V1 / ACTIVE
-Zone support policy:           LEGACY
-Era evidence:                  COOPERATIVE_CANDIDATE_WORK_V1
-Zone debug export:             4
-Diagnostic format:             1
-Report persistence ceiling:    20,480 bytes
-```
-
-v1.11.8 changes era-evidence execution boundaries and diagnostics only. Evidence ranks and meanings, Zone scoring, support scoring, candidate order, random consumption, weapon routes, Phase D, rerolls, locks, hidden state, SavedVariables, cache formats, Courier output, adaptive persistence, and export lineage remain unchanged.
+Retail validation is required before v1.11.9 becomes the accepted Zone anchor-policy baseline.

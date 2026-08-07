@@ -62,9 +62,12 @@ local function ContinueCandidate(job, work)
         if job.styleEngine then
             started = NowMilliseconds()
             if job.styleEngine.CreateSourceEraEvidenceWork then
-                candidateWork.eraWork = job.styleEngine.CreateSourceEraEvidenceWork(source)
+                candidateWork.eraWork = job.styleEngine.CreateSourceEraEvidenceWork(source, {
+                    executionMode = job.styleEngine._Private and job.styleEngine._Private.ERA_EXECUTION_GENERATION_COOPERATIVE,
+                    schedulerOwner = job,
+                })
                 if candidateWork.eraWork.done then candidateWork.eraEvidence = candidateWork.eraWork.result end
-            elseif job.styleEngine.GetSourceEraEvidence then candidateWork.eraEvidence = job.styleEngine.GetSourceEraEvidence(source) end
+            else candidateWork.eraEvidence = { pending = true, reason = "Cooperative era evidence is unavailable." } end
             RecordPhase(job, "supportEraEvidence", started)
         end
     end
@@ -84,7 +87,10 @@ local function ContinueCandidate(job, work)
             if not candidateWork.eligibilityWork then
                 local started = NowMilliseconds()
                 candidateWork.eligibilityWork = job.styleEngine.CreateCachedSourceEligibilityWork(
-                    candidateWork.source, job.styleMode, job.styleContext, candidateWork.eraEvidence, candidateWork.prechecked
+                    candidateWork.source, job.styleMode, job.styleContext, candidateWork.eraEvidence, candidateWork.prechecked, {
+                        executionMode = job.styleEngine._Private and job.styleEngine._Private.ERA_EXECUTION_GENERATION_COOPERATIVE,
+                        schedulerOwner = job,
+                    }
                 )
                 RecordPhase(job, "supportEligibility", started)
             end

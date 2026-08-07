@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the complete v1.11.8 shared-generation extraction contract."""
+"""Verify the complete v1.11.9 shared-generation extraction contract."""
 from pathlib import Path
 import re
 import sys
@@ -12,8 +12,8 @@ def fail(message: str) -> None:
 
 version = (ROOT / "VERSION.txt").read_text(encoding="utf-8").strip()
 toc = (ROOT / "QuestChronicle.toc").read_text(encoding="utf-8")
-if version != "1.11.8" or "## Version: 1.11.8" not in toc:
-    fail("package metadata is not the clean numeric v1.11.8 release")
+if version != "1.11.9" or "## Version: 1.11.9" not in toc:
+    fail("package metadata is not the clean numeric v1.11.9 release")
 if re.search(r"1\.10\.0(?:a|b|rc)\d*", "\n".join(
     p.read_text(encoding="utf-8", errors="ignore")
     for p in [ROOT / "VERSION.txt", ROOT / "QuestChronicle.toc", ROOT / "RELEASE_NOTES.md"]
@@ -78,6 +78,6 @@ if "generationImplementation" not in snapshot or "Generation implementation" not
     fail("implementation identity is not preserved in diagnostics")
 
 if "EXTRACTION_BRIDGE" in "\n".join((ROOT / r).read_text(encoding="utf-8") for r in required):
-    fail("completed v1.11.8 runtime still contains EXTRACTION_BRIDGE")
+    fail("completed v1.11.9 runtime still contains EXTRACTION_BRIDGE")
 
-print("PASS: v1.11.8 shared framework, Traveler policy, legacy adapters, API routing, diagnostics, and numeric version contract are present.")
+print("PASS: v1.11.9 shared framework, Traveler policy, legacy adapters, API routing, diagnostics, and numeric version contract are present.")

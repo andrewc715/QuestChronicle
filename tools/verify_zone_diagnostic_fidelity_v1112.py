@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the v1.11.8 Zone export-fidelity and applicability contract."""
+"""Verify the v1.11.9 Zone export-fidelity and applicability contract."""
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
@@ -14,7 +14,7 @@ adapter = (root / "Core/Generation/Modes/ZoneLegacyAdapter.lua").read_text()
 ui = (root / "UI/DebugReport.lua").read_text()
 
 checks = {
-    "clean numeric metadata": version == "1.11.8" and "## Version: 1.11.8" in toc,
+    "clean numeric metadata": version == "1.11.9" and "## Version: 1.11.9" in toc,
     "encoding module listed once": toc.count(r"Core\ZoneStyle\Zone\ExportEncoding.lua") == 1,
     "affinity format 2": "Zone.AFFINITY_FORMAT = 2" in foundation,
     "export format 4": "Zone.DEBUG_EXPORT_FORMAT = 4" in exporter,
@@ -35,8 +35,8 @@ checks = {
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
-    print("FAIL: v1.11.8 Zone diagnostic-fidelity guard failed:")
+    print("FAIL: v1.11.9 Zone diagnostic-fidelity guard failed:")
     for name in failed:
         print("  -", name)
     raise SystemExit(1)
-print(f"PASS: v1.11.8 Zone diagnostic fidelity verification: {len(checks)} checks")
+print(f"PASS: v1.11.9 Zone diagnostic fidelity verification: {len(checks)} checks")
