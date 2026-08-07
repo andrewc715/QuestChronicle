@@ -158,6 +158,11 @@ local report, message = D.AddReport({
         phaseStats = phaseStats,
         schedulerDiagnostics = { expensiveCallYields = 17, phaseTransitionYields = 184,
             preventedTransitions = 184, postExpensiveCallContinuations = 0, maximumSliceDebtMs = 0.8 },
+        supportScheduling = { eligibilitySteps = 928, eligibilityYields = 140,
+            eligibilityCacheCompletions = 512, eligibilityComputedCompletions = 416,
+            eligibilityMarkerBatch = 4, beamCandidateSteps = 5408, beamFallbackSteps = 6,
+            beamFallbackYields = 5, beamStageFinalizations = 7, beamFreshSliceDeferrals = 7,
+            beamStageFinalizeMaxMs = 6.8, largestSubphase = "supportBeamStageFinalize", largestSubphaseMs = 6.8 },
         weaponCapabilities = { status = "REUSED", generation = 4, buildsThisAction = 1,
             reusesThisAction = 4, staleAtCommit = false, currentGeneration = 4,
             invalidationReason = "LOGIN_SESSION_RESET", eligibilitySteps = 110,
@@ -182,6 +187,8 @@ assert(#(report.zoneFoundation.anchorPolicy.selected or {}) == 5, "selected Zone
 assert(report.performance and report.performance.weaponCapabilities, "weapon capability summary was lost")
 assert(report.performance.weaponCapabilities.eligibilitySteps == 110, "weapon capability counters were lost")
 assert(report.performance.schedulerDiagnostics.postExpensiveCallContinuations == 0, "scheduler integrity was lost")
+assert(report.performance.supportScheduling and report.performance.supportScheduling.eligibilityMarkerBatch == 4, "support scheduling core was lost")
+assert(report.performance.supportScheduling.largestSubphase == "supportBeamStageFinalize", "support subphase identity was lost")
 assert(report.support and report.support.finalValidationStatus == "CLEAN", "support validation outcome was lost")
 assert(report.support.phaseDFinal and report.support.phaseDFinal.status == "CLEAN", "Phase D outcome was lost")
 assert(#(report.skeleton and report.skeleton.components or {}) == 5, "selected skeleton was lost")

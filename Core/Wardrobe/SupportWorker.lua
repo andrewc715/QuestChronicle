@@ -2,6 +2,8 @@ local QC = QuestChronicle
 local Wardrobe = QC.Wardrobe
 local P = Wardrobe._Private
 
+P.SUPPORT_ELIGIBILITY_MARKER_BATCH = 4
+
 local function NowMilliseconds()
     return P.GenerationNowMilliseconds and P.GenerationNowMilliseconds() or 0
 end
@@ -40,7 +42,10 @@ local function ContinueCandidate(job, work)
     local candidateWork = work.candidateWork
     if not candidateWork then
         local source = work.sources[work.sourceIndex]
-        candidateWork = { source = source }
+        candidateWork = {
+            source = source, eligibilitySteps = 0, eligibilityCompleted = false,
+            eligibilityFromCache = false,
+        }
         work.candidateWork = candidateWork
         local started = NowMilliseconds()
         candidateWork.valid = Wardrobe.ValidateSource(source, work.slotKey) == true
@@ -67,16 +72,55 @@ local function ContinueCandidate(job, work)
         local started = NowMilliseconds()
         local done, evidence, processed = job.styleEngine.StepSourceEraEvidenceWork(candidateWork.eraWork, P.GENERATION_ERA_CANDIDATES_PER_OPERATION)
         job.eraCandidatesProcessed = job.eraCandidatesProcessed + (tonumber(processed) or 0)
-        RecordPhase(job, "supportEraEvidence", started)
+        local eraElapsed = RecordPhase(job, "supportEraEvidence", started)
+        if P.RecordEraSchedulingOperation then P.RecordEraSchedulingOperation(job, candidateWork.eraWork, eraElapsed) end
         if not done then return false end
         candidateWork.eraEvidence = evidence
     end
-    if job.styleEngine then
-        local started = NowMilliseconds()
-        local eligible = job.styleEngine.GetSourceEligibilityCached and job.styleEngine.GetSourceEligibilityCached(candidateWork.source, job.styleMode, job.styleContext, candidateWork.eraEvidence, candidateWork.prechecked)
-            or job.styleEngine.GetSourceEligibility(candidateWork.source, job.styleMode, job.styleContext, candidateWork.eraEvidence, candidateWork.prechecked)
-        RecordPhase(job, "supportEligibility", started)
-        if not eligible then return true end
+    if job.styleEngine and not candidateWork.eligibilityCompleted then
+        local hasCooperativeAPI = job.styleEngine.CreateCachedSourceEligibilityWork
+            and job.styleEngine.StepCachedSourceEligibilityWork
+        if hasCooperativeAPI then
+            if not candidateWork.eligibilityWork then
+                local started = NowMilliseconds()
+                candidateWork.eligibilityWork = job.styleEngine.CreateCachedSourceEligibilityWork(
+                    candidateWork.source, job.styleMode, job.styleContext, candidateWork.eraEvidence, candidateWork.prechecked
+                )
+                RecordPhase(job, "supportEligibility", started)
+            end
+            local started = NowMilliseconds()
+            local done, eligible, _, _, fromCache = job.styleEngine.StepCachedSourceEligibilityWork(
+                candidateWork.eligibilityWork, P.SUPPORT_ELIGIBILITY_MARKER_BATCH
+            )
+            candidateWork.eligibilitySteps = candidateWork.eligibilitySteps + 1
+            job.supportEligibilitySteps = (tonumber(job.supportEligibilitySteps) or 0) + 1
+            job.supportEligibilityMarkerBatch = P.SUPPORT_ELIGIBILITY_MARKER_BATCH
+            RecordPhase(job, "supportEligibility", started)
+            if not done then
+                job.supportEligibilityYields = (tonumber(job.supportEligibilityYields) or 0) + 1
+                return false
+            end
+            candidateWork.eligibilityCompleted = true
+            candidateWork.eligibilityFromCache = fromCache == true or candidateWork.eligibilityWork.fromCache == true
+            if candidateWork.eligibilityFromCache then
+                job.supportEligibilityCacheCompletions = (tonumber(job.supportEligibilityCacheCompletions) or 0) + 1
+            else
+                job.supportEligibilityComputedCompletions = (tonumber(job.supportEligibilityComputedCompletions) or 0) + 1
+            end
+            if not eligible then return true end
+            return false
+        else
+            local started = NowMilliseconds()
+            local eligible = job.styleEngine.GetSourceEligibilityCached and job.styleEngine.GetSourceEligibilityCached(
+                candidateWork.source, job.styleMode, job.styleContext, candidateWork.eraEvidence, candidateWork.prechecked
+            ) or job.styleEngine.GetSourceEligibility(
+                candidateWork.source, job.styleMode, job.styleContext, candidateWork.eraEvidence, candidateWork.prechecked
+            )
+            RecordPhase(job, "supportEligibility", started)
+            candidateWork.eligibilityCompleted = true
+            if not eligible then return true end
+            return false
+        end
     end
     local started = NowMilliseconds()
     local candidate = P.BuildSupportCandidate(candidateWork.source, work.definition, job, job.supportWork.profile, work.currentSourceID)
@@ -219,10 +263,31 @@ function P.StepSupportGenerationJob(job, stepStarted)
                 end
             end
         elseif work.stage == "BEAM" then
-            if P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.0) then return "RUNNING" end
+            local operation = P.DescribeNextSupportBeamOperation and P.DescribeNextSupportBeamOperation(work.beamWork) or "CANDIDATE"
+            if operation == "STAGE_FINALIZE" then
+                if P.CanStartFreshGenerationPhase and not P.CanStartFreshGenerationPhase(job, 0.25) then
+                    job.supportBeamFreshSliceDeferrals = (tonumber(job.supportBeamFreshSliceDeferrals) or 0) + 1
+                    return "RUNNING"
+                end
+            elseif P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.0) then
+                return "RUNNING"
+            end
+            local phaseKey = operation == "FALLBACK_SCAN" and "supportBeamFallback"
+                or operation == "STAGE_FINALIZE" and "supportBeamStageFinalize"
+                or "supportBeamCandidate"
             local started = NowMilliseconds()
             local done = P.StepSupportBeamWork(work.beamWork)
-            RecordPhase(job, "supportBeamExpansion", started)
+            local elapsed = RecordPhase(job, phaseKey, started)
+            if P.RecordGenerationPhase then P.RecordGenerationPhase(job, "supportBeamExpansion", elapsed) end
+            if operation == "FALLBACK_SCAN" then
+                job.supportBeamFallbackSteps = (tonumber(job.supportBeamFallbackSteps) or 0) + 1
+                if work.beamWork.fallbackWork then job.supportBeamFallbackYields = (tonumber(job.supportBeamFallbackYields) or 0) + 1 end
+            elseif operation == "STAGE_FINALIZE" then
+                job.supportBeamStageFinalizations = (tonumber(job.supportBeamStageFinalizations) or 0) + 1
+                job.supportBeamStageFinalizeMaxMs = math.max(tonumber(job.supportBeamStageFinalizeMaxMs) or 0, elapsed)
+            elseif operation == "CANDIDATE" then
+                job.supportBeamCandidateSteps = (tonumber(job.supportBeamCandidateSteps) or 0) + 1
+            end
             if done then work.stage = "SELECT" return "RUNNING" end
         elseif work.stage == "SELECT" then
             if P.CanStartGenerationPhase and not P.CanStartGenerationPhase(job, 1.5) then return "RUNNING" end

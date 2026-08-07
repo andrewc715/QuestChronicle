@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.11.8 - 2026-08-06
+
+- Replaced monolithic per-sibling era resolution with a resumable bounded-operation state machine.
+- Added fresh-slice admission for set-list, tracking, encounter-list, and item-metadata evidence calls.
+- Added session-only stable fragment memoization with pending exclusion and conservative invalidation.
+- Added detailed era scheduling and subphase diagnostics while keeping Zone debug export format 4.
+- Preserved evidence precedence, aggregate pending semantics, scoring, candidate order, random consumption, support, weapon behavior, and all data formats.
+
+## 1.11.7 - 2026-08-06
+
+- Added marker-batched cooperative support eligibility using batches of four.
+- Replaced synchronous full-pool fallback scans with resumable one-candidate operations.
+- Added operation-aware support beam scheduling and fresh-slice admission for stage finalization.
+- Added candidate, fallback, and stage-finalization timing identities plus compact closure counters.
+- Preserved support scoring, traversal, random consumption, fallback tie behavior, finalist ordering, and selected outfits.
+- Preserved adaptive report persistence, format-4 Zone export lineage, weapon capability behavior, and every data format.
+
 ## 1.11.6 - 2026-08-06
 
 - Replaced fixed diagnostic trimming with exact-size adaptive compaction tiers.

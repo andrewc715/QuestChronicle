@@ -155,3 +155,26 @@ function P.AddSupportComparisonLines(lines, comparison)
     Add(lines, string.format("Whole-outfit cohesion: %.3f → %.3f", tonumber(comparison.previousWholeOutfitCohesion) or 0, tonumber(comparison.wholeOutfitCohesion) or 0))
     Add(lines, string.format("Support outliers: %d → %d", tonumber(comparison.previousOutliers) or 0, tonumber(comparison.outliers) or 0))
 end
+
+local function Integer(value)
+    return tostring(math.floor(tonumber(value) or 0))
+end
+
+function P.AddSupportSchedulingPerformanceLines(lines, performance, phaseLabels)
+    local support = performance and performance.supportScheduling
+    if not support then return end
+    Add(lines, string.format("Support eligibility: %s steps • %s yields • batch %s", Integer(support.eligibilitySteps), Integer(support.eligibilityYields), Integer(support.eligibilityMarkerBatch)))
+    Add(lines, string.format("Support eligibility completions: %s cache • %s computed", Integer(support.eligibilityCacheCompletions), Integer(support.eligibilityComputedCompletions)))
+    Add(lines, string.format("Support beam scheduling: %s candidate • %s fallback • %s fallback yields", Integer(support.beamCandidateSteps), Integer(support.beamFallbackSteps), Integer(support.beamFallbackYields)))
+    Add(lines, string.format("Support stage finalizations: %s • fresh-slice deferrals %s • %.2f ms max", Integer(support.beamStageFinalizations), Integer(support.beamFreshSliceDeferrals), tonumber(support.beamStageFinalizeMaxMs) or 0))
+    local largestKey, largestMs = support.largestSubphase, tonumber(support.largestSubphaseMs) or 0
+    if not largestKey then
+        local phaseStats = performance.phaseStats or {}
+        for _, key in ipairs({ "supportEligibility", "supportBeamCandidate", "supportBeamFallback", "supportBeamStageFinalize" }) do
+            local value = tonumber(phaseStats[key] and phaseStats[key].maxMs) or 0
+            if value > largestMs then largestKey, largestMs = key, value end
+        end
+    end
+    if largestKey then Add(lines, string.format("Largest support subphase: %s %.2f ms", phaseLabels and phaseLabels[largestKey] or largestKey, largestMs)) end
+end
+

@@ -100,23 +100,45 @@ local function FinishStage(work)
     work.nodeIndex, work.candidateIndex, work.nextBeam = 1, 1, {}
 end
 
-local function AddFallback(work, node, pool, remaining)
-    local bestDecision
-    for _, candidate in ipairs(pool or {}) do
-        local decision = P.ScoreSupportCandidate(candidate, node, work.job, work.profile, remaining, false)
-        if not bestDecision or decision.mismatchSpent < bestDecision.mismatchSpent then bestDecision = decision end
-    end
+local function BeginFallback(work, node, pool, remaining)
+    work.fallbackWork = {
+        node = node, pool = pool or {}, remaining = remaining or {}, candidateIndex = 1, bestDecision = nil,
+    }
+end
+
+local function FinishFallback(work, fallback)
+    local bestDecision = fallback.bestDecision
     if bestDecision then
         bestDecision.allowed = true
         bestDecision.fallback = true
         bestDecision.budgetState = "OVER"
         bestDecision.budgetEvaluation.allowed = true
-        work.nextBeam[#work.nextBeam + 1] = ExtendNode(node, bestDecision)
+        work.nextBeam[#work.nextBeam + 1] = ExtendNode(fallback.node, bestDecision)
         work.fallbacks = work.fallbacks + 1
     else
-        work.nextBeam[#work.nextBeam + 1] = node
+        work.nextBeam[#work.nextBeam + 1] = fallback.node
         work.emptySlots = work.emptySlots + 1
     end
+    work.fallbackWork = nil
+    work.nodeIndex = work.nodeIndex + 1
+    work.candidateIndex = 1
+end
+
+local function StepFallback(work)
+    local fallback = work.fallbackWork
+    if not fallback then return true end
+    local candidate = fallback.pool[fallback.candidateIndex]
+    if candidate then
+        local decision = P.ScoreSupportCandidate(candidate, fallback.node, work.job, work.profile, fallback.remaining, false)
+        if not fallback.bestDecision or decision.mismatchSpent < fallback.bestDecision.mismatchSpent then
+            fallback.bestDecision = decision
+        end
+        fallback.candidateIndex = fallback.candidateIndex + 1
+        if fallback.candidateIndex > #fallback.pool then FinishFallback(work, fallback) return true end
+        return false
+    end
+    FinishFallback(work, fallback)
+    return true
 end
 
 function P.CreateSupportBeamWork(job, profile, budget, slotOrder, pools, lockedSelections, lockedDecisions)
@@ -128,8 +150,21 @@ function P.CreateSupportBeamWork(job, profile, budget, slotOrder, pools, lockedS
     }
 end
 
+function P.DescribeNextSupportBeamOperation(work)
+    if not work or work.stageIndex > #(work.slotOrder or {}) then return "COMPLETE" end
+    if work.fallbackWork then return "FALLBACK_SCAN" end
+    local node = work.beam and work.beam[work.nodeIndex]
+    if not node then return #(work.nextBeam or {}) == 0 and "COMPLETE" or "STAGE_FINALIZE" end
+    local slotKey = work.slotOrder[work.stageIndex]
+    local pool = work.pools[slotKey] or {}
+    if pool[work.candidateIndex] then return "CANDIDATE" end
+    if #pool == 0 or #(work.nextBeam or {}) == (work.nodeStartCount or 0) then return "FALLBACK_SCAN" end
+    return "CANDIDATE"
+end
+
 function P.StepSupportBeamWork(work)
     if work.stageIndex > #work.slotOrder then return true end
+    if work.fallbackWork then StepFallback(work) return false end
     local slotKey = work.slotOrder[work.stageIndex]
     local pool = work.pools[slotKey] or {}
     local node = work.beam[work.nodeIndex]
@@ -148,7 +183,11 @@ function P.StepSupportBeamWork(work)
         work.candidateIndex = work.candidateIndex + 1
         return false
     end
-    if #pool == 0 or #work.nextBeam == (work.nodeStartCount or 0) then AddFallback(work, node, pool, RemainingSlots(work, work.stageIndex)) end
+    if #pool == 0 or #work.nextBeam == (work.nodeStartCount or 0) then
+        BeginFallback(work, node, pool, RemainingSlots(work, work.stageIndex))
+        StepFallback(work)
+        return false
+    end
     work.nodeIndex = work.nodeIndex + 1
     work.candidateIndex = 1
     return false

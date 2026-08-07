@@ -1,14 +1,21 @@
 QuestChronicle = { Diagnostics = { _Private = {} } }
 local root = debug.getinfo(1, "S").source:sub(2):gsub("tools/test_zone_anchor_report_v1113.lua$", "")
+assert(loadfile(root .. "Core/Diagnostics/SupportReportFormatter.lua"))()
 assert(loadfile(root .. "Core/Diagnostics/ReportFormatter.lua"))()
 local report = {
-    version = "1.11.6", timestamp = 1, timestampText = "2026-08-06 08:00:00",
+    version = "1.11.7", timestamp = 1, timestampText = "2026-08-06 08:00:00",
     character = { name = "Xyrkian", realm = "MoonGuard", className = "WARRIOR" },
     action = "GENERATE_OUTFIT", mode = "ZONE_NATIVE", generationImplementation = "LEGACY",
     result = "COMPLETED", message = "Generated a Zone Native outfit.", context = { profileLabel = "Outland" },
     outfit = { generatedName = "Netherstorm Field Kit" },
     skeleton = { components = {}, scoreBreakdown = {}, cohesionComponents = {}, excludedComponents = {} },
-    beam = {}, cache = {}, performance = { steps = 1, elapsedMs = 1, phaseStats = { zoneAnchorPolicy = { maxMs = 0.4, totalMs = 2, calls = 10 } }, schedulerDiagnostics = {} },
+    beam = {}, cache = {}, performance = { steps = 1, elapsedMs = 1,
+        phaseStats = { zoneAnchorPolicy = { maxMs = 0.4, totalMs = 2, calls = 10 }, supportBeamStageFinalize = { maxMs = 6.8, totalMs = 6.8, calls = 1 } },
+        schedulerDiagnostics = {}, supportScheduling = { eligibilitySteps = 928, eligibilityYields = 140,
+            eligibilityMarkerBatch = 4, eligibilityCacheCompletions = 512, eligibilityComputedCompletions = 416,
+            beamCandidateSteps = 5408, beamFallbackSteps = 6, beamFallbackYields = 5,
+            beamStageFinalizations = 7, beamFreshSliceDeferrals = 7, beamStageFinalizeMaxMs = 6.8,
+            largestSubphase = "supportBeamStageFinalize", largestSubphaseMs = 6.8 } },
     warnings = {}, zoneFoundation = {
         foundation = "CONTEXT_EVIDENCE_V1", fingerprint = "ZCTX-test", compatibility = "PASS",
         identity = { label = "Outland", profileKey = "outland" }, era = {}, provenance = {}, coverage = {},
@@ -27,5 +34,7 @@ for _, expected in ipairs({
     "== Zone Anchor Policy ==", "Policy: ZONE_ANCHOR_POLICY_V1 • ACTIVE", "Support policy: LEGACY",
     "CHEST", "Pair interpretation: visual armor 10.00 • Zone armor 2.00",
     "Weapon bundle: TWO_HAND • 1 logical visual • linked deduplicated Yes", "Zone anchor policy",
-}) do assert(text:find(expected, 1, true), "missing v1.11.6 Zone policy report text: " .. expected) end
-print("PASS v1.11.6 Zone report: policy decomposition, legacy support boundary, weapon dedup, and performance")
+    "Support eligibility: 928 steps • 140 yields • batch 4", "Support stage finalizations: 7 • fresh-slice deferrals 7 • 6.80 ms max",
+    "Largest support subphase: Support beam stage finalization 6.80 ms",
+}) do assert(text:find(expected, 1, true), "missing v1.11.7 Zone policy report text: " .. expected) end
+print("PASS v1.11.7 Zone report: policy decomposition, legacy support boundary, weapon dedup, and performance")

@@ -300,6 +300,8 @@ local function CompactPerformanceCore(performance)
         "synchronousLaunchPreparationMs", "preWorkerPreparationMs",
     })
     core.schedulerDiagnostics = performance.schedulerDiagnostics
+    core.eraScheduling = performance.eraScheduling
+    core.supportScheduling = performance.supportScheduling
     core.weaponCapabilities = performance.weaponCapabilities
     core.weaponIndex = CompactWeaponIndex(performance.weaponIndex)
     return core

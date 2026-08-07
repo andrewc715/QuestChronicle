@@ -1,5 +1,5 @@
 QuestChronicle = {
-    version = "1.11.6",
+    version = "1.11.7",
     ZoneStyle = {
         MODE_TRAVELER = "TRAVELER", MODE_ZONE_NATIVE = "ZONE_NATIVE",
         MODE_CLASS_FANTASY = "CLASS_FANTASY", MODE_CHRONICLE_ECHO = "CHRONICLE_ECHO",
@@ -45,6 +45,8 @@ local policy = { id="QCDBG-policy", timestampText="2026-08-06 12:00:01", action=
         policyID="ZONE_ANCHOR_POLICY_V1",authority="ACTIVE",snapshotFingerprint="ZCTX-policy",supportPolicy="LEGACY",selected={},pools={}
     }}, performance={longestWorkerSliceMs=7.2,largestInstrumentedCallPhase="weaponStyleEligibilityStep",largestInstrumentedCallMs=1.4,
         weaponCapabilities={status="REUSED",generation=4,buildsThisAction=0,reusesThisAction=4,staleAtCommit=false,eligibilitySteps=12,eligibilityYields=5},
+        supportScheduling={eligibilitySteps=928,eligibilityYields=140,eligibilityMarkerBatch=4,beamStageFinalizations=7,
+            beamFreshSliceDeferrals=7,beamStageFinalizeMaxMs=6.8,largestSubphase="supportBeamStageFinalize",largestSubphaseMs=6.8},
         schedulerDiagnostics={maximumSliceDebtMs=0.4,postExpensiveCallContinuations=0}}, message="Policy reroll" }
 QC.Diagnostics.GetReports = function() return { newest, malformed, fallbackOnly, policy } end
 
@@ -56,6 +58,8 @@ for _, expected in ipairs({
     "Zone debug export format: `4`", "Source report: `QCDBG-policy`", "Latest Zone report carries policy: `NO`",
     "legacy action without an anchor-policy payload", "Parent report: `QCDBG-parent`", "Snapshot: `ZCTX-policy`",
     "## Zone Anchor Policy Performance", "Capability snapshot: `REUSED`", "Eligibility steps: `12` • eligibility yields: `5`",
+    "Support eligibility steps: `928` • yields: `140` • batch: `4`", "Support stage finalizations: `7` • fresh-slice deferrals: `7`",
+    "Largest support subphase: `supportBeamStageFinalize` `6.80 ms`",
     "Report ID: `QCDBG-new`", "Action: `REROLL_SLOT`",
 }) do assert(text:find(expected,1,true), "missing lineage text: "..expected) end
 assert(not text:find("QCDBG-bad",1,true), "malformed policy payload was selected")
@@ -68,11 +72,12 @@ local older = Zone.BuildZoneDebugExport(snapshot, affinity)
 for _, expected in ipairs({
     "Worker slice: `Not recorded`", "Largest call: `Not recorded`",
     "Capability builds this action: `Not recorded`", "Eligibility steps: `Not recorded`",
-    "Maximum slice debt: `Not recorded`",
+    "Maximum slice debt: `Not recorded`", "Support eligibility steps: `Not recorded`",
+    "Support stage finalizations: `Not recorded`", "Largest support subphase: `Not recorded`",
 }) do assert(older:find(expected,1,true), "older policy performance should remain unknown: "..expected) end
 
 QC.Diagnostics.GetReports = function() return {} end
 local empty = Zone.BuildZoneDebugExport(snapshot, affinity)
 assert(empty:find("No Zone anchor-policy report is currently available.",1,true), "empty policy history message missing")
 assert(empty:find("No Zone Native generation report is currently available.",1,true), "empty Zone history message missing")
-print("PASS v1.11.6 Zone export lineage: newest Zone and newest valid policy report are selected independently")
+print("PASS v1.11.7 Zone export lineage: newest Zone and newest valid policy report are selected independently")

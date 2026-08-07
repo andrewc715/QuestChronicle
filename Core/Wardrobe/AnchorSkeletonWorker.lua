@@ -109,7 +109,8 @@ local function ContinuePoolCandidate(job, work)
         local eraStarted = NowMilliseconds()
         local done, evidence, processed = job.styleEngine.StepSourceEraEvidenceWork(candidate.eraWork, P.GENERATION_ERA_CANDIDATES_PER_OPERATION)
         job.eraCandidatesProcessed = job.eraCandidatesProcessed + (tonumber(processed) or 0)
-        RecordPhase(job, "eraEvidence", eraStarted)
+        local eraElapsed = RecordPhase(job, "eraEvidence", eraStarted)
+        if P.RecordEraSchedulingOperation then P.RecordEraSchedulingOperation(job, candidate.eraWork, eraElapsed) end
         if not done then return false end
         candidate.eraEvidence = evidence
     end

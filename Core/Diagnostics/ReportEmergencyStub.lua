@@ -236,6 +236,25 @@ local function CompactScheduler(scheduler)
     })
 end
 
+local function CompactEraScheduling(scheduling)
+    if type(scheduling) ~= "table" then return nil end
+    return PrimitiveMap(scheduling, {
+        "operations", "siblingCompletions", "freshSliceDeferrals", "fragmentCacheHits",
+        "fragmentCacheBuilds", "pendingCandidateCompletions", "aggregateFinalizations",
+        "largestSubphase", "largestSubphaseMs",
+    })
+end
+
+local function CompactSupportScheduling(scheduling)
+    if type(scheduling) ~= "table" then return nil end
+    return PrimitiveMap(scheduling, {
+        "eligibilitySteps", "eligibilityYields", "eligibilityCacheCompletions",
+        "eligibilityComputedCompletions", "eligibilityMarkerBatch", "beamCandidateSteps",
+        "beamFallbackSteps", "beamFallbackYields", "beamStageFinalizations",
+        "beamFreshSliceDeferrals", "beamStageFinalizeMaxMs", "largestSubphase", "largestSubphaseMs",
+    })
+end
+
 local function CompactCapabilities(capabilities)
     if type(capabilities) ~= "table" then return nil end
     return PrimitiveMap(capabilities, {
@@ -255,6 +274,8 @@ local function CompactPerformance(performance)
         "largestInstrumentedCallMs", "synchronousLaunchPreparationMs", "preWorkerPreparationMs",
     })
     result.schedulerDiagnostics = CompactScheduler(performance.schedulerDiagnostics)
+    result.eraScheduling = CompactEraScheduling(performance.eraScheduling)
+    result.supportScheduling = CompactSupportScheduling(performance.supportScheduling)
     result.weaponCapabilities = CompactCapabilities(performance.weaponCapabilities)
     return result
 end

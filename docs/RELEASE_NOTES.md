@@ -1,34 +1,23 @@
-# Quest Chronicle v1.11.6
+# Quest Chronicle v1.11.8
 
-## Adaptive diagnostic-budget guarantee
+## Cooperative era-evidence scheduling closure
 
-The first Retail v1.11.5 Zone generation completed successfully but its diagnostic report still exceeded the 20,480-byte persistence ceiling after fixed compaction. v1.11.6 replaces that brittle boundary with deterministic adaptive tiers.
+The v1.11.7 Retail closure batch proved contextual-support scheduling was bounded, but one of three warm rerolls still reached an 8.9 ms worker slice because the monolithic per-sibling `eraEvidence` call consumed 8.3 ms and produced 3.40 ms of slice debt.
 
-### Fixed
+### Improved
 
-- Reports are measured with the same serialized representation used by persistence.
-- Compaction advances through duplicate removal, reconstructible-detail removal, summary-table collapse, mandatory-core rebuilding, and an emergency stub only as needed.
-- Valid generation reports no longer vanish merely because optional diagnostic detail is large.
-- The emergency stub retains action identity, Zone policy, selected anchors, weapon capability and scheduler summaries, support and Phase D outcomes, warnings, and the final message.
-- Existing compacted reports are stabilized and remeasured when Debug History is pruned.
-
-### Diagnostics
-
-Every compacted report records:
-
-```text
-compaction format
-compaction tier and label
-original serialized bytes
-final serialized bytes
-emergency-stub state
-```
-
-The copy report displays the same persistence summary in **Warnings and Fallback**.
+- Per-sibling era resolution now advances through explicit `BUILD`, `CURATED`, set, tracking, encounter, item, and finalization stages.
+- Variable Blizzard API stages require fresh-slice admission before they execute.
+- Set records, encounter drops, and encounter tiers are reduced one record per operation.
+- The outer era worker still owns visual-sibling aggregation, earliest-era selection, pending semantics, and existing persistent cache writes.
+- Stable non-pending sibling fragments can be reused from a session-only cache; item-pending and tracking-pending fragments are never stored.
+- Item, source-identity, tracking, and manifest invalidations conservatively clear affected fragments.
+- Reports and format-4 Zone exports now identify the largest era subphase and retain operation, sibling, deferral, and fragment-cache counters through adaptive compaction.
 
 ### Preserved
 
-- diagnostic format 1 and the 20,480-byte per-report ceiling;
-- `ZONE_ANCHOR_POLICY_V1` authority and coefficients;
-- weapon capability, cooperative ordering, and stale-commit behavior from v1.11.5;
-- all generation, support, repair, reroll, lock, hidden-slot, cache, SavedVariables, and Courier behavior.
+- Era evidence version 2, era manifest version 3, evidence ranks, later-era conflict behavior within one sibling, and earliest-era behavior across siblings;
+- `ZONE_ANCHOR_POLICY_V1`, Zone Context Snapshot format 1, Zone Affinity format 2, and Zone debug export format 4;
+- support and weapon scheduling already validated in v1.11.7;
+- adaptive diagnostic persistence and the 20,480-byte ceiling;
+- scoring, candidate order, random-call order, legal routes, Phase D, rerolls, locks, hidden slots, SavedVariables, caches, and Courier behavior.

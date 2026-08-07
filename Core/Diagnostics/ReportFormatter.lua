@@ -20,7 +20,8 @@ local PHASE_ORDER = {
     "generationWeaponIndexSnapshot", "setup", "validation", "eraEvidence", "eligibility", "coherence", "scoring",
     "anchorCandidateScoring", "zoneAnchorPolicy", "anchorBeamSearch", "anchorWeaponExpansion", "anchorSelection",
     "supportProfile", "supportLockedCommitments", "supportValidation", "supportEraEvidence", "supportEligibility",
-    "supportCandidateScoring", "supportBeamExpansion", "supportSelection", "supportFinalValidation",
+    "supportCandidateScoring", "supportBeamCandidate", "supportBeamFallback", "supportBeamStageFinalize",
+    "supportBeamExpansion", "supportSelection", "supportFinalValidation",
     "supportRepairTargeting", "supportRepairCandidateEvaluation", "supportRepairPass1", "supportRepairRevalidation",
     "supportRepairPass2", "supportAlternateSkeleton", "slotSetup", "slotFinalization", "progressUpdate", "weaponRouting", "stateCommit",
     "previewApply", "uiRefresh", "completionNotify", "rerollLaunchManifest", "rerollStateCapture",
@@ -46,7 +47,9 @@ local PHASE_LABELS = {
     supportProfile = "Support profile", supportLockedCommitments = "Locked support commitments",
     supportValidation = "Support validation", supportEraEvidence = "Support era evidence",
     supportEligibility = "Support eligibility", supportCandidateScoring = "Support candidate scoring",
-    supportBeamExpansion = "Support beam expansion", supportSelection = "Support selection",
+    supportBeamCandidate = "Support beam candidate", supportBeamFallback = "Support beam fallback",
+    supportBeamStageFinalize = "Support beam stage finalization", supportBeamExpansion = "Support beam expansion",
+    supportSelection = "Support selection",
     supportFinalValidation = "Support final validation", supportRepairTargeting = "Support repair targeting",
     supportRepairCandidateEvaluation = "Support repair candidate evaluation",
     supportRepairPass1 = "Support repair pass 1", supportRepairRevalidation = "Support repair revalidation",
@@ -85,12 +88,10 @@ local MODE_LABELS = {
     ZONE_NATIVE = "Zone Native", TRAVELER = "Traveler",
     CLASS_FANTASY = "Class Fantasy", CHRONICLE_ECHO = "Chronicle Echo",
 }
-
 local function F(value, decimals)
     value = tonumber(value) or 0
     return string.format("%." .. tostring(decimals or 1) .. "f", value)
 end
-
 local function N(value)
     local number = math.floor(tonumber(value) or 0)
     local text = tostring(number)
@@ -99,15 +100,12 @@ local function N(value)
     local formatted = digits:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
     return (sign or "") .. formatted
 end
-
 local function YesNo(value)
     return value and "Yes" or "No"
 end
-
 local function Add(lines, text)
     lines[#lines + 1] = text or ""
 end
-
 local function AddHeading(lines, title, rich)
     if #lines > 0 then Add(lines, "") end
     Add(lines, rich and ("|cffd9b36c" .. title .. "|r") or ("== " .. title .. " =="))
@@ -191,10 +189,10 @@ local function AddOverview(lines, report, rich)
     if performance.supportRerollTiming then
         Add(lines, string.format("Synchronous launch preparation: %.1f ms", tonumber(performance.synchronousLaunchPreparationMs or performance.preWorkerPreparationMs) or 0))
         Add(lines, string.format("Longest cooperative worker slice: %.1f ms", tonumber(performance.longestWorkerSliceMs) or tonumber(performance.maxStepMs) or 0))
-        Add(lines, string.format("Largest cooperative call: %s %.1f ms", PHASE_LABELS[performance.largestCooperativeCallPhase] or tostring(performance.largestCooperativeCallPhase or "Unknown"), tonumber(performance.largestCooperativeCallMs) or 0))
+        Add(lines, string.format("Largest cooperative call: %s %.1f ms", (PHASE_LABELS[performance.largestCooperativeCallPhase] or (QC.Wardrobe and QC.Wardrobe._Private and QC.Wardrobe._Private.GENERATION_PHASE_LABELS and QC.Wardrobe._Private.GENERATION_PHASE_LABELS[performance.largestCooperativeCallPhase])) or tostring(performance.largestCooperativeCallPhase or "Unknown"), tonumber(performance.largestCooperativeCallMs) or 0))
     else
         Add(lines, string.format("Longest worker slice: %.1f ms", tonumber(performance.longestWorkerSliceMs) or tonumber(performance.maxStepMs) or 0))
-        Add(lines, string.format("Largest instrumented call: %s %.1f ms", PHASE_LABELS[performance.largestInstrumentedCallPhase or performance.slowestPhase] or tostring(performance.largestInstrumentedCallPhase or performance.slowestPhase or "Unknown"), tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0))
+        Add(lines, string.format("Largest instrumented call: %s %.1f ms", (PHASE_LABELS[performance.largestInstrumentedCallPhase or performance.slowestPhase] or (QC.Wardrobe and QC.Wardrobe._Private and QC.Wardrobe._Private.GENERATION_PHASE_LABELS and QC.Wardrobe._Private.GENERATION_PHASE_LABELS[performance.largestInstrumentedCallPhase or performance.slowestPhase])) or tostring(performance.largestInstrumentedCallPhase or performance.slowestPhase or "Unknown"), tonumber(performance.largestInstrumentedCallMs) or tonumber(performance.slowestPhaseMs) or 0))
     end
     Add(lines, "Fallback: " .. tostring((report.skeleton and report.skeleton.fallbackReason) or report.supportFallbackReason or "None"))
 end
@@ -374,13 +372,17 @@ local function AddPerformance(lines, report, rich)
     for _, entry in ipairs(PhaseRows(report)) do
         local phase = entry.phase or {}
         local severity = (tonumber(phase.maxMs) or 0) > 16 and " !!" or ((tonumber(phase.maxMs) or 0) > 8 and " !" or "")
-        Add(lines, string.format("%-31s %7.1f ms %8.1f ms %7s%s", PHASE_LABELS[entry.key] or tostring(entry.key), tonumber(phase.maxMs) or 0, tonumber(phase.totalMs) or 0, N(phase.calls), severity))
+        local label = PHASE_LABELS[entry.key] or (QC.Wardrobe and QC.Wardrobe._Private and QC.Wardrobe._Private.GENERATION_PHASE_LABELS[entry.key]) or tostring(entry.key)
+        Add(lines, string.format("%-31s %7.1f ms %8.1f ms %7s%s", label, tonumber(phase.maxMs) or 0, tonumber(phase.totalMs) or 0, N(phase.calls), severity))
     end
-    local scheduler = report.performance and report.performance.schedulerDiagnostics
+    local performance = report.performance or {}
+    local scheduler = performance.schedulerDiagnostics
     if scheduler then
         Add(lines, string.format("Scheduler: %s expensive-call yields • %s phase-transition yields • %s prevented transitions", N(scheduler.expensiveCallYields), N(scheduler.phaseTransitionYields), N(scheduler.preventedPhaseTransitions)))
         Add(lines, string.format("Scheduler integrity: %s post-expensive continuations • %.2f ms maximum slice debt", N(scheduler.postExpensiveCallContinuations), tonumber(scheduler.maximumSliceDebtMs) or 0))
     end
+    if P.AddEraSchedulingPerformanceLines then P.AddEraSchedulingPerformanceLines(lines, performance, QC.Wardrobe and QC.Wardrobe._Private and QC.Wardrobe._Private.GENERATION_PHASE_LABELS or PHASE_LABELS) end
+    if P.AddSupportSchedulingPerformanceLines then P.AddSupportSchedulingPerformanceLines(lines, performance, PHASE_LABELS) end
 end
 
 local function AddCache(lines, report, verbose, rich)

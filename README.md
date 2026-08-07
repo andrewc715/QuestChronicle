@@ -1,17 +1,19 @@
-# Quest Chronicle v1.11.6
+# Quest Chronicle v1.11.8
 
 Quest Chronicle records a character's quest journey, builds zone-aware outfit concepts, and exports verified Blizzard Custom Sets.
 
-Version 1.11.6 guarantees that valid diagnostic actions leave a retained Debug History record even when their full payload exceeds the fixed persistence ceiling. It replaces fixed one-pass trimming with exact-size adaptive compaction tiers and an emergency mandatory-core stub.
+Version 1.11.8 closes the remaining era-evidence scheduling gap beneath the authoritative Zone anchor policy. Per-visual-sibling era evidence is now a resumable state machine, variable Blizzard API work starts from fresh worker slices, and stable non-pending sibling fragments can be reused during aggregate rebuilds.
 
-## v1.11.6 focus
+## v1.11.8 focus
 
-- measure the exact serialized report size after every compaction tier;
-- continue deterministically from duplicate trimming through mandatory-core compaction until the report fits;
-- retain action identity, Zone context and policy, selected anchors, capability and scheduler summaries, support outcome, Phase D state, warnings, and final message;
-- preserve a compact emergency report rather than discarding a valid generation action;
-- record original bytes, final bytes, compaction tier, and emergency-stub state in every compacted report;
-- keep visible rejection handling only as an impossible-ceiling final guard.
+- resolve one bounded era-evidence operation per cooperative step;
+- preserve the exact curated, set, tracking, encounter, and item evidence precedence from v1.11.7;
+- require set-list, tracking, encounter-list, and item-metadata calls to begin on fresh worker slices;
+- process one set record, drop record, or tier record per operation;
+- cache only stable non-pending source fragments in session memory with conservative invalidation;
+- keep aggregate earliest-era, pending, retry, and persistent-cache semantics unchanged;
+- expose exact era subphase timing, operation counts, deferrals, sibling completions, and fragment reuse in retained diagnostics and Zone export format 4;
+- keep the frozen 5.5 ms preferred slice, 7.5 ms soft ceiling, and 2.0 ms expensive-call threshold.
 
 ## Architecture boundary
 
@@ -21,9 +23,10 @@ Zone Native implementation:    LEGACY
 Zone foundation:               CONTEXT_EVIDENCE_V1
 Zone anchor policy:            ZONE_ANCHOR_POLICY_V1 / ACTIVE
 Zone support policy:           LEGACY
+Era evidence:                  COOPERATIVE_CANDIDATE_WORK_V1
+Zone debug export:             4
 Diagnostic format:             1
 Report persistence ceiling:    20,480 bytes
-Adaptive compaction format:    1
 ```
 
-v1.11.6 changes diagnostic storage only. Zone scoring, candidate order, random consumption, anchor selection, weapon routes, support, validation, repair, rerolls, locks, hidden state, SavedVariables, cache formats, and Courier output remain unchanged.
+v1.11.8 changes era-evidence execution boundaries and diagnostics only. Evidence ranks and meanings, Zone scoring, support scoring, candidate order, random consumption, weapon routes, Phase D, rerolls, locks, hidden state, SavedVariables, cache formats, Courier output, adaptive persistence, and export lineage remain unchanged.

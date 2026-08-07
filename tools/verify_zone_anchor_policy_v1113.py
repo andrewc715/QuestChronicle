@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the v1.11.6 Zone anchor-policy authority transfer and parity boundary."""
+"""Verify the v1.11.8 Zone anchor-policy authority transfer and parity boundary."""
 from pathlib import Path
 import re
 
@@ -32,7 +32,7 @@ required_callbacks = [
     "ScoreAnchorPair", "ScoreAnchorSkeleton", "BuildNoveltyReference", "ClassifyNovelty",
 ]
 checks = {
-    "clean numeric v1.11.6 metadata": version == "1.11.6" and "## Version: 1.11.6" in toc,
+    "clean numeric v1.11.8 metadata": version == "1.11.8" and "## Version: 1.11.8" in toc,
     "new modules listed once": all(toc.count(path) == 1 for path in required_modules),
     "bridge precedes anchor search": toc.index(required_modules[0]) < toc.index(r"Core\Wardrobe\AnchorSkeletonSearch.lua"),
     "Zone scoring precedes Zone policy": toc.index(required_modules[2]) < toc.index(required_modules[3]),
@@ -75,7 +75,7 @@ checks = {
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
-    print("FAIL: v1.11.6 Zone anchor-policy guard failed:")
+    print("FAIL: v1.11.8 Zone anchor-policy guard failed:")
     for name in failed: print("  -", name)
     raise SystemExit(1)
-print(f"PASS: v1.11.6 Zone anchor-policy verification: {len(checks)} checks")
+print(f"PASS: v1.11.8 Zone anchor-policy verification: {len(checks)} checks")

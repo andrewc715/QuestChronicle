@@ -64,6 +64,20 @@ end
 
 function P.InvalidateSourceEraEvidence(source, reason, preservePersistent, itemID, eventInfo)
     if not source then return false end
+    local zonePrivate = QC.ZoneStyle and QC.ZoneStyle._Private
+    if zonePrivate then
+        if reason == "ERA_MANIFEST_REBUILT" and zonePrivate.ClearEraCandidateFragmentCache then
+            zonePrivate.ClearEraCandidateFragmentCache()
+        else
+            if itemID and zonePrivate.InvalidateEraCandidateFragmentsForItem then
+                zonePrivate.InvalidateEraCandidateFragmentsForItem(itemID)
+            end
+            if source.sourceID and zonePrivate.InvalidateEraCandidateFragmentsForSourceID
+                and (reason == "ITEM_METADATA_IDENTITY_CHANGED" or reason == "SOURCE_METADATA_CHANGED") then
+                zonePrivate.InvalidateEraCandidateFragmentsForSourceID(source.sourceID)
+            end
+        end
+    end
     local itemDataReason = reason == "ITEM_DATA_LOADED"
         or reason == "ITEM_METADATA_IDENTITY_CHANGED"
     if itemDataReason and P.InvalidatePersistentGenerationCacheForItemData then

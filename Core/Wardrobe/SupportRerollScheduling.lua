@@ -34,6 +34,15 @@ function P.CanStartSupportRerollPhase(job, slice)
     return Workers.CanStartPhase(slice, PHASE_RESERVE[job and job.phase] or 0.5)
 end
 
+function P.CanStartFreshSupportRerollPhase(slice, maximumPriorElapsedMs)
+    if not slice then return true end
+    if slice.forceYield then return false end
+    if (tonumber(slice.operationCount) or 0) > 0 then return false end
+    maximumPriorElapsedMs = math.max(0, tonumber(maximumPriorElapsedMs) or 0.25)
+    if Workers and Workers.Elapsed then return Workers.Elapsed(slice) <= maximumPriorElapsedMs end
+    return math.max(0, NowMilliseconds() - (tonumber(slice.startedAtMs) or NowMilliseconds())) <= maximumPriorElapsedMs
+end
+
 function P.AccumulateSupportRerollSliceDiagnostics(job, slice)
     if not job or not Workers or not Workers.ExportSliceDiagnostics then return end
     local values = Workers.ExportSliceDiagnostics(slice)

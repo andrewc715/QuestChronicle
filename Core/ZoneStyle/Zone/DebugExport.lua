@@ -365,6 +365,33 @@ local function AddZoneAnchorPolicy(lines, report, latestReport)
         Add(lines, "- Maximum slice debt: " .. Code("Not recorded")
             .. " • post-expensive continuations: " .. Code("Not recorded"))
     end
+    local era = perf.eraScheduling
+    if era then
+        Add(lines, string.format("- Era operations: `%d` • sibling completions: `%d` • fresh-slice deferrals: `%d` • fragment-cache hits: `%d`",
+            tonumber(era.operations) or 0, tonumber(era.siblingCompletions) or 0,
+            tonumber(era.freshSliceDeferrals) or 0, tonumber(era.fragmentCacheHits) or 0))
+        Add(lines, "- Largest era subphase: " .. Code(era.largestSubphase or "Not recorded")
+            .. (era.largestSubphaseMs and string.format(" `%.2f ms`", tonumber(era.largestSubphaseMs) or 0) or ""))
+    else
+        Add(lines, "- Era operations: " .. Code("Not recorded") .. " • sibling completions: " .. Code("Not recorded")
+            .. " • fresh-slice deferrals: " .. Code("Not recorded") .. " • fragment-cache hits: " .. Code("Not recorded"))
+        Add(lines, "- Largest era subphase: " .. Code("Not recorded"))
+    end
+    local support = perf.supportScheduling
+    if support then
+        Add(lines, string.format("- Support eligibility steps: `%d` • yields: `%d` • batch: `%d`",
+            tonumber(support.eligibilitySteps) or 0, tonumber(support.eligibilityYields) or 0,
+            tonumber(support.eligibilityMarkerBatch) or 0))
+        Add(lines, string.format("- Support stage finalizations: `%d` • fresh-slice deferrals: `%d` • max: `%.2f ms`",
+            tonumber(support.beamStageFinalizations) or 0, tonumber(support.beamFreshSliceDeferrals) or 0,
+            tonumber(support.beamStageFinalizeMaxMs) or 0))
+        Add(lines, "- Largest support subphase: " .. Code(support.largestSubphase or "Not recorded")
+            .. (support.largestSubphaseMs and string.format(" `%.2f ms`", tonumber(support.largestSubphaseMs) or 0) or ""))
+    else
+        Add(lines, "- Support eligibility steps: " .. Code("Not recorded") .. " • yields: " .. Code("Not recorded"))
+        Add(lines, "- Support stage finalizations: " .. Code("Not recorded") .. " • fresh-slice deferrals: " .. Code("Not recorded"))
+        Add(lines, "- Largest support subphase: " .. Code("Not recorded"))
+    end
     Add(lines, "")
 end
 

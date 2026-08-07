@@ -26,6 +26,17 @@ function P.CanStartGenerationPhase(job, reserveMs)
     return Workers.CanStartPhase(job.currentSlice, reserveMs or 1.0)
 end
 
+function P.CanStartFreshGenerationPhase(job, maximumPriorElapsedMs)
+    if not job or not job.currentSlice then return true end
+    local slice = job.currentSlice
+    if slice.forceYield then return false end
+    if (tonumber(slice.operationCount) or 0) > 0 then return false end
+    maximumPriorElapsedMs = math.max(0, tonumber(maximumPriorElapsedMs) or 0.25)
+    if Workers and Workers.Elapsed then return Workers.Elapsed(slice) <= maximumPriorElapsedMs end
+    local now = P.GenerationNowMilliseconds and P.GenerationNowMilliseconds() or 0
+    return math.max(0, now - (tonumber(slice.startedAtMs) or now)) <= maximumPriorElapsedMs
+end
+
 function P.AccumulateGenerationSliceDiagnostics(job)
     if not job or not job.currentSlice or not Workers or not Workers.ExportSliceDiagnostics then return end
     local values = Workers.ExportSliceDiagnostics(job.currentSlice)

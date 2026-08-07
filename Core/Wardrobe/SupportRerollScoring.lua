@@ -95,7 +95,8 @@ local function StepEraWork(job, candidate)
         P.GENERATION_ERA_CANDIDATES_PER_OPERATION
     )
     job.eraCandidatesProcessed = (job.eraCandidatesProcessed or 0) + (tonumber(processed) or 0)
-    Record(job, "rerollEraEvidence", started)
+    local eraElapsed = Record(job, "rerollEraEvidence", started)
+    if P.RecordEraSchedulingOperation then P.RecordEraSchedulingOperation(job, candidate.eraWork, eraElapsed) end
     if done then
         candidate.eraEvidence = evidence
         candidate.stage = "ELIGIBILITY_INIT"

@@ -14,6 +14,11 @@ P.GENERATION_PHASE_LABELS = {
     generationWeaponIndexSnapshot = "Generation weapon-index snapshot",
     validation = "Source validation",
     eraEvidence = "Era evidence",
+    eraCandidateBuild = "Era candidate build", eraCurated = "Era curated evidence",
+    eraSetList = "Era set list", eraSetEntry = "Era set entry", eraTracking = "Era tracking evidence",
+    eraEncounterList = "Era encounter list", eraEncounterEntry = "Era encounter entry",
+    eraEncounterResolve = "Era encounter resolve", eraItemMetadata = "Era item metadata",
+    eraCandidateFinalize = "Era candidate finalization", eraAggregateFinalize = "Era aggregate finalization",
     eligibility = "Eligibility",
     coherence = "Outfit coherence",
     scoring = "Candidate scoring",
@@ -32,7 +37,9 @@ P.GENERATION_PHASE_LABELS = {
     supportProfile = "Support profile", supportLockedCommitments = "Locked support commitments",
     supportValidation = "Support validation", supportEraEvidence = "Support era evidence",
     supportEligibility = "Support eligibility", supportCandidateScoring = "Support candidate scoring",
-    supportBeamExpansion = "Support beam expansion", supportSelection = "Support selection",
+    supportBeamExpansion = "Support beam expansion", supportBeamCandidate = "Support beam candidate",
+    supportBeamFallback = "Support beam fallback", supportBeamStageFinalize = "Support beam stage finalization",
+    supportSelection = "Support selection",
     supportFinalValidation = "Support final validation", supportRepairTargeting = "Support repair targeting",
     supportRepairCandidateEvaluation = "Support repair candidate evaluation",
     supportRepairPass1 = "Support repair pass 1", supportRepairRevalidation = "Support repair revalidation",
@@ -74,6 +81,10 @@ P.GENERATION_PHASE_LABELS = {
 P.GENERATION_PHASE_SHORT_LABELS = {
     validation = "Validation",
     eraEvidence = "Era",
+    eraCandidateBuild = "Era build", eraCurated = "Era curated", eraSetList = "Era sets",
+    eraSetEntry = "Era set entry", eraTracking = "Era tracking", eraEncounterList = "Era encounters",
+    eraEncounterEntry = "Era encounter entry", eraEncounterResolve = "Era encounter resolve",
+    eraItemMetadata = "Era item", eraCandidateFinalize = "Era finalize", eraAggregateFinalize = "Era aggregate",
     coherence = "Coherence",
     scoring = "Scoring",
     slotFinalization = "Slot finalize",
@@ -89,7 +100,9 @@ P.GENERATION_PHASE_SHORT_LABELS = {
     supportProfile = "Support profile", supportLockedCommitments = "Locked support commitments",
     supportValidation = "Support validation", supportEraEvidence = "Support era evidence",
     supportEligibility = "Support eligibility", supportCandidateScoring = "Support candidate scoring",
-    supportBeamExpansion = "Support beam expansion", supportSelection = "Support selection",
+    supportBeamExpansion = "Support beam expansion", supportBeamCandidate = "Support beam candidate",
+    supportBeamFallback = "Support beam fallback", supportBeamStageFinalize = "Support beam stage finalization",
+    supportSelection = "Support selection",
     supportFinalValidation = "Support final validation", supportRepairTargeting = "Support repair targeting",
     supportRepairCandidateEvaluation = "Support repair candidate evaluation",
     supportRepairPass1 = "Support repair pass 1", supportRepairRevalidation = "Support repair revalidation",
@@ -144,9 +157,70 @@ local function ResolveSlowestPhase(phaseStats, allowed)
     for phaseKey, phase in pairs(phaseStats or {}) do
         local accepted = not allowed or allowed(phaseKey)
         local phaseMax = accepted and (tonumber(phase and phase.maxMs) or 0) or 0
-        if phaseMax > slowestMax then slowestKey, slowestMax = phaseKey, phaseMax end
+        local specificSupportTie = phaseMax == slowestMax and slowestKey == "supportBeamExpansion"
+            and (phaseKey == "supportBeamCandidate" or phaseKey == "supportBeamFallback" or phaseKey == "supportBeamStageFinalize")
+        if phaseMax > slowestMax or specificSupportTie then slowestKey, slowestMax = phaseKey, phaseMax end
     end
     return slowestKey, slowestMax
+end
+
+local ERA_OPERATION_PHASE = {
+    BUILD = "eraCandidateBuild", CURATED = "eraCurated", SET_LIST = "eraSetList",
+    SET_ENTRY = "eraSetEntry", TRACKING = "eraTracking", ENCOUNTER_LIST = "eraEncounterList",
+    ENCOUNTER_DROP = "eraEncounterEntry", ENCOUNTER_TIER = "eraEncounterEntry",
+    ENCOUNTER_RESOLVE = "eraEncounterResolve", EARLY_DECISION = "eraCandidateFinalize",
+    ITEM_METADATA = "eraItemMetadata", FINALIZE = "eraCandidateFinalize",
+    AGGREGATE_FINALIZE = "eraAggregateFinalize",
+}
+
+local ERA_SUBPHASES = {
+    "eraCandidateBuild", "eraCurated", "eraSetList", "eraSetEntry", "eraTracking",
+    "eraEncounterList", "eraEncounterEntry", "eraEncounterResolve", "eraItemMetadata",
+    "eraCandidateFinalize", "eraAggregateFinalize",
+}
+
+local function ResolveLargestEraSubphase(phaseStats)
+    local key, value = nil, 0
+    for _, phaseKey in ipairs(ERA_SUBPHASES) do
+        local current = tonumber(phaseStats and phaseStats[phaseKey] and phaseStats[phaseKey].maxMs) or 0
+        if current > value then key, value = phaseKey, current end
+    end
+    return key, value
+end
+
+function P.RecordEraSchedulingOperation(job, eraWork, elapsedMs)
+    if not job or not eraWork then return end
+    local diag = eraWork.lastStepDiagnostics or {}
+    if diag.deferred then return end
+    local operation = diag.operation
+    if not operation then return end
+    job.eraOperations = (tonumber(job.eraOperations) or 0) + 1
+    if diag.siblingCompleted then job.eraSiblingCompletions = (tonumber(job.eraSiblingCompletions) or 0) + 1 end
+    if diag.fragmentCacheHit then job.eraFragmentCacheHits = (tonumber(job.eraFragmentCacheHits) or 0) + 1 end
+    if diag.fragmentCacheBuilt then job.eraFragmentCacheBuilds = (tonumber(job.eraFragmentCacheBuilds) or 0) + 1 end
+    if diag.pendingCandidate then job.eraPendingCandidateCompletions = (tonumber(job.eraPendingCandidateCompletions) or 0) + 1 end
+    if operation == "SET_LIST" then job.eraSetListCalls = (tonumber(job.eraSetListCalls) or 0) + 1
+    elseif operation == "SET_ENTRY" then job.eraSetEntryCalls = (tonumber(job.eraSetEntryCalls) or 0) + 1
+    elseif operation == "TRACKING" then job.eraTrackingCalls = (tonumber(job.eraTrackingCalls) or 0) + 1
+    elseif operation == "ENCOUNTER_LIST" then job.eraEncounterListCalls = (tonumber(job.eraEncounterListCalls) or 0) + 1
+    elseif operation == "ENCOUNTER_DROP" or operation == "ENCOUNTER_TIER" then job.eraEncounterEntryOperations = (tonumber(job.eraEncounterEntryOperations) or 0) + 1
+    elseif operation == "ITEM_METADATA" then job.eraItemMetadataCalls = (tonumber(job.eraItemMetadataCalls) or 0) + 1
+    elseif operation == "AGGREGATE_FINALIZE" then job.eraAggregateFinalizations = (tonumber(job.eraAggregateFinalizations) or 0) + 1 end
+    local phaseKey = ERA_OPERATION_PHASE[operation]
+    if phaseKey then P.RecordGenerationPhase(job, phaseKey, elapsedMs) end
+end
+
+local SUPPORT_SUBPHASES = {
+    "supportEligibility", "supportBeamCandidate", "supportBeamFallback", "supportBeamStageFinalize",
+}
+
+local function ResolveLargestSupportSubphase(phaseStats)
+    local key, value = nil, 0
+    for _, phaseKey in ipairs(SUPPORT_SUBPHASES) do
+        local current = tonumber(phaseStats and phaseStats[phaseKey] and phaseStats[phaseKey].maxMs) or 0
+        if current > value then key, value = phaseKey, current end
+    end
+    return key, value
 end
 
 local function IsCooperativeRerollPhase(phaseKey)
@@ -169,6 +243,8 @@ end
 
 function P.BuildGenerationPerformance(job, finishedAtMs)
     local slowestKey, slowestMax = ResolveSlowestPhase(job and job.phaseStats)
+    local supportSlowestKey, supportSlowestMax = ResolveLargestSupportSubphase(job and job.phaseStats)
+    local eraSlowestKey, eraSlowestMax = ResolveLargestEraSubphase(job and job.phaseStats)
     local weaponYieldMs = job and math.max(job.weaponWork and job.weaponWork.maxResumeMs or 0, job.anchorWeaponSlowYieldMs or 0) or 0
     local weaponYieldPhase = job and ((job.weaponWork and job.weaponWork.slowestYieldPhase) or job.anchorWeaponSlowYieldPhase) or nil
     local largestKey, largestMax = slowestKey, slowestMax
@@ -207,6 +283,35 @@ function P.BuildGenerationPerformance(job, finishedAtMs)
         synchronousLaunchPreparationMs = job and (job.synchronousLaunchPreparationMs or job.preWorkerPreparationMs) or 0,
         preWorkerPreparationMs = job and (job.synchronousLaunchPreparationMs or job.preWorkerPreparationMs) or 0,
         schedulerDiagnostics = job and job.schedulerDiagnostics or nil,
+        eraScheduling = job and {
+            operations = tonumber(job.eraOperations) or 0,
+            siblingCompletions = tonumber(job.eraSiblingCompletions) or 0,
+            freshSliceDeferrals = tonumber(job.eraFreshSliceDeferrals) or 0,
+            fragmentCacheHits = tonumber(job.eraFragmentCacheHits) or 0,
+            fragmentCacheBuilds = tonumber(job.eraFragmentCacheBuilds) or 0,
+            pendingCandidateCompletions = tonumber(job.eraPendingCandidateCompletions) or 0,
+            setListCalls = tonumber(job.eraSetListCalls) or 0, setEntryCalls = tonumber(job.eraSetEntryCalls) or 0,
+            trackingCalls = tonumber(job.eraTrackingCalls) or 0, encounterListCalls = tonumber(job.eraEncounterListCalls) or 0,
+            encounterEntryOperations = tonumber(job.eraEncounterEntryOperations) or 0,
+            itemMetadataCalls = tonumber(job.eraItemMetadataCalls) or 0,
+            aggregateFinalizations = tonumber(job.eraAggregateFinalizations) or 0,
+            largestSubphase = eraSlowestKey, largestSubphaseMs = eraSlowestMax,
+        } or nil,
+        supportScheduling = job and {
+            eligibilitySteps = tonumber(job.supportEligibilitySteps) or 0,
+            eligibilityYields = tonumber(job.supportEligibilityYields) or 0,
+            eligibilityCacheCompletions = tonumber(job.supportEligibilityCacheCompletions) or 0,
+            eligibilityComputedCompletions = tonumber(job.supportEligibilityComputedCompletions) or 0,
+            eligibilityMarkerBatch = tonumber(job.supportEligibilityMarkerBatch) or P.SUPPORT_ELIGIBILITY_MARKER_BATCH or 4,
+            beamCandidateSteps = tonumber(job.supportBeamCandidateSteps) or 0,
+            beamFallbackSteps = tonumber(job.supportBeamFallbackSteps) or 0,
+            beamFallbackYields = tonumber(job.supportBeamFallbackYields) or 0,
+            beamStageFinalizations = tonumber(job.supportBeamStageFinalizations) or 0,
+            beamFreshSliceDeferrals = tonumber(job.supportBeamFreshSliceDeferrals) or 0,
+            beamStageFinalizeMaxMs = tonumber(job.supportBeamStageFinalizeMaxMs) or 0,
+            largestSubphase = supportSlowestKey,
+            largestSubphaseMs = supportSlowestMax,
+        } or nil,
         weaponCapabilities = job and {
             status = job.weaponCapabilitySnapshotStatus,
             generation = job.weaponCapabilityGeneration,

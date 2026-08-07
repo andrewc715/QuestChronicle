@@ -60,7 +60,7 @@ for index = 1, 45 do phaseStats["phase_" .. index] = { calls = 100 + index, tota
 
 local report, message = D.AddReport({
     formatVersion = D.FORMAT_VERSION, id = "QCDBG-ZONE-PERSIST-1", sequence = 1,
-    timestamp = 1785981000, timestampText = "2026-08-06 09:50:00", version = "1.11.6",
+    timestamp = 1785981000, timestampText = "2026-08-06 09:50:00", version = "1.11.7",
     action = "GENERATE_OUTFIT", result = "COMPLETED", generationToken = "QCGEN-ZONE-PERSIST-1",
     lineageID = "Tester-Realm", character = { key = "Tester-Realm", name = "Tester", realm = "Realm" },
     outfit = { generatedName = "Zone Policy Persistence", slots = components },
@@ -72,7 +72,15 @@ local report, message = D.AddReport({
         },
         decisions = supportDecisions, repairs = {}, finalValidationStatus = "CLEAN",
     },
-    performance = { elapsedMs = 6000, maxStepMs = 7.1, phaseStats = phaseStats },
+    performance = { elapsedMs = 6000, maxStepMs = 7.1, phaseStats = phaseStats,
+        supportScheduling = {
+            eligibilitySteps = 928, eligibilityYields = 140, eligibilityCacheCompletions = 512,
+            eligibilityComputedCompletions = 416, eligibilityMarkerBatch = 4,
+            beamCandidateSteps = 5408, beamFallbackSteps = 6, beamFallbackYields = 5,
+            beamStageFinalizations = 7, beamFreshSliceDeferrals = 7,
+            beamStageFinalizeMaxMs = 6.8, largestSubphase = "supportBeamStageFinalize", largestSubphaseMs = 6.8,
+        },
+    },
     cache = { invalidationReasons = { NONE = 0 } }, warnings = {},
     zoneFoundation = {
         foundation = "CONTEXT_EVIDENCE_V1", fingerprint = "ZCTX-ZONE-PERSIST", compatibility = "PASS",
@@ -113,8 +121,11 @@ for _, component in ipairs(report.skeleton.components or {}) do
 end
 assert(report.support.profile.entries, "support-profile ancestry required by rerolls must survive")
 assert(report.support.finalValidationStatus == "CLEAN", "Phase D result must survive")
+assert(report.performance.supportScheduling.eligibilityMarkerBatch == 4, "support eligibility closure counters were lost")
+assert(report.performance.supportScheduling.beamFreshSliceDeferrals == 7, "fresh-slice scheduling diagnostics were lost")
+assert(report.performance.supportScheduling.largestSubphase == "supportBeamStageFinalize", "largest support subphase was lost")
 local trimmed = false
 for _, warning in ipairs(report.warnings or {}) do if warning.key == "REPORT_TRIMMED" then trimmed = true end end
 assert(trimmed, "compacted Zone report must retain a trimming warning")
 
-print(string.format("PASS v1.11.6 realistic Zone report retained after policy-aware compaction: %d bytes", report.approximateBytes or 0))
+print(string.format("PASS v1.11.7 realistic Zone report retained after policy-aware compaction: %d bytes", report.approximateBytes or 0))

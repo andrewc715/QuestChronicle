@@ -244,7 +244,8 @@ local function ContinueArmorCandidate(job, work)
             P.GENERATION_ERA_CANDIDATES_PER_OPERATION
         )
         job.eraCandidatesProcessed = job.eraCandidatesProcessed + (tonumber(processed) or 0)
-        RecordPhase(job, "eraEvidence", eraStarted)
+        local eraElapsed = RecordPhase(job, "eraEvidence", eraStarted)
+        if P.RecordEraSchedulingOperation then P.RecordEraSchedulingOperation(job, candidate.eraWork, eraElapsed) end
         if not done then return false end
         candidate.eraEvidence = evidence
     end
@@ -316,7 +317,6 @@ local function ProcessArmor(job, stepStarted, slice)
     end
     return true
 end
-
 P.ProcessLegacyArmorGeneration, P.CommitSharedGenerationDraft = ProcessArmor, CommitDraft
 function P.GetSharedGenerationRuntime()
     return { NowMilliseconds = NowMilliseconds, BeginWorkerSlice = BeginWorkerSlice,

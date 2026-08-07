@@ -113,7 +113,13 @@ function P.StepPendingEraEvidenceReevaluations(force)
         end
 
         local done, result = QC.ZoneStyle.StepSourceEraEvidenceWork(job.work, 1)
-        if done then FinishJob(job, result) end
+        if done then FinishJob(job, result)
+        elseif not force then
+            -- One nested era operation per background tick keeps pending
+            -- reevaluation from recreating a monolithic candidate bundle.
+            Schedule(0)
+            return false
+        end
         if not force and NowMilliseconds() - started >= P.PENDING_ERA_RESOLVER_BUDGET_MS then
             Schedule(0)
             return false

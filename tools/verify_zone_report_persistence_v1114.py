@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the v1.11.6 Zone diagnostic-persistence repair and protected scope."""
+"""Verify the v1.11.8 Zone diagnostic-persistence repair and protected scope."""
 from pathlib import Path
 import sys
 
@@ -12,7 +12,7 @@ zone_test = (root / "tools/test_zone_report_persistence_v1114.lua").read_text(en
 rejection_test = (root / "tools/test_diagnostic_rejection_visibility_v1114.lua").read_text(encoding="utf-8")
 
 checks = {
-    "numeric v1.11.6 metadata": version == "1.11.6" and "## Version: 1.11.6" in toc,
+    "numeric v1.11.8 metadata": version == "1.11.8" and "## Version: 1.11.8" in toc,
     "compaction module loads before history": "Core\\Diagnostics\\ReportCompaction.lua\nCore\\Diagnostics\\AnchorAncestry.lua\nCore\\Diagnostics\\History.lua" in toc,
     "Zone aggregate policy is retained": "foundation.anchorPolicy" in compaction and "component.anchorPolicy = nil" in compaction,
     "per-piece affinity duplicate is removed": "foundation.affinity.pieces = nil" in compaction,
@@ -26,8 +26,8 @@ checks = {
 
 failed = [name for name, passed in checks.items() if not passed]
 if failed:
-    print("FAIL: v1.11.6 Zone report persistence guard failed:")
+    print("FAIL: v1.11.8 Zone report persistence guard failed:")
     for name in failed:
         print(f"  - {name}")
     sys.exit(1)
-print(f"PASS: v1.11.6 Zone report persistence verification: {len(checks)} checks")
+print(f"PASS: v1.11.8 Zone report persistence verification: {len(checks)} checks")

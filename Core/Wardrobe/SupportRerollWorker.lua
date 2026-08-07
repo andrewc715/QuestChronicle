@@ -243,6 +243,7 @@ function P.StepSupportRerollJob(token)
     job.steps = (job.steps or 0) + 1
     local stepStarted = NowMilliseconds()
     local slice = P.BeginSupportRerollSlice()
+    job.currentSlice = slice
     job.currentStepStartedMs = stepStarted
     if not ManifestValid(job) then return end
     if job.startSignature and P.SupportRerollStateSignature(job.liveState) ~= job.startSignature then

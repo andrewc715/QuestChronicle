@@ -17,7 +17,7 @@ frozen_hashes = {
     "Core/Wardrobe/SupportFinalValidation.lua": "8a3ce9ec3bdc6eb8b66ab8d647dfea240cdd090342b37516c73c4ef0bda75295",
     "Core/Wardrobe/SupportRepair.lua": "87494c9386a7169552587c8d8353372260089c888f770720be9cc14e7c3d8ab9",
     "Core/Wardrobe/AnchorSkeletonSearch.lua": "b2ed9aafd6116bff0197281e877b9d9a2d60edae75012fdf8a003b5f18ee51ce",
-    "Core/Wardrobe/GenerationScheduling.lua": "a523d71b827da1f96dbacd9a605d6a7a2d1a666dc4135f58cc3d05e4d14c4f36",
+    "Core/Wardrobe/GenerationScheduling.lua": "8a5672c4439d435bffeb5a38929f28630bed6e8bde5b517f5232054148da0406",
     "Core/Wardrobe/AppearanceRoutes.lua": "9428bb5e2c091d217a15cef28758485143d28b63ec17c2ea5596bdd49f3562f2",
     "Core/Wardrobe/WeaponPipeline.lua": "41f495e24c15cf2342cfbe8d90ffa1001646082311c2ab488411545d09b33068",
 }

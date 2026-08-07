@@ -21,6 +21,7 @@ local evidenceRanks = {
     encounter = 70,
     item = 40,
 }
+P.eraEvidenceRanks = evidenceRanks
 
 local function Evidence(expansionID, method, label, sourceID, itemID, rank)
     expansionID = tonumber(expansionID)
@@ -35,6 +36,8 @@ local function Evidence(expansionID, method, label, sourceID, itemID, rank)
     }
 end
 
+P.CreateEraEvidence = Evidence
+
 local function PreferStronger(current, candidate)
     if not candidate then return current end
     if not current then return candidate end
@@ -47,6 +50,8 @@ local function PreferStronger(current, candidate)
     end
     return current
 end
+
+P.PreferEraEvidence = PreferStronger
 
 function P.ResolveEraFromText(text)
     text = P.Normalize(text)
@@ -379,25 +384,88 @@ function ZoneStyle.CreateSourceEraEvidenceWork(source, options)
     }
 end
 
+function ZoneStyle.DescribeNextSourceEraEvidenceOperation(work)
+    if not work or work.done then return "COMPLETE", false end
+    if work.candidateWork and P.DescribeNextEraCandidateOperation then
+        local operation, fresh = P.DescribeNextEraCandidateOperation(work.candidateWork)
+        return operation, fresh == true
+    end
+    if work.sourceIndex <= #work.sourceIDs then return "BUILD", false end
+    return "AGGREGATE_FINALIZE", false
+end
+
+local function FoldCandidateResult(work, evidence, candidatePending, pendingItemID, trackingPending)
+    work.pending = work.pending or candidatePending
+    if pendingItemID then work.pendingItemIDs[tonumber(pendingItemID)] = true end
+    work.trackingPending = work.trackingPending or trackingPending == true
+    if evidence and (not work.earliest
+        or evidence.expansionID < work.earliest.expansionID
+        or (evidence.expansionID == work.earliest.expansionID and evidence.rank > work.earliest.rank))
+    then
+        work.earliest = evidence
+    end
+end
+
+
+
 function ZoneStyle.StepSourceEraEvidenceWork(work, maxCandidates)
     if not work then return true, { pending = true, reason = "No era-evidence work was provided." }, 0 end
     if work.done then return true, work.result, 0 end
 
+    -- v1.11.8 runtime path: one bounded nested candidate operation per step.
+    if P.CreateEraCandidateResolutionWork and P.StepEraCandidateResolutionWork then
+        if work.sourceIndex > #work.sourceIDs then
+            if not P.AdmitEraEvidenceOperation(work, "AGGREGATE_FINALIZE", false) then return false, nil, 0, "DEFERRED" end
+            work.aggregateFinalizations = (work.aggregateFinalizations or 0) + 1
+            work.lastStepDiagnostics = { operation = "AGGREGATE_FINALIZE", aggregateFinalized = true }
+            return true, FinalizeEraWork(work), 0
+        end
+        if not work.candidateWork then
+            work.candidateWork = P.CreateEraCandidateResolutionWork(work.source, work.sourceIDs[work.sourceIndex])
+        end
+        local operation, fresh
+        if P.DescribeNextEraCandidateOperation then
+            operation, fresh = P.DescribeNextEraCandidateOperation(work.candidateWork)
+        else
+            operation, fresh = "BUILD", false
+        end
+        if not P.AdmitEraEvidenceOperation(work, operation, fresh) then return false, nil, 0, "DEFERRED" end
+        local candidateWork = work.candidateWork
+        local done, evidence, candidatePending, pendingItemID, trackingPending =
+            P.StepEraCandidateResolutionWork(candidateWork)
+        work.candidateOperations = (work.candidateOperations or 0) + 1
+        work.lastStepDiagnostics = { operation = operation }
+        if operation == "SET_LIST" then work.setListCalls = (work.setListCalls or 0) + 1
+        elseif operation == "SET_ENTRY" then work.setEntryCalls = (work.setEntryCalls or 0) + 1
+        elseif operation == "TRACKING" then work.trackingCalls = (work.trackingCalls or 0) + 1
+        elseif operation == "ENCOUNTER_LIST" then work.encounterListCalls = (work.encounterListCalls or 0) + 1
+        elseif operation == "ENCOUNTER_DROP" or operation == "ENCOUNTER_TIER" then work.encounterEntryOperations = (work.encounterEntryOperations or 0) + 1
+        elseif operation == "ITEM_METADATA" then work.itemMetadataCalls = (work.itemMetadataCalls or 0) + 1 end
+        if done then
+            if candidateWork.fragmentCacheHit then work.fragmentCacheHits = (work.fragmentCacheHits or 0) + 1 end
+            if candidateWork.fragmentCacheBuilt then work.fragmentCacheBuilds = (work.fragmentCacheBuilds or 0) + 1 end
+            if candidatePending then work.pendingCandidateCompletions = (work.pendingCandidateCompletions or 0) + 1 end
+            work.lastStepDiagnostics.siblingCompleted = true
+            work.lastStepDiagnostics.fragmentCacheHit = candidateWork.fragmentCacheHit == true
+            work.lastStepDiagnostics.fragmentCacheBuilt = candidateWork.fragmentCacheBuilt == true
+            work.lastStepDiagnostics.pendingCandidate = candidatePending == true
+            FoldCandidateResult(work, evidence, candidatePending, pendingItemID, trackingPending)
+            work.candidateWork = nil
+            work.sourceIndex = work.sourceIndex + 1
+            work.siblingCompletions = (work.siblingCompletions or 0) + 1
+            return false, nil, 1
+        end
+        return false, nil, 0
+    end
+
+    -- Reference fallback retained for focused harnesses and compatibility.
     maxCandidates = math.max(1, tonumber(maxCandidates) or 1)
     local processed = 0
     while work.sourceIndex <= #work.sourceIDs and processed < maxCandidates do
         local sourceID = work.sourceIDs[work.sourceIndex]
         local evidence, candidatePending, pendingItemID, trackingPending =
             P.ResolveEraCandidate(P.BuildEraCandidate(work.source, sourceID))
-        work.pending = work.pending or candidatePending
-        if pendingItemID then work.pendingItemIDs[tonumber(pendingItemID)] = true end
-        work.trackingPending = work.trackingPending or trackingPending == true
-        if evidence and (not work.earliest
-            or evidence.expansionID < work.earliest.expansionID
-            or (evidence.expansionID == work.earliest.expansionID and evidence.rank > work.earliest.rank))
-        then
-            work.earliest = evidence
-        end
+        FoldCandidateResult(work, evidence, candidatePending, pendingItemID, trackingPending)
         work.sourceIndex = work.sourceIndex + 1
         processed = processed + 1
         local wardrobePrivate = QC.Wardrobe and QC.Wardrobe._Private
@@ -405,10 +473,7 @@ function ZoneStyle.StepSourceEraEvidenceWork(work, maxCandidates)
             wardrobePrivate.MaybeYieldWeaponGeneration("eraEvidence")
         end
     end
-
-    if work.sourceIndex > #work.sourceIDs then
-        return true, FinalizeEraWork(work), processed
-    end
+    if work.sourceIndex > #work.sourceIDs then return true, FinalizeEraWork(work), processed end
     return false, nil, processed
 end
 
